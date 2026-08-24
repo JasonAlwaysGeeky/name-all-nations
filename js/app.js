@@ -33,12 +33,16 @@
   const TAP_SLOP = { mouse: 5, pen: 5, touch: 9 };
   const STRIKES = 3;           // wrong placements before the answer is shown
 
-  // Island nations drawn with a dotted outline per island group.
-  const ARCHIPELAGOS = new Set(['TV', 'FM', 'TO', 'MH', 'PW', 'KI', 'CV', 'KM', 'VU', 'BS', 'FJ', 'SB', 'ST', 'WS', 'TT', 'MV']);
+  // Island nations drawn with a dotted outline per island group — the
+  // Pacific ones, plus the Caribbean micro-islands so they get the same
+  // look once you're zoomed into the arc.
+  const ARCHIPELAGOS = new Set(['TV', 'FM', 'TO', 'MH', 'PW', 'KI', 'CV', 'KM', 'VU', 'BS', 'FJ', 'SB', 'ST', 'WS', 'TT', 'MV',
+    'AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD']);
   const ARCH_GAP = 45;         // map units between islands before they split into separate groups
 
-  // Continent hotkeys run west → east across the map.
-  const CONTINENT_KEYS = { 1: 'North America', 2: 'South America', 3: 'Europe', 4: 'Africa', 5: 'Asia', 6: 'Oceania' };
+  // Continent hotkeys run west → east across the map. Oceania has no
+  // digit — the T zone frames it whole, so one hotkey is enough.
+  const CONTINENT_KEYS = { 1: 'North America', 2: 'South America', 3: 'Europe', 4: 'Africa', 5: 'Asia' };
   const ZONE_BY_KEY = {};
   const ZONE_BY_CODE = {};
   for (const z of BUTTON_ZONES) {
@@ -634,7 +638,7 @@
     // A giant country only pulls the frame up to 30 units past its core:
     // a continent view should frame the playable mass, not drag half a
     // screen of empty Arctic in because Canada technically reaches it.
-    const CAP = codes.length > 1 ? 30 : Infinity;
+    const CAP = codes.length > 1 ? 22 : Infinity;
     for (const code of codes) {
       const g = geom[code];
       if (!g) continue;
@@ -657,14 +661,14 @@
 
   // Fit tight — the play area should fill the screen — with a fixed
   // screen allowance so offset buttons and their tails stay inside.
-  function zoomToCodes(codes, ms = 260, padFactor = 1.18) {
+  function zoomToCodes(codes, ms = 260, padFactor = 1.08) {
     if (codes.length === WORLD_CODES.length) { animateView({ ...fullVB }, ms); return; }
     const f = fitCodes(codes);
     if (!f) return;
     const w = f.x2 - f.x1, h = f.y2 - f.y1;
     const aspect = fullVB.h / fullVB.w;
     let tw = Math.max(w * padFactor, h * padFactor / aspect, fullVB.w / MAX_ZOOM * 2);
-    if (W > 400) tw *= W / (W - 170);           // room for buttons and tails
+    if (W > 400) tw *= W / (W - 110);           // room for buttons and tails
     animateView({ x: f.x1 + w / 2 - tw / 2, y: f.y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
   }
 
@@ -676,8 +680,8 @@
     const w = f.x2 - f.x1, h = f.y2 - f.y1;
     const aspect = fullVB.h / fullVB.w;
     const K = Math.min(W, H / aspect);          // scale = K / tw
-    let tw = Math.max(w * 1.25, h * 1.25 / aspect);
-    if (W > 400) tw *= W / (W - 170);           // room for buttons and tails
+    let tw = Math.max(w * 1.1, h * 1.1 / aspect);
+    if (W > 400) tw *= W / (W - 110);           // room for buttons and tails
     if (K > 0) tw = Math.min(tw, K / (z.minScale * 1.1));  // at least clickable-layer zoom
     tw = Math.max(tw, fullVB.w / MAX_ZOOM * 2);
     animateView({ x: f.x1 + w / 2 - tw / 2, y: f.y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
@@ -1294,7 +1298,9 @@
   function buildBank() {
     const L = state.level;
     el.wordBank.hidden = false;
-    el.wordBank.classList.remove('collapsed');
+    // Start folded — the list blocks the map otherwise; ▾ opens it.
+    el.wordBank.classList.add('collapsed');
+    el.bankCollapse.textContent = '▴';
     el.bankChips.innerHTML = '';
     el.bankHint.className = '';
     const pending = L.codes.filter(c => !state.status[c]).sort(() => Math.random() - 0.5);

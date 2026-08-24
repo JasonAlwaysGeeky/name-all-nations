@@ -1128,6 +1128,14 @@ footer a { color: inherit; }
 
 #jump-bar button:hover { background: #fff; }
 #jump-bar button.gap { margin-top: 6px; }
+
+#jump-bar button.sub {
+  margin-left: 20px;
+  font-size: 0.7rem;
+  padding: 3px 9px 3px 4px;
+  background: rgba(255, 255, 255, 0.68);
+}
+#jump-bar button.sub:hover { background: #fff; }
 #jump-bar button:active { transform: translateY(1px); }
 #jump-bar kbd { font-size: 0.68rem; padding: 0 5px; }
 
