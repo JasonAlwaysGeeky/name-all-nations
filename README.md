@@ -19,12 +19,13 @@ map, **you click a country and name it**.
   Finish and you get a results screen with your time, first-try accuracy,
   the countries you missed, and whether you set a new best. Place mode is
   level one (learn the region), Name mode is the real test.
-- Scroll/pinch to zoom, drag to pan. Three zoom layers on hotkeys: `0`
-  is the whole world, `1`–`5` are the continents west to east, and
-  `Q`/`W`/`E`/`R`/`T` are the areas that need a layer of their own,
-  nested under their closest continent in the jump bar — Caribbean
-  (S. America), West African coast (Africa), Europe's micro-states
-  (Europe), Middle East and Oceania (Asia). Oceania has no digit; `T`
+- Scroll/pinch to zoom, drag to pan. Three zoom layers sweep the
+  keyboard: `0` is the whole world, `1`–`5` are the continents
+  west to east, and `W`/`E`/`R`/`T`/`Y` are the areas that need a layer
+  of their own, nested under their closest continent in the jump bar —
+  Caribbean (S. America), Europe's micro-states (Europe), West African
+  coast (Africa), Middle East and Oceania (Asia). `Q` doubles as South
+  America, pairing with `W` right under it. Oceania has no digit; `Y`
   frames it whole.
   Fits are tight and cap how far a giant country drags the frame, so a
   continent view frames the playable mass, not the empty Arctic.

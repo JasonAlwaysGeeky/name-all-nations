@@ -29,15 +29,15 @@
 
     <nav id="jump-bar" aria-label="Jump around the map">
       <button data-key="1" title="Jump to North America (1)"><kbd>1</kbd> N. America</button>
-      <button data-key="2" title="Jump to South America (2)"><kbd>2</kbd> S. America</button>
-      <button data-key="q" class="sub" title="Jump to the Caribbean (Q)"><kbd>Q</kbd> Caribbean</button>
+      <button data-key="2" title="Jump to South America (2 or Q)"><kbd>2</kbd><kbd>Q</kbd> S. America</button>
+      <button data-key="w" class="sub" title="Jump to the Caribbean (W)"><kbd>W</kbd> Caribbean</button>
       <button data-key="3" title="Jump to Europe (3)"><kbd>3</kbd> Europe</button>
       <button data-key="e" class="sub" title="Jump to Europe's micro-states (E)"><kbd>E</kbd> Micro-states</button>
       <button data-key="4" title="Jump to Africa (4)"><kbd>4</kbd> Africa</button>
-      <button data-key="w" class="sub" title="Jump to the West African coast (W)"><kbd>W</kbd> West coast</button>
+      <button data-key="r" class="sub" title="Jump to the West African coast (R)"><kbd>R</kbd> West coast</button>
       <button data-key="5" title="Jump to Asia (5)"><kbd>5</kbd> Asia</button>
-      <button data-key="r" class="sub" title="Jump to the Middle East (R)"><kbd>R</kbd> Mid-East</button>
-      <button data-key="t" class="sub" title="Jump to Oceania (T)"><kbd>T</kbd> Oceania</button>
+      <button data-key="t" class="sub" title="Jump to the Middle East (T)"><kbd>T</kbd> Mid-East</button>
+      <button data-key="y" class="sub" title="Jump to Oceania (Y)"><kbd>Y</kbd> Oceania</button>
       <button data-key="0" class="gap" title="Whole world (0)"><kbd>0</kbd> World</button>
     </nav>
 
@@ -55,9 +55,9 @@
       <p>Click any country and type its name — close spellings count.
          Turn on the 🎤 to just say the names out loud.
          Pick a continent or region from 🎯 for a smaller, timed challenge.</p>
-      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>5</kbd> jump to a continent ·
-         <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd> the dense areas &amp; Oceania ·
-         <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
+      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>5</kbd> continents (<kbd>Q</kbd> = S. America) ·
+         <kbd>W</kbd>–<kbd>Y</kbd> the dense areas &amp; Oceania · <kbd>0</kbd> whole world ·
+         <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
       <button id="hello-close">Let's go</button>
     </div>
 
@@ -186,10 +186,11 @@
       <button id="help-close" aria-label="Close">×</button>
       <h2>Shortcuts</h2>
       <dl class="keys">
-        <dt><kbd>1</kbd> … <kbd>5</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia</dd>
-        <dt><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd></dt><dd>The areas that need a layer of their own, nested under their continent:
-          Caribbean · West African coast · Europe's micro-states · Middle East · Oceania</dd>
         <dt><kbd>0</kbd></dt><dd>Whole-world view</dd>
+        <dt><kbd>1</kbd> … <kbd>5</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia
+          (<kbd>Q</kbd> also jumps to S. America — it pairs with <kbd>W</kbd>, its Caribbean)</dd>
+        <dt><kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd></dt><dd>The areas that need a layer of their own, in jump-bar order:
+          Caribbean · Europe's micro-states · West African coast · Middle East · Oceania</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
         <dt><kbd>P</kbd></dt><dd>Pause — hides the map and stops the clock (it starts on your first move)</dd>

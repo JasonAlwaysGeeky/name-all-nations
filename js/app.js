@@ -1761,6 +1761,7 @@
   // layer of their own; anything deeper is scroll and drag.
   const jumpTo = (key) => {
     if (!vb) return;
+    if (key === 'q') key = '2';                 // Q doubles as South America (pairs with W, its Caribbean)
     if (key === '0') { animateView({ ...fullVB }, 220); return; }
     if (ZONE_BY_KEY[key]) { zoomToZone(ZONE_BY_KEY[key], 220); return; }
     if (CONTINENT_KEYS[key]) zoomToCodes(CODES_BY_REGION[CONTINENT_KEYS[key]], 220);
@@ -1788,7 +1789,7 @@
     }
     else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
-    else if (e.key === '0' || CONTINENT_KEYS[e.key] || ZONE_BY_KEY[e.key.toLowerCase()]) {
+    else if (e.key === '0' || e.key.toLowerCase() === 'q' || CONTINENT_KEYS[e.key] || ZONE_BY_KEY[e.key.toLowerCase()]) {
       e.preventDefault();
       jumpTo(CONTINENT_KEYS[e.key] || e.key === '0' ? e.key : e.key.toLowerCase());
     }
