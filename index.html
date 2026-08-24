@@ -34,9 +34,11 @@
       <button data-key="4" title="Jump to Africa (4)"><kbd>4</kbd> Africa</button>
       <button data-key="5" title="Jump to Asia (5)"><kbd>5</kbd> Asia</button>
       <button data-key="6" title="Jump to Oceania (6)"><kbd>6</kbd> Oceania</button>
-      <button data-key="7" class="gap" title="Jump to the Caribbean (7)"><kbd>7</kbd> Caribbean</button>
-      <button data-key="8" title="Jump to the Pacific islands (8)"><kbd>8</kbd> Pacific</button>
-      <button data-key="9" title="Jump to the Middle East (9)"><kbd>9</kbd> Mid-East</button>
+      <button data-key="q" class="gap" title="Jump to the Caribbean (Q)"><kbd>Q</kbd> Caribbean</button>
+      <button data-key="w" title="Jump to the West African coast (W)"><kbd>W</kbd> W. Africa</button>
+      <button data-key="e" title="Jump to Europe's micro-states (E)"><kbd>E</kbd> Micro-Europe</button>
+      <button data-key="r" title="Jump to the Middle East (R)"><kbd>R</kbd> Mid-East</button>
+      <button data-key="t" title="Jump to the Pacific islands (T)"><kbd>T</kbd> Pacific</button>
       <button data-key="0" class="gap" title="Whole world (0)"><kbd>0</kbd> World</button>
     </nav>
 
@@ -54,9 +56,9 @@
       <p>Click any country and type its name — close spellings count.
          Turn on the 🎤 to just say the names out loud.
          Pick a continent or region from 🎯 for a smaller, timed challenge.</p>
-      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>6</kbd> jump to a continent (again for its regions) ·
-         <kbd>7</kbd>/<kbd>8</kbd>/<kbd>9</kbd> Caribbean / Pacific / Mid-East · <kbd>0</kbd> whole world ·
-         <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
+      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>6</kbd> jump to a continent ·
+         <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd> the dense areas (Caribbean → Pacific) ·
+         <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
       <button id="hello-close">Let's go</button>
     </div>
 
@@ -96,7 +98,17 @@
       </span>
       <button id="challenge-next" title="Next challenge (])" aria-label="Next challenge">›</button>
       <button id="level-restart" title="Restart this challenge" aria-label="Restart">↻</button>
+      <button id="pause-timer" title="Pause — hides the map, stops the clock (P)" aria-label="Pause">⏸</button>
       <button id="level-mode" title="Switch mode"></button>
+    </div>
+
+    <div id="pause-veil" hidden>
+      <div class="pause-box">
+        <div class="pause-icon">⏸</div>
+        <h2>Paused</h2>
+        <p>The map is hidden and the clock is stopped.</p>
+        <button class="btn-primary">▶ Resume <kbd>P</kbd></button>
+      </div>
     </div>
 
     <section id="word-bank" hidden>
@@ -135,9 +147,10 @@
     <aside id="levels-panel" class="panel" hidden>
       <button id="levels-close" aria-label="Close">×</button>
       <h2>🎯 Challenges</h2>
-      <p class="levels-blurb">Pick how much of the world to take on. Every challenge is timed and starts fresh.
-        <strong>Name</strong> is the real test — type or say each country.
-        <strong>Place</strong> is the warm-up — put the listed names on the map.</p>
+      <p class="levels-blurb">Pick how much of the world to take on. Every challenge starts fresh, and the
+        clock starts on your first move.
+        <strong>Place</strong> is level one — put the listed names on the map.
+        <strong>Name</strong> is the real test — type or say each country.</p>
       <div id="levels-list"></div>
     </aside>
 
@@ -174,12 +187,12 @@
       <button id="help-close" aria-label="Close">×</button>
       <h2>Shortcuts</h2>
       <dl class="keys">
-        <dt><kbd>1</kbd> … <kbd>6</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia · Oceania.
-          Press the same key again to step through the continent's regions.</dd>
-        <dt><kbd>7</kbd> <kbd>8</kbd> <kbd>9</kbd></dt><dd>Caribbean · Pacific islands · Middle East</dd>
+        <dt><kbd>1</kbd> … <kbd>6</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia · Oceania</dd>
+        <dt><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd></dt><dd>The dense areas, west to east: Caribbean · West African coast · Europe's micro-states · Middle East · Pacific islands</dd>
         <dt><kbd>0</kbd></dt><dd>Whole-world view</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
+        <dt><kbd>P</kbd></dt><dd>Pause — hides the map and stops the clock (it starts on your first move)</dd>
         <dt><kbd>Esc</kbd></dt><dd>Close panels</dd>
         <dt>Scroll / pinch</dt><dd>Zoom at the cursor</dd>
         <dt>Drag</dt><dd>Pan the map</dd>

@@ -14,15 +14,20 @@ map, **you click a country and name it**.
 - 💡 Hint gives you the first letter, length, and continent; more presses
   reveal more letters. Reveal shows the answer but marks it orange —
   it doesn't count until you can name it yourself.
-- Every challenge is timed. Finish one and you get a results screen with
-  your time, first-try accuracy, the countries you missed, and whether you
-  set a new best.
-- Scroll/pinch to zoom, drag to pan. Keys: `1`–`6` jump to a continent,
-  west to east (press the same key again to step through that continent's
-  regions), `7`/`8`/`9` go straight to the Caribbean, the Pacific islands
-  and the Middle East, `0` is the whole world — the jump bar at top-left
-  shows them all. `[` / `]` step through challenges, `Space` skips the
-  current name in place mode, `?` lists the shortcuts.
+- Every challenge is timed, but the clock only starts on your first move,
+  and `P` pauses it — the map is hidden while paused, so no free scouting.
+  Finish and you get a results screen with your time, first-try accuracy,
+  the countries you missed, and whether you set a new best. Place mode is
+  level one (learn the region), Name mode is the real test.
+- Scroll/pinch to zoom, drag to pan. Three zoom layers on hotkeys: `0`
+  is the whole world, `1`–`6` are the continents west to east, and
+  `Q`/`W`/`E`/`R`/`T` are the dense areas that need a layer of their own
+  (Caribbean · West African coast · Europe's micro-states · Middle East ·
+  Pacific), also west to east — the jump bar at top-left shows them all.
+  Fits are tight and cap how far a giant country drags the frame, so a
+  continent view frames the playable mass, not the empty Arctic.
+  `[` / `]` step through challenges, `Space` skips the current name in
+  place mode, `?` lists the shortcuts.
 
 ### Finding the small ones
 

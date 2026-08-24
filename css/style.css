@@ -296,7 +296,7 @@ svg.world g.btn .tail {
 }
 
 svg.world g.btn .face { stroke-width: 2.5; }
-svg.world g.btn .tail { stroke-width: 1.5; stroke-linejoin: round; pointer-events: none; }
+svg.world g.btn .tail { stroke-width: 1.5; stroke-linejoin: round; pointer-events: all; }
 svg.world g.btn .pad { fill: transparent; stroke: none; pointer-events: all; }
 
 svg.world g.btn:hover .face,
@@ -699,7 +699,8 @@ body.no-flags .flag { display: none; }
 
 #challenge-prev,
 #challenge-next,
-#level-restart {
+#level-restart,
+#pause-timer {
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
@@ -715,11 +716,34 @@ body.no-flags .flag { display: none; }
 
 #challenge-prev:hover,
 #challenge-next:hover,
-#level-restart:hover { background: #dde5ec; }
+#level-restart:hover,
+#pause-timer:hover { background: #dde5ec; }
 #challenge-prev:active,
 #challenge-next:active,
-#level-restart:active { transform: scale(0.92); }
+#level-restart:active,
+#pause-timer:active { transform: scale(0.92); }
 #level-restart { font-size: 1rem; }
+#pause-timer { font-size: 0.9rem; }
+
+/* ————— pause veil: no scouting while the clock is stopped ————— */
+#pause-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: linear-gradient(180deg, #16344f, #0d2036);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#pause-veil[hidden] { display: none; }
+
+.pause-box { text-align: center; color: #fff; }
+.pause-icon { font-size: 3.4rem; line-height: 1; margin-bottom: 10px; }
+.pause-box h2 { font-size: 1.5rem; margin-bottom: 6px; }
+.pause-box p { color: rgba(255, 255, 255, 0.75); margin-bottom: 18px; }
+.pause-box kbd { margin-left: 6px; }
 
 #level-mode {
   font-size: 0.82rem;

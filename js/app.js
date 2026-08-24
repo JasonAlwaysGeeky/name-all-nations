@@ -245,6 +245,7 @@
     'levels-list', 'level-banner', 'level-title', 'level-progress', 'level-timer', 'level-mode',
     'challenge-prev', 'challenge-next', 'level-restart',
     'word-bank', 'bank-target', 'bank-flag', 'bank-name', 'bank-strikes', 'bank-skip', 'bank-show', 'bank-collapse', 'bank-hint', 'bank-chips',
+    'pause-timer', 'pause-veil',
     'results', 'results-close', 'results-title', 'results-sub', 'results-tiles', 'results-misses', 'results-again', 'results-mode', 'results-next', 'confetti',
     'stats-panel', 'stats-close', 'stat-tiles', 'heat-toggle', 'heat-mode-note', 'flags-toggle', 'best-times', 'region-mastery', 'stats-reset',
     'help', 'help-close',
@@ -630,6 +631,10 @@
 
   function fitCodes(codes) {
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    // A giant country only pulls the frame up to 30 units past its core:
+    // a continent view should frame the playable mass, not drag half a
+    // screen of empty Arctic in because Canada technically reaches it.
+    const CAP = codes.length > 1 ? 30 : Infinity;
     for (const code of codes) {
       const g = geom[code];
       if (!g) continue;
@@ -641,8 +646,10 @@
         // Kiribati's far-flung groups would force a whole-map view; only
         // the region's centre of mass matters for a multi-country zoom.
         if (codes.length > 1 && g.groups && b !== g.groups[0] && Math.abs(b.x - g.groups[0].x) > 200) continue;
-        x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
-        x2 = Math.max(x2, b.x + Math.max(b.w, 1)); y2 = Math.max(y2, b.y + Math.max(b.h, 1));
+        const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+        const hw = Math.min(Math.max(b.w, 1) / 2, CAP), hh = Math.min(Math.max(b.h, 1) / 2, CAP);
+        x1 = Math.min(x1, cx - hw); y1 = Math.min(y1, cy - hh);
+        x2 = Math.max(x2, cx + hw); y2 = Math.max(y2, cy + hh);
       }
     }
     return x1 === Infinity ? null : { x1, y1, x2, y2 };
@@ -650,7 +657,7 @@
 
   // Fit tight — the play area should fill the screen — with a fixed
   // screen allowance so offset buttons and their tails stay inside.
-  function zoomToCodes(codes, ms = 260, padFactor = 1.25) {
+  function zoomToCodes(codes, ms = 260, padFactor = 1.18) {
     if (codes.length === WORLD_CODES.length) { animateView({ ...fullVB }, ms); return; }
     const f = fitCodes(codes);
     if (!f) return;
@@ -883,6 +890,7 @@
   // ————— pointer input —————
 
   function handleTarget(target, pt) {
+    if (state.level?.pausedAt != null) return;
     const zg = target.closest('g.btn.zone');
     if (zg) {
       zoomToZone(BUTTON_ZONES.find(z => z.name === zg.dataset.zone));
@@ -1024,6 +1032,7 @@
   // ————— selection & guessing (name mode) —————
 
   function selectCountry(code, pt) {
+    ensureTimer();
     if (state.selected) setSelectedClass(state.selected, false);
     state.selected = code;
     state.selectedAt = pt;
@@ -1083,6 +1092,8 @@
   }
 
   function submitGuess(guess, viaVoice = false) {
+    if (state.level?.pausedAt != null) return;
+    ensureTimer();
     const code = state.selected;
     if (!code || state.status[code] === 'named') return;
     if (!guess.trim()) return;
@@ -1114,6 +1125,7 @@
   function giveHint() {
     const c = COUNTRY_BY_CODE[state.selected];
     if (!c) return;
+    ensureTimer();
     settle(c.code, false);
     state.hintLevel++;
     const name = c.name;
@@ -1160,7 +1172,34 @@
   function renderTimer() {
     const L = state.level;
     if (!L) return;
-    el.levelTimer.textContent = fmtTime(L.done ? L.elapsed : performance.now() - L.t0);
+    const ms = L.done ? L.elapsed
+      : L.t0 == null ? 0
+      : (L.pausedAt != null ? L.pausedAt : performance.now()) - L.t0;
+    el.levelTimer.textContent = fmtTime(ms);
+  }
+
+  // The clock starts on your first move, not when the challenge loads.
+  function ensureTimer() {
+    const L = state.level;
+    if (L && !L.done && L.t0 == null) L.t0 = performance.now();
+  }
+
+  // Pause stops the clock but also hides the map — no scouting for free.
+  function togglePause() {
+    const L = state.level;
+    if (!L || L.done || L.t0 == null) return;
+    if (L.pausedAt == null) {
+      L.pausedAt = performance.now();
+      el.pauseVeil.hidden = false;
+      el.pauseTimer.textContent = '▶';
+      if (document.activeElement?.blur) document.activeElement.blur();
+    } else {
+      L.t0 += performance.now() - L.pausedAt;
+      L.pausedAt = null;
+      el.pauseVeil.hidden = true;
+      el.pauseTimer.textContent = '⏸';
+    }
+    renderTimer();
   }
 
   function startTimer() {
@@ -1198,7 +1237,7 @@
       id: def.id, name: def.name, tier: def.tier, region: def.region,
       codes: def.codes.slice(), mode,
       armed: null, strikes: 0, result: {},
-      t0: performance.now(), elapsed: 0, done: false,
+      t0: null, pausedAt: null, elapsed: 0, done: false,
     };
     deselect();
     closePanels();
@@ -1214,6 +1253,8 @@
     updateOverlay();
     zoomToCodes(state.level.codes);
     el.levelBanner.hidden = false;
+    el.pauseVeil.hidden = true;
+    el.pauseTimer.textContent = '⏸';
     if (mode === 'place') buildBank();
     else el.wordBank.hidden = true;
     updateLevelUI();
@@ -1299,7 +1340,8 @@
 
   function skipTarget() {
     const L = state.level;
-    if (!L || L.mode !== 'place' || !L.armed) return;
+    if (!L || L.mode !== 'place' || !L.armed || L.pausedAt != null) return;
+    ensureTimer();
     const chip = el.bankChips.querySelector(`.chip[data-code="${L.armed}"]`);
     if (!chip || el.bankChips.children.length < 2) return;
     const skipped = COUNTRY_BY_CODE[L.armed].name;
@@ -1310,6 +1352,7 @@
   }
 
   function placeAttempt(code, pt) {
+    ensureTimer();
     const L = state.level;
     const name = COUNTRY_BY_CODE[code].name;
     if (state.status[code]) {
@@ -1346,7 +1389,8 @@
   function revealTarget(auto = false) {
     const L = state.level;
     const code = L?.armed;
-    if (!code) return;
+    if (!code || L.pausedAt != null) return;
+    ensureTimer();
     const name = COUNTRY_BY_CODE[code].name;
     settle(code, false);
     setStatus(code, 'missed');
@@ -1380,7 +1424,10 @@
   function finishLevel() {
     const L = state.level;
     L.done = true;
-    L.elapsed = performance.now() - L.t0;
+    L.elapsed = L.t0 == null ? 0 : (L.pausedAt != null ? L.pausedAt : performance.now()) - L.t0;
+    L.pausedAt = null;
+    el.pauseVeil.hidden = true;
+    el.pauseTimer.textContent = '⏸';
     stopTimer();
     const total = L.codes.length;
     const clean = L.codes.filter(c => L.result[c] === true).length;
@@ -1551,8 +1598,8 @@
       (best ? `<span class="level-best">${best}</span>` : '') +
       `<span class="level-count">${def.codes.length}</span>` +
       `<span class="level-actions">` +
-      `<button class="level-play">Name</button>` +
       (place ? `<button class="level-place">Place</button>` : '') +
+      `<button class="level-play">Name</button>` +
       `</span>`;
     row.querySelector('.level-name').textContent = def.name;
     const play = () => startLevel(def, 'name');
@@ -1656,6 +1703,13 @@
   el.helpBtn.addEventListener('click', toggleHelp);
   el.helpClose.addEventListener('click', () => { el.help.hidden = true; });
 
+  el.pauseTimer.addEventListener('click', () => togglePause());
+  el.pauseVeil.addEventListener('click', () => togglePause());
+  document.addEventListener('visibilitychange', () => {
+    const L = state.level;
+    if (document.hidden && L && !L.done && L.t0 != null && L.pausedAt == null) togglePause();
+  });
+
   el.challengePrev.addEventListener('click', () => stepChallenge(-1));
   el.challengeNext.addEventListener('click', () => stepChallenge(1));
   el.levelRestart.addEventListener('click', () => {
@@ -1696,26 +1750,14 @@
   el.zoomOut.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 1 / 0.6));
   el.zoomReset.addEventListener('click', () => animateView({ ...fullVB }));
 
-  // Jump bar / hotkeys. A continent key pressed again steps through the
-  // continent's sub-regions, so each press zooms a layer deeper.
-  const jumpCycle = { key: null, idx: -1, t: 0 };
+  // Jump bar / hotkeys: three zoom layers. 0 = the world, digits 1-6 =
+  // continents (west to east), letters = the dense areas that need a
+  // layer of their own; anything deeper is scroll and drag.
   const jumpTo = (key) => {
     if (!vb) return;
-    if (key === '0') { animateView({ ...fullVB }, 220); jumpCycle.key = null; return; }
-    if (ZONE_BY_KEY[key]) { zoomToZone(ZONE_BY_KEY[key], 220); jumpCycle.key = null; return; }
-    const region = CONTINENT_KEYS[key];
-    if (!region) return;
-    const subs = SUBREGIONS.filter(x => x.region === region);
-    const now = performance.now();
-    if (jumpCycle.key === key && now - jumpCycle.t < 8000 && subs.length > 1) {
-      jumpCycle.idx = jumpCycle.idx + 1 >= subs.length ? -1 : jumpCycle.idx + 1;
-    } else {
-      jumpCycle.idx = -1;
-    }
-    jumpCycle.key = key;
-    jumpCycle.t = now;
-    if (jumpCycle.idx < 0) zoomToCodes(CODES_BY_REGION[region], 220);
-    else zoomToCodes(subs[jumpCycle.idx].codes, 220);
+    if (key === '0') { animateView({ ...fullVB }, 220); return; }
+    if (ZONE_BY_KEY[key]) { zoomToZone(ZONE_BY_KEY[key], 220); return; }
+    if (CONTINENT_KEYS[key]) zoomToCodes(CODES_BY_REGION[CONTINENT_KEYS[key]], 220);
   };
   for (const b of el.jumpBar.querySelectorAll('button')) {
     b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -1723,6 +1765,10 @@
   }
 
   document.addEventListener('keydown', (e) => {
+    if (state.level?.pausedAt != null) {
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { e.preventDefault(); togglePause(); }
+      return;
+    }
     if (e.key === 'Escape') { deselect(); closePanels(); return; }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;     // don't hijack typing
@@ -1734,8 +1780,12 @@
     else if (e.key === ' ' || e.key === 'ArrowRight') {
       if (L?.mode === 'place' && L.armed) { e.preventDefault(); skipTarget(); }
     }
+    else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
-    else if (e.key === '0' || CONTINENT_KEYS[e.key] || ZONE_BY_KEY[e.key]) { e.preventDefault(); jumpTo(e.key); }
+    else if (e.key === '0' || CONTINENT_KEYS[e.key] || ZONE_BY_KEY[e.key.toLowerCase()]) {
+      e.preventDefault();
+      jumpTo(CONTINENT_KEYS[e.key] || e.key === '0' ? e.key : e.key.toLowerCase());
+    }
   });
 
   window.addEventListener('resize', () => {

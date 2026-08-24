@@ -347,10 +347,11 @@ const BUTTON_MIN_SCALE = { LI: 2.2, ME: 5, MK: 5 };
 // Zoom layers: below `minScale` a dense area's buttons collapse into one
 // numbered button at `at` (map units) that zooms to the layer where the
 // individual buttons are clickable. The keyed ones are also hotkeys.
+// Zone hotkeys run west -> east, like the continent digits.
 const BUTTON_ZONES = [
-  { key: '7', name: 'Caribbean', at: [299, 422], minScale: 3.2, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
-  { key: '8', name: 'Pacific islands', at: [949, 479], minScale: 2.6, codes: ['PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'] },
-  { key: '9', name: 'Middle East', at: [596, 390], minScale: 3.4, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA'] },
-  { name: 'European microstates', at: [504, 332], minScale: 3.4, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
-  { name: 'West African coast', at: [450, 470], minScale: 3.0, codes: ['CV', 'GM', 'GW', 'SL', 'TG', 'GQ', 'ST'] },
+  { key: 'q', name: 'Caribbean', at: [299, 422], minScale: 3.2, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
+  { key: 'w', name: 'West African coast', at: [450, 470], minScale: 3.0, codes: ['CV', 'GM', 'GW', 'SL', 'TG', 'GQ', 'ST'] },
+  { key: 'e', name: 'European microstates', at: [504, 332], minScale: 3.4, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
+  { key: 'r', name: 'Middle East', at: [596, 390], minScale: 3.4, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA'] },
+  { key: 't', name: 'Pacific islands', at: [949, 479], minScale: 2.6, codes: ['PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'] },
 ];
