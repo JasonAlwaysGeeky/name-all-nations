@@ -40,15 +40,12 @@
     'AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD']);
   const ARCH_GAP = 45;         // map units between islands before they split into separate groups
 
-  // Continent hotkeys run west → east across the map. Oceania has no
-  // digit — the T zone frames it whole, so one hotkey is enough.
-  const CONTINENT_KEYS = { 1: 'North America', 2: 'South America', 3: 'Europe', 4: 'Africa', 5: 'Asia' };
-  const ZONE_BY_KEY = {};
   const ZONE_BY_CODE = {};
   for (const z of BUTTON_ZONES) {
-    if (z.key) ZONE_BY_KEY[z.key] = z;
     for (const c of z.codes) ZONE_BY_CODE[c] = z;
   }
+  const ZONE_BY_NAME = Object.fromEntries(BUTTON_ZONES.map(z => [z.name, z]));
+  const SUB_CODES = Object.fromEntries(SUBREGIONS.map(x => [x.name, x.codes]));
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -1756,15 +1753,35 @@
   el.zoomOut.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 1 / 0.6));
   el.zoomReset.addEventListener('click', () => animateView({ ...fullVB }));
 
-  // Jump bar / hotkeys: three zoom layers. 0 = the world, digits 1-6 =
-  // continents (west to east), letters = the dense areas that need a
-  // layer of their own; anything deeper is scroll and drag.
+  // The keyboard is a little map: 1 2 3 across the north (N. America,
+  // Europe, Asia), Q W E across the south (S. America, Africa, India to
+  // New Zealand). Tapping the same key again dives into that area's
+  // dense pocket; tapping once more comes back out.
+  const PACIFIC_ISLES = ['PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'];
+  const JUMP_KEYS = {
+    1: { area: () => CODES_BY_REGION['North America'], sub: () => zoomToCodes(SUB_CODES['Central America'], 220) },
+    2: { area: () => CODES_BY_REGION['Europe'], sub: () => zoomToZone(ZONE_BY_NAME['European microstates'], 220) },
+    3: { area: () => CODES_BY_REGION['Asia'], sub: () => zoomToZone(ZONE_BY_NAME['Middle East'], 220) },
+    q: { area: () => CODES_BY_REGION['South America'], sub: () => zoomToZone(ZONE_BY_NAME['Caribbean'], 220) },
+    w: { area: () => CODES_BY_REGION['Africa'], sub: () => zoomToZone(ZONE_BY_NAME['West African coast'], 220) },
+    e: {
+      area: () => [...SUB_CODES['South Asia'], ...SUB_CODES['Southeast Asia'], ...CODES_BY_REGION['Oceania']],
+      sub: () => zoomToCodes(PACIFIC_ISLES, 220),
+    },
+  };
+  const jumpState = { key: null, stage: 0, t: 0 };
   const jumpTo = (key) => {
     if (!vb) return;
-    if (key === 'q') key = '2';                 // Q doubles as South America (pairs with W, its Caribbean)
-    if (key === '0') { animateView({ ...fullVB }, 220); return; }
-    if (ZONE_BY_KEY[key]) { zoomToZone(ZONE_BY_KEY[key], 220); return; }
-    if (CONTINENT_KEYS[key]) zoomToCodes(CODES_BY_REGION[CONTINENT_KEYS[key]], 220);
+    if (key === '0') { animateView({ ...fullVB }, 220); jumpState.key = null; return; }
+    const j = JUMP_KEYS[key];
+    if (!j) return;
+    const now = performance.now();
+    const again = jumpState.key === key && now - jumpState.t < 15000;
+    jumpState.stage = again ? (jumpState.stage + 1) % 2 : 0;
+    jumpState.key = key;
+    jumpState.t = now;
+    if (jumpState.stage === 0) zoomToCodes(j.area(), 220);
+    else j.sub();
   };
   for (const b of el.jumpBar.querySelectorAll('button')) {
     b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -1789,9 +1806,9 @@
     }
     else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
-    else if (e.key === '0' || e.key.toLowerCase() === 'q' || CONTINENT_KEYS[e.key] || ZONE_BY_KEY[e.key.toLowerCase()]) {
+    else if (e.key === '0' || JUMP_KEYS[e.key.toLowerCase()]) {
       e.preventDefault();
-      jumpTo(CONTINENT_KEYS[e.key] || e.key === '0' ? e.key : e.key.toLowerCase());
+      jumpTo(e.key === '0' ? '0' : e.key.toLowerCase());
     }
   });
 

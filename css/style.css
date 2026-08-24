@@ -1104,10 +1104,8 @@ footer a { color: inherit; }
   position: absolute;
   left: 12px;
   top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   z-index: 10;
+  width: 240px;
 }
 
 #jump-bar button {
@@ -1127,15 +1125,24 @@ footer a { color: inherit; }
 }
 
 #jump-bar button:hover { background: #fff; }
-#jump-bar button.gap { margin-top: 6px; }
 
-#jump-bar button.sub {
-  margin-left: 20px;
-  font-size: 0.7rem;
-  padding: 3px 9px 3px 4px;
-  background: rgba(255, 255, 255, 0.68);
+#jump-bar .jump-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
 }
-#jump-bar button.sub:hover { background: #fff; }
+
+#jump-bar .jump-grid button { justify-content: flex-start; border-radius: 9px; }
+#jump-bar .jump-world { margin-top: 5px; width: 100%; justify-content: center; border-radius: 9px; }
+
+#jump-bar .jump-hint {
+  margin-top: 3px;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(10, 30, 55, 0.5);
+}
 #jump-bar button:active { transform: translateY(1px); }
 #jump-bar kbd { font-size: 0.68rem; padding: 0 5px; }
 
