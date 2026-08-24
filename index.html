@@ -34,7 +34,10 @@
       <button data-key="4" title="Jump to Africa (4)"><kbd>4</kbd> Africa</button>
       <button data-key="5" title="Jump to Asia (5)"><kbd>5</kbd> Asia</button>
       <button data-key="6" title="Jump to Oceania (6)"><kbd>6</kbd> Oceania</button>
-      <button data-key="0" title="Whole world (0)"><kbd>0</kbd> World</button>
+      <button data-key="7" class="gap" title="Jump to the Caribbean (7)"><kbd>7</kbd> Caribbean</button>
+      <button data-key="8" title="Jump to the Pacific islands (8)"><kbd>8</kbd> Pacific</button>
+      <button data-key="9" title="Jump to the Middle East (9)"><kbd>9</kbd> Mid-East</button>
+      <button data-key="0" class="gap" title="Whole world (0)"><kbd>0</kbd> World</button>
     </nav>
 
     <div id="zoom-controls">
@@ -51,8 +54,9 @@
       <p>Click any country and type its name — close spellings count.
          Turn on the 🎤 to just say the names out loud.
          Pick a continent or region from 🎯 for a smaller, timed challenge.</p>
-      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>6</kbd> jump to a continent, west to east · <kbd>0</kbd> whole world ·
-         <kbd>[</kbd> <kbd>]</kbd> previous / next challenge · <kbd>Space</kbd> skip (place mode)</p>
+      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>6</kbd> jump to a continent (again for its regions) ·
+         <kbd>7</kbd>/<kbd>8</kbd>/<kbd>9</kbd> Caribbean / Pacific / Mid-East · <kbd>0</kbd> whole world ·
+         <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
       <button id="hello-close">Let's go</button>
     </div>
 
@@ -170,7 +174,9 @@
       <button id="help-close" aria-label="Close">×</button>
       <h2>Shortcuts</h2>
       <dl class="keys">
-        <dt><kbd>1</kbd> … <kbd>6</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia · Oceania</dd>
+        <dt><kbd>1</kbd> … <kbd>6</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia · Oceania.
+          Press the same key again to step through the continent's regions.</dd>
+        <dt><kbd>7</kbd> <kbd>8</kbd> <kbd>9</kbd></dt><dd>Caribbean · Pacific islands · Middle East</dd>
         <dt><kbd>0</kbd></dt><dd>Whole-world view</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
@@ -178,8 +184,10 @@
         <dt>Scroll / pinch</dt><dd>Zoom at the cursor</dd>
         <dt>Drag</dt><dd>Pan the map</dd>
       </dl>
-      <p class="help-note">Small countries have a round button with a pointer to the shape — click the button.
-        Dotted outlines group an island nation's islands; a numbered button is two that overlap at this zoom — click it to zoom in.</p>
+      <p class="help-note">Small countries have a round button with a pointer to the shape — click the button;
+        it retires once you're zoomed in enough to click the country itself.
+        A numbered button is a dense area (the Caribbean, the Pacific, the micro-states…) — click it to zoom
+        to the layer where each country has its own button. Dotted outlines group an island nation's islands and are clickable too.</p>
     </aside>
   </main>
 

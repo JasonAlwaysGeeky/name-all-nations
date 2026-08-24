@@ -18,25 +18,25 @@ map, **you click a country and name it**.
   your time, first-try accuracy, the countries you missed, and whether you
   set a new best.
 - Scroll/pinch to zoom, drag to pan. Keys: `1`–`6` jump to a continent,
-  west to east (N. America, S. America, Europe, Africa, Asia, Oceania — the
-  jump bar at top-left shows them), `0` is the whole world, `[` / `]` step through challenges, `Space` skips
-  the current name in place mode, `?` lists the shortcuts.
+  west to east (press the same key again to step through that continent's
+  regions), `7`/`8`/`9` go straight to the Caribbean, the Pacific islands
+  and the Middle East, `0` is the whole world — the jump bar at top-left
+  shows them all. `[` / `]` step through challenges, `Space` skips the
+  current name in place mode, `?` lists the shortcuts.
 
 ### Finding the small ones
 
 - Every country too small to click reliably (58 of them — the micro-states,
   the Caribbean and Pacific islands, Togo, Gambia, Belize, Rwanda, East
-  Timor…) has a round button of fixed size that never disappears, however
-  far you zoom in or out. Where there's room the button sits just off the
-  coast with a pointer wedge back to the shape (Seterra-style); landlocked
-  micro-states get the button on top of them. Click the button, not the
-  speck. Their offsets are hand-laid in `BUTTON_OFFSETS` (`js/countries.js`)
-  so nothing collides between a 1280px-wide window and a 1920px one.
-  Where that's impossible the rule bends: Vatican/San Marino/Monaco show
-  one numbered button at world zoom that zooms in and splits apart once
-  you're on Europe, and Liechtenstein, Montenegro and North Macedonia
-  only get a button once you're zoomed in on them (before that their
-  neighbours aren't clickable either).
+  Timor…) has a round button with a pointer wedge back to the shape
+  (Seterra-style). Buttons retire once you're zoomed in far enough to
+  click the country itself, and the five densest areas — the Caribbean,
+  the Pacific, the Middle East, Europe's micro-states and the West African
+  coast — fold into one numbered button when zoomed out; clicking it (or
+  its hotkey) zooms to the layer where every member is clickable. Offsets
+  are hand-laid in `BUTTON_OFFSETS` (`js/countries.js`), zones in
+  `BUTTON_ZONES`, verified collision-free from a 1280px window up to deep
+  zoom.
 - Island nations (Fiji, the Bahamas, Micronesia, Kiribati…) get a quiet
   dotted outline around each island group — an ellipse for the halves of a
   nation split by the antimeridian — so you can see which islands belong

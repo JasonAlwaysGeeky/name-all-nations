@@ -316,11 +316,21 @@ svg.world g.btn.missed .tail { fill: var(--missed-stroke); stroke: #ffffff; }
 svg.world g.btn.group .face { fill: rgba(255, 255, 255, 0.96); stroke-width: 3; }
 svg.world g.btn.group:hover .face { stroke: #2f2616; }
 
-svg.world g.btn.group text {
+svg.world g.btn.group text,
+svg.world g.btn.zone text {
   fill: #3f3623;
   font-weight: 700;
   pointer-events: none;
 }
+
+/* a whole dense area folded into one button — click to zoom to its layer */
+svg.world g.btn.zone .face {
+  fill: rgba(255, 255, 255, 0.9);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
+}
+
+svg.world g.btn.zone:hover .face { fill: #ffffff; stroke: #2f2616; stroke-dasharray: none; }
 
 /* ————— feedback flashes ————— */
 svg.world path.country.flash-good,
@@ -1093,6 +1103,7 @@ footer a { color: inherit; }
 }
 
 #jump-bar button:hover { background: #fff; }
+#jump-bar button.gap { margin-top: 6px; }
 #jump-bar button:active { transform: translateY(1px); }
 #jump-bar kbd { font-size: 0.68rem; padding: 0 5px; }
 

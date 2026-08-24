@@ -39,6 +39,12 @@
 
   // Continent hotkeys run west → east across the map.
   const CONTINENT_KEYS = { 1: 'North America', 2: 'South America', 3: 'Europe', 4: 'Africa', 5: 'Asia', 6: 'Oceania' };
+  const ZONE_BY_KEY = {};
+  const ZONE_BY_CODE = {};
+  for (const z of BUTTON_ZONES) {
+    if (z.key) ZONE_BY_KEY[z.key] = z;
+    for (const c of z.codes) ZONE_BY_CODE[c] = z;
+  }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -329,6 +335,21 @@
     measure();
     setView({ ...fullVB });
     bindMapEvents();
+
+    // A tab can load hidden (0x0 viewport) and be shown later; re-measure
+    // and refit whenever the map's size actually changes.
+    new ResizeObserver(() => {
+      const w0 = W, h0 = H;
+      measure();
+      if (W === w0 && H === h0) return;
+      if (!vb || !isFinite(vb.x + vb.y + vb.w + vb.h)) {
+        if (W > 0 && H > 0) { base = null; setView({ ...fullVB }); }
+        return;
+      }
+      dirty = true;
+      setView({ ...vb });
+      bake();
+    }).observe(el.map);
   }
 
   // A country's bounding box lies about where it "is" when its islands
@@ -386,6 +407,24 @@
       const pad = Math.max(1.4, Math.max(x2 - x1, y2 - y1) * 0.12);
       return { x: x1 - pad, y: y1 - pad, w: (x2 - x1) + 2 * pad, h: (y2 - y1) + 2 * pad };
     });
+  }
+
+  // A button earns its keep only while the country itself is too small
+  // to click; past that it's clutter. Archipelagos drop theirs once the
+  // dotted group outline is a big target of its own.
+  function buttonRedundant(code, s) {
+    const g = geom[code];
+    if (g.groups) return focusPoint(code).dim * s >= 110;
+    return g.anchor.dim * s >= 26 && g.anchor.thin * s >= 12;
+  }
+
+  // Zoom needed before this country's own button shows (zone layers and
+  // the boxed-in micro-states).
+  function minScaleFor(code) {
+    let m = BUTTON_MIN_SCALE[code] || 0;
+    const z = ZONE_BY_CODE[code];
+    if (z) m = Math.max(m, z.minScale);
+    return m;
   }
 
   // Where to look for a country: the biggest island group for
@@ -459,7 +498,9 @@
   }
 
   function setView(next) {
-    vb = clampView(next);
+    next = clampView(next);
+    if (!isFinite(next.x + next.y + next.w + next.h)) return;   // never let a bad fit poison the view
+    vb = next;
     if (!base) { bake(); return; }
     const sb = scaleFor(base), s = scaleFor(vb), k = s / sb;
     const ox = (W - base.w * sb) / 2, oy = (H - base.h * sb) / 2;
@@ -587,8 +628,7 @@
     setView({ x: pt.x - (pt.x - vb.x) * k, y: pt.y - (pt.y - vb.y) * k, w, h: vb.h * k });
   }
 
-  function zoomToCodes(codes, ms = 260, padFactor = 1.8) {
-    if (codes.length === WORLD_CODES.length) { animateView({ ...fullVB }, ms); return; }
+  function fitCodes(codes) {
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
     for (const code of codes) {
       const g = geom[code];
@@ -605,11 +645,35 @@
         x2 = Math.max(x2, b.x + Math.max(b.w, 1)); y2 = Math.max(y2, b.y + Math.max(b.h, 1));
       }
     }
-    if (x1 === Infinity) return;
-    const w = x2 - x1, h = y2 - y1;
+    return x1 === Infinity ? null : { x1, y1, x2, y2 };
+  }
+
+  // Fit tight — the play area should fill the screen — with a fixed
+  // screen allowance so offset buttons and their tails stay inside.
+  function zoomToCodes(codes, ms = 260, padFactor = 1.25) {
+    if (codes.length === WORLD_CODES.length) { animateView({ ...fullVB }, ms); return; }
+    const f = fitCodes(codes);
+    if (!f) return;
+    const w = f.x2 - f.x1, h = f.y2 - f.y1;
     const aspect = fullVB.h / fullVB.w;
-    const tw = Math.max(w * padFactor, h * padFactor / aspect, fullVB.w / MAX_ZOOM * 2);
-    animateView({ x: x1 + w / 2 - tw / 2, y: y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
+    let tw = Math.max(w * padFactor, h * padFactor / aspect, fullVB.w / MAX_ZOOM * 2);
+    if (W > 400) tw *= W / (W - 170);           // room for buttons and tails
+    animateView({ x: f.x1 + w / 2 - tw / 2, y: f.y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
+  }
+
+  // Zoom to a layer where the zone's buttons are clickable.
+  function zoomToZone(z, ms = 240) {
+    if (!z) return;
+    const f = fitCodes(z.codes);
+    if (!f) return;
+    const w = f.x2 - f.x1, h = f.y2 - f.y1;
+    const aspect = fullVB.h / fullVB.w;
+    const K = Math.min(W, H / aspect);          // scale = K / tw
+    let tw = Math.max(w * 1.25, h * 1.25 / aspect);
+    if (W > 400) tw *= W / (W - 170);           // room for buttons and tails
+    if (K > 0) tw = Math.min(tw, K / (z.minScale * 1.1));  // at least clickable-layer zoom
+    tw = Math.max(tw, fullVB.w / MAX_ZOOM * 2);
+    animateView({ x: f.x1 + w / 2 - tw / 2, y: f.y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
   }
 
   // Pan (and zoom in if needed) so a country is comfortably on screen.
@@ -619,7 +683,7 @@
     const pad = 0.12;
     const inside = f.x > vb.x + vb.w * pad && f.x < vb.x + vb.w * (1 - pad) &&
                    f.y > vb.y + vb.h * pad && f.y < vb.y + vb.h * (1 - pad);
-    const hasButton = BUTTON_OFFSETS[code] && s >= (BUTTON_MIN_SCALE[code] || 0);
+    const hasButton = BUTTON_OFFSETS[code] && s >= minScaleFor(code);
     if (inside && (f.dim * s >= 6 || hasButton)) return false;
     const aspect = fullVB.h / fullVB.w;
     let w = vb.w;
@@ -637,6 +701,7 @@
     overlayLayer.textContent = '';
     ovByCode = {};
     const s = scaleFor(vb);
+    if (!isFinite(s) || s <= 0) return;         // hidden viewport — rebuilt on resize
     const codes = state.level ? state.level.codes : WORLD_CODES;
 
     const decorate = (elem, code) => {
@@ -674,12 +739,42 @@
       }
     }
 
-    // Buttons: fixed screen size and offset, so they never shrink away
-    // and never cover the shape they point at.
+    // Zoom layers: below a zone's minScale its buttons collapse into one
+    // numbered button that zooms to where they're clickable.
+    const grouped = new Set();
+    for (const z of BUTTON_ZONES) {
+      const members = z.codes.filter(c => codes.includes(c) && BUTTON_OFFSETS[c] && geom[c] && !buttonRedundant(c, s));
+      if (s >= z.minScale || members.length < 2) continue;
+      for (const c of members) grouped.add(c);
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.setAttribute('class', 'btn zone');
+      g.dataset.zone = z.name;
+      g.dataset.codes = members.join(',');
+      const face = document.createElementNS(SVG_NS, 'circle');
+      face.setAttribute('class', 'face');
+      face.setAttribute('cx', z.at[0]); face.setAttribute('cy', z.at[1]);
+      face.setAttribute('r', (BTN_R + 3) / s);
+      const t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', z.at[0]); t.setAttribute('y', z.at[1]);
+      t.setAttribute('font-size', 13 / s);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('dominant-baseline', 'central');
+      t.textContent = members.length;
+      const zpad = document.createElementNS(SVG_NS, 'circle');
+      zpad.setAttribute('class', 'pad');
+      zpad.setAttribute('cx', z.at[0]); zpad.setAttribute('cy', z.at[1]);
+      zpad.setAttribute('r', (BTN_HIT + 4) / s);
+      g.appendChild(face); g.appendChild(t); g.appendChild(zpad);
+      overlayLayer.appendChild(g);
+    }
+
+    // Buttons: fixed screen size and offset, so they never cover the
+    // shape they point at, and gone once the country is big enough to
+    // click for itself.
     const items = [];
     for (const code of codes) {
       const off = BUTTON_OFFSETS[code];
-      if (!off || !geom[code] || s < (BUTTON_MIN_SCALE[code] || 0)) continue;
+      if (!off || !geom[code] || grouped.has(code) || s < (BUTTON_MIN_SCALE[code] || 0) || buttonRedundant(code, s)) continue;
       const f = focusPoint(code);
       items.push({ code, fx: f.x, fy: f.y, x: f.x + off[0] / s, y: f.y + off[1] / s, offset: Math.hypot(off[0], off[1]) });
     }
@@ -788,6 +883,11 @@
   // ————— pointer input —————
 
   function handleTarget(target, pt) {
+    const zg = target.closest('g.btn.zone');
+    if (zg) {
+      zoomToZone(BUTTON_ZONES.find(z => z.name === zg.dataset.zone));
+      return;
+    }
     const grp = target.closest('g.btn.group');
     if (grp) {
       zoomToCodes(grp.dataset.codes.split(','), 260, 3);
@@ -892,7 +992,10 @@
     if (e.pointerType !== 'mouse') return;
     const target = e.target.closest?.('[data-code], path[id], g.btn');
     let text = null;
-    if (target?.closest('g.btn.group')) {
+    if (target?.closest('g.btn.zone')) {
+      const zg2 = target.closest('g.btn.zone');
+      text = `${zg2.dataset.zone} — ${zg2.dataset.codes.split(',').length} small countries · click to zoom in`;
+    } else if (target?.closest('g.btn.group')) {
       const n = target.closest('g.btn.group').dataset.codes.split(',').length;
       text = `${n} small countries — click to zoom in`;
     } else if (target) {
@@ -1593,11 +1696,26 @@
   el.zoomOut.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 1 / 0.6));
   el.zoomReset.addEventListener('click', () => animateView({ ...fullVB }));
 
-  // Continent jump bar: the same targets as keys 1–6 / 0.
+  // Jump bar / hotkeys. A continent key pressed again steps through the
+  // continent's sub-regions, so each press zooms a layer deeper.
+  const jumpCycle = { key: null, idx: -1, t: 0 };
   const jumpTo = (key) => {
     if (!vb) return;
-    if (key === '0') animateView({ ...fullVB }, 220);
-    else if (CONTINENT_KEYS[key]) zoomToCodes(CODES_BY_REGION[CONTINENT_KEYS[key]], 220);
+    if (key === '0') { animateView({ ...fullVB }, 220); jumpCycle.key = null; return; }
+    if (ZONE_BY_KEY[key]) { zoomToZone(ZONE_BY_KEY[key], 220); jumpCycle.key = null; return; }
+    const region = CONTINENT_KEYS[key];
+    if (!region) return;
+    const subs = SUBREGIONS.filter(x => x.region === region);
+    const now = performance.now();
+    if (jumpCycle.key === key && now - jumpCycle.t < 8000 && subs.length > 1) {
+      jumpCycle.idx = jumpCycle.idx + 1 >= subs.length ? -1 : jumpCycle.idx + 1;
+    } else {
+      jumpCycle.idx = -1;
+    }
+    jumpCycle.key = key;
+    jumpCycle.t = now;
+    if (jumpCycle.idx < 0) zoomToCodes(CODES_BY_REGION[region], 220);
+    else zoomToCodes(subs[jumpCycle.idx].codes, 220);
   };
   for (const b of el.jumpBar.querySelectorAll('button')) {
     b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -1617,7 +1735,7 @@
       if (L?.mode === 'place' && L.armed) { e.preventDefault(); skipTarget(); }
     }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
-    else if (e.key === '0' || CONTINENT_KEYS[e.key]) { e.preventDefault(); jumpTo(e.key); }
+    else if (e.key === '0' || CONTINENT_KEYS[e.key] || ZONE_BY_KEY[e.key]) { e.preventDefault(); jumpTo(e.key); }
   });
 
   window.addEventListener('resize', () => {
