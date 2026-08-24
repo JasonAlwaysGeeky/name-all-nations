@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#1c4b7a">
+  <title>Name All Nations</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header id="topbar">
+    <h1>🌍 Name All Nations</h1>
+    <button id="progress-wrap" title="Choose a challenge" aria-label="Choose a challenge">
+      <span id="progress-text">0 / 195</span>
+      <span id="progress-bar"><span id="progress-fill"></span></span>
+    </button>
+    <div id="topbar-buttons">
+      <button id="levels-btn" title="Choose a challenge" aria-label="Challenges">🎯 <span class="btn-label">Challenges</span></button>
+      <button id="stats-btn" title="Stats &amp; heat map" aria-label="Stats">📊 <span class="btn-label">Stats</span></button>
+      <button id="help-btn" title="Shortcuts (?)" aria-label="Help">?</button>
+      <button id="mic-toggle" title="Voice input on/off" aria-label="Toggle voice input">🎤</button>
+    </div>
+  </header>
+
+  <main id="map-wrap">
+    <div id="map" aria-label="World map"></div>
+
+    <nav id="jump-bar" aria-label="Jump to a continent">
+      <button data-key="1" title="Jump to North America (1)"><kbd>1</kbd> N. America</button>
+      <button data-key="2" title="Jump to South America (2)"><kbd>2</kbd> S. America</button>
+      <button data-key="3" title="Jump to Europe (3)"><kbd>3</kbd> Europe</button>
+      <button data-key="4" title="Jump to Africa (4)"><kbd>4</kbd> Africa</button>
+      <button data-key="5" title="Jump to Asia (5)"><kbd>5</kbd> Asia</button>
+      <button data-key="6" title="Jump to Oceania (6)"><kbd>6</kbd> Oceania</button>
+      <button data-key="0" title="Whole world (0)"><kbd>0</kbd> World</button>
+    </nav>
+
+    <div id="zoom-controls">
+      <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+      <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+      <button id="zoom-reset" title="Reset view (0)" aria-label="Reset view">⛶</button>
+    </div>
+
+    <div id="tooltip" hidden></div>
+    <div id="toast" hidden></div>
+
+    <div id="hello" class="panel">
+      <h2>Can you name all 195 countries?</h2>
+      <p>Click any country and type its name — close spellings count.
+         Turn on the 🎤 to just say the names out loud.
+         Pick a continent or region from 🎯 for a smaller, timed challenge.</p>
+      <p class="hello-keys">Keys: <kbd>1</kbd>–<kbd>6</kbd> jump to a continent, west to east · <kbd>0</kbd> whole world ·
+         <kbd>[</kbd> <kbd>]</kbd> previous / next challenge · <kbd>Space</kbd> skip (place mode)</p>
+      <button id="hello-close">Let's go</button>
+    </div>
+
+    <section id="card" class="panel" hidden>
+      <button id="card-close" aria-label="Close">×</button>
+
+      <div id="card-question">
+        <p id="card-prompt">What country is this?</p>
+        <form id="guess-form" autocomplete="off">
+          <input id="guess-input" type="text" autocomplete="off" autocapitalize="words"
+                 spellcheck="false" placeholder="Type its name…" aria-label="Country name guess">
+          <button type="submit" id="guess-btn">Guess</button>
+        </form>
+        <p id="mic-status" hidden>🎤 listening… just say the country's name</p>
+        <p id="feedback" role="status"></p>
+        <div id="card-actions">
+          <button id="hint-btn">💡 Hint</button>
+          <button id="reveal-btn">Reveal</button>
+        </div>
+      </div>
+
+      <div id="card-answer" hidden>
+        <p id="answer-result"></p>
+        <h2 id="answer-name"></h2>
+        <p id="answer-meta"></p>
+        <button id="speak-btn">🔊 Pronounce</button>
+        <button id="retry-btn" hidden>✏️ Try to name it</button>
+      </div>
+    </section>
+
+    <div id="level-banner" hidden>
+      <button id="challenge-prev" title="Previous challenge ([)" aria-label="Previous challenge">‹</button>
+      <span id="level-info">
+        <span id="level-title"></span>
+        <span id="level-progress"></span>
+        <span id="level-timer">0:00.0</span>
+      </span>
+      <button id="challenge-next" title="Next challenge (])" aria-label="Next challenge">›</button>
+      <button id="level-restart" title="Restart this challenge" aria-label="Restart">↻</button>
+      <button id="level-mode" title="Switch mode"></button>
+    </div>
+
+    <section id="word-bank" hidden>
+      <div id="bank-target">
+        <span id="bank-find">Find</span>
+        <span id="bank-flag"></span>
+        <strong id="bank-name"></strong>
+        <span id="bank-strikes" aria-label="Wrong tries"></span>
+        <span class="bank-buttons">
+          <button id="bank-skip" title="Skip for now (Space)">⏭ Skip</button>
+          <button id="bank-show" title="Show me where it is (counts as a miss)">👁 Show me</button>
+          <button id="bank-collapse" title="Show / hide the list" aria-label="Toggle list">▾</button>
+        </span>
+      </div>
+      <p id="bank-hint"></p>
+      <div id="bank-chips"></div>
+    </section>
+
+    <section id="results" class="panel" hidden>
+      <button id="results-close" aria-label="Close">×</button>
+      <div class="results-head">
+        <div class="results-trophy">🏆</div>
+        <h2 id="results-title"></h2>
+        <p id="results-sub"></p>
+      </div>
+      <div class="results-tiles" id="results-tiles"></div>
+      <div id="results-misses"></div>
+      <div class="results-actions">
+        <button id="results-again">↻ Play again</button>
+        <button id="results-mode"></button>
+        <button id="results-next" class="btn-primary">Next challenge ›</button>
+      </div>
+    </section>
+    <canvas id="confetti" hidden></canvas>
+
+    <aside id="levels-panel" class="panel" hidden>
+      <button id="levels-close" aria-label="Close">×</button>
+      <h2>🎯 Challenges</h2>
+      <p class="levels-blurb">Pick how much of the world to take on. Every challenge is timed and starts fresh.
+        <strong>Name</strong> is the real test — type or say each country.
+        <strong>Place</strong> is the warm-up — put the listed names on the map.</p>
+      <div id="levels-list"></div>
+    </aside>
+
+    <aside id="stats-panel" class="panel" hidden>
+      <button id="stats-close" aria-label="Close">×</button>
+      <h2>📊 Your stats</h2>
+      <div class="stat-tiles" id="stat-tiles"></div>
+
+      <label class="toggle">
+        <input type="checkbox" id="heat-toggle">
+        <span>🔥 <strong>Heat map</strong> — colour every country by how many times in a row you've got it right
+          <small id="heat-mode-note"></small></span>
+      </label>
+      <div id="heat-legend">
+        <span class="leg leg-x">not tried</span><span class="leg leg-0">0</span><span class="leg leg-1">1</span>
+        <span class="leg leg-2">2</span><span class="leg leg-3">3–4</span><span class="leg leg-4">5+ in a row</span>
+      </div>
+
+      <label class="toggle">
+        <input type="checkbox" id="flags-toggle">
+        <span>🏳️ <strong>Show flags</strong> next to names in place mode and on answers</span>
+      </label>
+
+      <h3>Best times</h3>
+      <div id="best-times"></div>
+
+      <h3>Mastery by region <small>(3+ in a row, name mode)</small></h3>
+      <div id="region-mastery"></div>
+
+      <button id="stats-reset">Reset all stats</button>
+    </aside>
+
+    <aside id="help" class="panel" hidden>
+      <button id="help-close" aria-label="Close">×</button>
+      <h2>Shortcuts</h2>
+      <dl class="keys">
+        <dt><kbd>1</kbd> … <kbd>6</kbd></dt><dd>Jump to a continent, west to east: N. America · S. America · Europe · Africa · Asia · Oceania</dd>
+        <dt><kbd>0</kbd></dt><dd>Whole-world view</dd>
+        <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
+        <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Close panels</dd>
+        <dt>Scroll / pinch</dt><dd>Zoom at the cursor</dd>
+        <dt>Drag</dt><dd>Pan the map</dd>
+      </dl>
+      <p class="help-note">Small countries have a round button with a pointer to the shape — click the button.
+        Dotted outlines group an island nation's islands; a numbered button is two that overlap at this zoom — click it to zoom in.</p>
+    </aside>
+  </main>
+
+  <footer>
+    Map © <a href="https://www.amcharts.com" target="_blank" rel="noopener">amCharts</a>
+  </footer>
+
+  <script src="js/countries.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
