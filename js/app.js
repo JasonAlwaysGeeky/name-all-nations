@@ -27,16 +27,20 @@
   const MAX_ZOOM = 60;
   const LOD_HI = 2.6;          // px per map unit above which the detailed coastlines are used…
   const LOD_LO = 2.2;          // …and below which the coarse ones come back (hysteresis)
-  const BTN_R = 13;            // button radius, px
-  const BTN_HIT = 18;          // invisible click radius around a button, px
-  const TAIL_W = 6;            // half-width of a button's pointer where it leaves the circle, px
+  const LOD_FULL_HI = 8.5;     // …and above which the untouched full-detail borders swap in
+  const LOD_FULL_LO = 7;       // (with their own hysteresis band on the way back out)
+  const ANIM_BAKE_GAP = 80;    // min ms between mid-animation re-renders (2-3 per transition)
+  const BTN_R = 16;            // button radius, px
+  const BTN_HIT = 22;          // invisible click radius around a button, px
+  const TAIL_W = 7;            // half-width of a button's pointer where it leaves the circle, px
+  const SQ_MIN = 40;           // min on-screen size of an island outline once it replaces the button, px
   const TAP_SLOP = { mouse: 5, pen: 5, touch: 9 };
   const STRIKES = 3;           // wrong placements before the answer is shown
 
   // Island nations drawn with a dotted outline per island group — the
   // Pacific ones, plus the Caribbean micro-islands so they get the same
   // look once you're zoomed into the arc.
-  const ARCHIPELAGOS = new Set(['TV', 'FM', 'TO', 'MH', 'PW', 'KI', 'CV', 'KM', 'VU', 'BS', 'FJ', 'SB', 'ST', 'WS', 'TT', 'MV',
+  const ARCHIPELAGOS = new Set(['TV', 'FM', 'TO', 'MH', 'PW', 'KI', 'NR', 'CV', 'KM', 'VU', 'BS', 'FJ', 'SB', 'ST', 'WS', 'TT', 'MV',
     'AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD']);
   const ARCH_GAP = 45;         // map units between islands before they split into separate groups
 
@@ -266,7 +270,9 @@
   let ovByCode = {};              // code -> overlay elements (rebuilt on every bake)
   let hitLayer = null;
   let overlayLayer = null;
-  const dHi = {}, dLo = {};       // id -> path data at the two detail levels
+  const dHi = {}, dLo = {};       // id -> path data at the two always-loaded detail levels
+  let dFull = null;               // id -> untouched amCharts path data (lazy-loaded)
+  let fullLoading = false;
   let lod = 'lo';
 
   function register(code, elem) {
@@ -413,11 +419,14 @@
 
   // A button earns its keep only while the country itself is too small
   // to click; past that it's clutter. Archipelagos drop theirs once the
-  // dotted group outline is a big target of its own.
+  // dotted group outline is a big target of its own. The thin threshold
+  // is generous so slivers (the Gambia, Togo) keep their buttons deep
+  // into a zone's own layer.
   function buttonRedundant(code, s) {
+    if (s < (BUTTON_KEEP[code] || 0)) return false;
     const g = geom[code];
-    if (g.groups) return focusPoint(code).dim * s >= 110;
-    return g.anchor.dim * s >= 26 && g.anchor.thin * s >= 12;
+    if (g.groups) return focusPoint(code).dim * s >= 48;
+    return g.anchor.dim * s >= 32 && g.anchor.thin * s >= 22;
   }
 
   // Zoom needed before this country's own button shows (zone layers and
@@ -477,6 +486,7 @@
   let W = 0, H = 0, rectLeft = 0, rectTop = 0;
   let bakeTimer = null;
   let dirty = false;
+  let lastBakeAt = 0;
 
   function measure() {
     const r = el.map.getBoundingClientRect();
@@ -512,8 +522,14 @@
     dirty = true;
     // Panned past the pre-rendered margin (bare edges would show) or
     // zoomed far from the baked raster (mush) — re-render right away.
+    // During an animation, though, a big zoom crosses that threshold on
+    // every frame; re-rendering each one is what makes a hotkey jump
+    // stutter, so mid-flight bakes are rationed and the landing bake
+    // restores full crispness.
     const lim = VIEW_MARGIN * Math.min(k, 1) * 0.92;
-    if (Math.abs(tx) > W * lim || Math.abs(ty) > H * lim || k < 0.75 || k > 3.2) bake();
+    const rough = Math.abs(tx) > W * lim || Math.abs(ty) > H * lim || k < 0.75 || k > 3.2;
+    const animating = animId != null || zoomAnim.active;
+    if (rough && (!animating || performance.now() - lastBakeAt > ANIM_BAKE_GAP)) bake();
     else scheduleBake();
   }
 
@@ -528,19 +544,42 @@
     if (!dirty && base) return;
     dirty = false;
     base = { ...vb };
+    lastBakeAt = performance.now();
     const s = scaleFor(vb);
-    // Coarse coastlines when zoomed out (a third of the points to
-    // rasterise), full detail once you're in close.
-    const want = s > LOD_HI ? 'hi' : s < LOD_LO ? 'lo' : lod;
+    // Three detail levels: coarse coastlines zoomed out (a third of the
+    // points to rasterise), the simplified map in the middle, and the
+    // untouched amCharts borders once you're deep into a sub-area.
+    let want = lod;
+    if (s > LOD_FULL_HI) want = 'full';
+    else if (s > LOD_HI) { if (lod !== 'full' || s < LOD_FULL_LO) want = 'hi'; }
+    else if (s < LOD_LO) want = 'lo';
+    if (want === 'full' && !dFull) { loadFullDetail(); want = 'hi'; }
     if (want !== lod) {
       lod = want;
-      const src = lod === 'hi' ? dHi : dLo;
+      const src = lod === 'full' ? dFull : lod === 'hi' ? dHi : dLo;
       for (const id of Object.keys(allPaths)) allPaths[id].setAttribute('d', src[id]);
     }
     const m = VIEW_MARGIN;
     svg.setAttribute('viewBox', `${vb.x - m * vb.w} ${vb.y - m * vb.h} ${vb.w * (1 + 2 * m)} ${vb.h * (1 + 2 * m)}`);
     svg.style.transform = '';
-    updateOverlay();
+    // Rebuilding the overlay mid-animation would just add to the frame's
+    // work; the landing bake redraws it at the final scale anyway.
+    if (animId == null && !zoomAnim.active) updateOverlay();
+  }
+
+  // The untouched amCharts map (full border detail, 1.4MB) is fetched in
+  // the background — at boot idle, or on first deep zoom — and swaps in
+  // as the third detail level.
+  function loadFullDetail() {
+    if (fullLoading) return;
+    fullLoading = true;
+    fetch('map/world-full.svg').then(r => r.text()).then(text => {
+      const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+      const d = {};
+      for (const p of doc.querySelectorAll('path[id]')) d[p.id] = p.getAttribute('d');
+      dFull = d;
+      if (scaleFor(vb) > LOD_FULL_HI) { dirty = true; bake(); }
+    }).catch(() => { fullLoading = false; });   // offline etc. — retry on next deep zoom
   }
 
   function clientToMap(cx, cy) {
@@ -570,6 +609,7 @@
     cancelAnim();
     const from = { ...vb };
     const to = clampView(target);
+    if (ms <= 0) { setView(to); bake(); return; }
     const t0 = performance.now();
     const step = () => {
       const k = Math.min(1, (performance.now() - t0) / ms);
@@ -630,11 +670,13 @@
     setView({ x: pt.x - (pt.x - vb.x) * k, y: pt.y - (pt.y - vb.y) * k, w, h: vb.h * k });
   }
 
+  // Two rectangles: x1…y2 caps a giant country's pull to 22 units past
+  // its core (so the scale frames the playable mass), while tx1…ty2 is
+  // the true union of the same landmasses, used to centre the view and
+  // to loosen the scale a little when the real extent needs it.
   function fitCodes(codes) {
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
-    // A giant country only pulls the frame up to 30 units past its core:
-    // a continent view should frame the playable mass, not drag half a
-    // screen of empty Arctic in because Canada technically reaches it.
+    let tx1 = Infinity, ty1 = Infinity, tx2 = -Infinity, ty2 = -Infinity;
     const CAP = codes.length > 1 ? 22 : Infinity;
     for (const code of codes) {
       const g = geom[code];
@@ -642,7 +684,9 @@
       // Russia's bbox reaches the Pacific; fitting it would turn the
       // Europe view into the whole world. It's still in the challenge.
       if (code === 'RU' && codes.length > 1) continue;
-      const parts = g.groups || [{ x: g.anchor.x - g.anchor.dim / 2, y: g.anchor.y - g.anchor.dim / 2, w: g.anchor.dim, h: g.anchor.dim }];
+      let big = g.boxes[0];
+      for (const b of g.boxes) if (b.w * b.h > big.w * big.h) big = b;
+      const parts = g.groups || [big];
       for (const b of parts) {
         // Kiribati's far-flung groups would force a whole-map view; only
         // the region's centre of mass matters for a multi-country zoom.
@@ -651,37 +695,109 @@
         const hw = Math.min(Math.max(b.w, 1) / 2, CAP), hh = Math.min(Math.max(b.h, 1) / 2, CAP);
         x1 = Math.min(x1, cx - hw); y1 = Math.min(y1, cy - hh);
         x2 = Math.max(x2, cx + hw); y2 = Math.max(y2, cy + hh);
+        tx1 = Math.min(tx1, b.x); ty1 = Math.min(ty1, b.y);
+        tx2 = Math.max(tx2, b.x + b.w); ty2 = Math.max(ty2, b.y + b.h);
       }
     }
-    return x1 === Infinity ? null : { x1, y1, x2, y2 };
+    return x1 === Infinity ? null : { x1, y1, x2, y2, tx1, ty1, tx2, ty2 };
   }
 
-  // Fit tight — the play area should fill the screen — with a fixed
-  // screen allowance so offset buttons and their tails stay inside.
-  function zoomToCodes(codes, ms = 260, padFactor = 1.08) {
+  // Hand-picked centres for the big area views: the fit still chooses
+  // the zoom, but the frame centres on this country instead of the
+  // region's bounding box ("put Germany in the middle"). `dy` then
+  // shifts the frame as a fraction of its height — negative slides the
+  // camera north, so the land sits lower on the screen. `yband` goes
+  // further and dictates the vertical span outright (map units): North
+  // America plays from the US–Canada border down to Panama, so that band
+  // fills the safe area regardless of window size.
+  const REGION_VIEW = {
+    Europe: { center: 'DE' },
+    Asia: { center: 'NP', dy: -0.05 },
+    'North America': { center: 'US', yband: [290, 452] },
+  };
+
+  function regionView(codes) {
+    for (const region of Object.keys(REGION_VIEW)) {
+      const rc = CODES_BY_REGION[region];
+      if (rc && codes.length === rc.length && rc.every(c => codes.includes(c))) return REGION_VIEW[region];
+    }
+    return null;
+  }
+
+  // The floating UI overlays the map's edges — the level banner across
+  // the top, the jump bar top-left, the zoom column top-right, the card
+  // and word bank along the bottom. Fits aim for the window minus this
+  // border, so a framed area never starts life under the chrome (and
+  // offset buttons and tails get breathing room too).
+  const SAFE = { top: 60, bottom: 64, left: 40, right: 64 };
+
+  // `extraBottom` reserves additional space above the bottom edge — the
+  // quiz card lives bottom-centre, and a dense zone's south member
+  // (Malta) must not end up underneath it.
+  function safeScale(f, pad, extraBottom = 0) {
+    return Math.min(
+      (W - SAFE.left - SAFE.right) / ((f.x2 - f.x1) * pad),
+      (H - SAFE.top - SAFE.bottom - extraBottom) / ((f.y2 - f.y1) * pad));
+  }
+
+  // The widest allowed fit is half of MAX_ZOOM, so a "zoom to this tiny
+  // island" never lands at full magnification.
+  function maxFitScale() {
+    const aspect = fullVB.h / fullVB.w;
+    return Math.min(W, H / aspect) / (fullVB.w / MAX_ZOOM * 2);
+  }
+
+  // View rect that shows `f` at scale s, centred in the safe area.
+  function frameAt(f, s, extraBottom = 0) {
+    const aspect = fullVB.h / fullVB.w;
+    const vw = Math.min(W, H / aspect) / s, vh = vw * aspect;
+    const ox = (W - vw * s) / 2, oy = (H - vh * s) / 2;
+    return {
+      x: (f.x1 + f.x2) / 2 - (SAFE.left + (W - SAFE.left - SAFE.right) / 2 - ox) / s,
+      y: (f.y1 + f.y2) / 2 - (SAFE.top + (H - SAFE.top - SAFE.bottom - extraBottom) / 2 - oy) / s,
+      w: vw, h: vh,
+    };
+  }
+
+  // Fit the play area into the safe frame so it fills the screen without
+  // hiding under the UI. The capped fit sets the baseline zoom, loosened
+  // up to 20% when the true extent asks for it (all of Norway, Chile's
+  // tip); the true extent is what gets centred, splitting any remaining
+  // overflow evenly between the frame's edges.
+  function zoomToCodes(codes, ms = 260, padFactor = 1.05) {
     if (codes.length === WORLD_CODES.length) { animateView({ ...fullVB }, ms); return; }
     const f = fitCodes(codes);
     if (!f) return;
-    const w = f.x2 - f.x1, h = f.y2 - f.y1;
-    const aspect = fullVB.h / fullVB.w;
-    let tw = Math.max(w * padFactor, h * padFactor / aspect, fullVB.w / MAX_ZOOM * 2);
-    if (W > 400) tw *= W / (W - 110);           // room for buttons and tails
-    animateView({ x: f.x1 + w / 2 - tw / 2, y: f.y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
+    const tf = { x1: f.tx1, y1: f.ty1, x2: f.tx2, y2: f.ty2 };
+    let s = Math.max(safeScale(tf, padFactor), safeScale(f, padFactor) * 0.8);
+    s = Math.min(s, maxFitScale());
+    if (!(s > 0)) return;
+    const rv = regionView(codes);
+    let t;
+    if (rv) {
+      if (rv.yband) s = Math.min((H - SAFE.top - SAFE.bottom) / (rv.yband[1] - rv.yband[0]), maxFitScale());
+      const a = geom[rv.center].anchor;
+      const cy = rv.yband ? (rv.yband[0] + rv.yband[1]) / 2 : a.y;
+      t = frameAt({ x1: a.x, x2: a.x, y1: cy, y2: cy }, s);
+      if (rv.dy) t.y += rv.dy * t.h;
+    } else {
+      t = frameAt(tf, s);
+    }
+    animateView(t, ms);
   }
 
-  // Zoom to a layer where the zone's buttons are clickable.
+  // Zoom to a layer where the zone's buttons are clickable. Every zone
+  // keeps clearance above the quiz card's home (bottom centre); a zone's
+  // own `pad`/`clear` loosen the frame further.
   function zoomToZone(z, ms = 240) {
     if (!z) return;
     const f = fitCodes(z.codes);
     if (!f) return;
-    const w = f.x2 - f.x1, h = f.y2 - f.y1;
-    const aspect = fullVB.h / fullVB.w;
-    const K = Math.min(W, H / aspect);          // scale = K / tw
-    let tw = Math.max(w * 1.1, h * 1.1 / aspect);
-    if (W > 400) tw *= W / (W - 110);           // room for buttons and tails
-    if (K > 0) tw = Math.min(tw, K / (z.minScale * 1.1));  // at least clickable-layer zoom
-    tw = Math.max(tw, fullVB.w / MAX_ZOOM * 2);
-    animateView({ x: f.x1 + w / 2 - tw / 2, y: f.y1 + h / 2 - (tw * aspect) / 2, w: tw, h: tw * aspect }, ms);
+    const clear = z.clear ?? 140;
+    let s = Math.max(safeScale(f, z.pad ?? 1.05, clear), z.minScale * 1.1);  // at least clickable-layer zoom
+    s = Math.min(s, maxFitScale());
+    if (!(s > 0)) return;
+    animateView(frameAt(f, s, clear), ms);
   }
 
   // Pan (and zoom in if needed) so a country is comfortably on screen.
@@ -720,14 +836,28 @@
       for (const cls of activeFlash.get(code) || []) elem.classList.add(cls);
     };
 
+    // Dense-zone island nations past their zone's squareScale: the
+    // dotted outline (grown to a comfortable click size below) replaces
+    // the button entirely.
+    const squared = new Set();
+    for (const z of BUTTON_ZONES) {
+      if (!z.squareScale || s < z.squareScale) continue;
+      for (const c of z.codes) if (geom[c]?.groups) squared.add(c);
+    }
+
     // Dotted outline around each island group — a rounded box for a
     // compact nation, an ellipse for the pieces of a split one (Kiribati
     // either side of the antimeridian) so the two halves read as a pair.
     for (const code of codes) {
       const g = geom[code];
       if (!g?.groups) continue;
-      for (const b of g.groups) {
-        if (Math.max(b.w, b.h) * s < 12) continue;
+      const takeover = squared.has(code);
+      for (let b of g.groups) {
+        if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
+        if (takeover && (b.w * s < SQ_MIN || b.h * s < SQ_MIN)) {
+          const w2 = Math.max(b.w, SQ_MIN / s), h2 = Math.max(b.h, SQ_MIN / s);
+          b = { x: b.x + (b.w - w2) / 2, y: b.y + (b.h - h2) / 2, w: w2, h: h2 };
+        }
         const grp = document.createElementNS(SVG_NS, 'g');
         grp.setAttribute('class', 'ov-box');
         let shape;
@@ -764,7 +894,7 @@
       face.setAttribute('r', (BTN_R + 3) / s);
       const t = document.createElementNS(SVG_NS, 'text');
       t.setAttribute('x', z.at[0]); t.setAttribute('y', z.at[1]);
-      t.setAttribute('font-size', 13 / s);
+      t.setAttribute('font-size', 15 / s);
       t.setAttribute('text-anchor', 'middle');
       t.setAttribute('dominant-baseline', 'central');
       t.textContent = members.length;
@@ -782,7 +912,7 @@
     const items = [];
     for (const code of codes) {
       const off = BUTTON_OFFSETS[code];
-      if (!off || !geom[code] || grouped.has(code) || s < (BUTTON_MIN_SCALE[code] || 0) || buttonRedundant(code, s)) continue;
+      if (!off || !geom[code] || grouped.has(code) || squared.has(code) || s < (BUTTON_MIN_SCALE[code] || 0) || buttonRedundant(code, s)) continue;
       const f = focusPoint(code);
       items.push({ code, fx: f.x, fy: f.y, x: f.x + off[0] / s, y: f.y + off[1] / s, offset: Math.hypot(off[0], off[1]) });
     }
@@ -804,15 +934,18 @@
       if (group.length === 1) {
         const it = group[0];
         g.setAttribute('class', 'btn');
-        // Pointer: a wedge from the circle to the country, unless the
-        // country is already under the button.
+        // Pointer: a wedge to the country, based at the circle's rim —
+        // the face is translucent, so a wedge crossing under its middle
+        // would show through. Skipped when the country is under the
+        // button.
         const d = Math.hypot(it.fx - it.x, it.fy - it.y);
-        if (it.offset > 0 && d * s > BTN_R + 3) {
+        if (it.offset > 0 && d * s > BTN_R + 8) {
           const ux = (it.fx - it.x) / d, uy = (it.fy - it.y) / d;
-          const w = TAIL_W / s;
+          const w = TAIL_W / s, r0 = (BTN_R - 2) / s;
+          const bx = it.x + ux * r0, by = it.y + uy * r0;
           const tail = document.createElementNS(SVG_NS, 'path');
           tail.setAttribute('class', 'tail');
-          tail.setAttribute('d', `M${it.x - uy * w},${it.y + ux * w} L${it.fx},${it.fy} L${it.x + uy * w},${it.y - ux * w} Z`);
+          tail.setAttribute('d', `M${bx - uy * w},${by + ux * w} L${it.fx},${it.fy} L${bx + uy * w},${by - ux * w} Z`);
           g.appendChild(tail);
         }
         const face = document.createElementNS(SVG_NS, 'circle');
@@ -837,7 +970,7 @@
         face.setAttribute('r', (BTN_R + 2) / s);
         const t = document.createElementNS(SVG_NS, 'text');
         t.setAttribute('x', cx); t.setAttribute('y', cy);
-        t.setAttribute('font-size', 13 / s);
+        t.setAttribute('font-size', 15 / s);
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('dominant-baseline', 'central');
         t.textContent = group.length;
@@ -1758,14 +1891,22 @@
   // New Zealand). Tapping the same key again dives into that area's
   // dense pocket; tapping once more comes back out.
   const PACIFIC_ISLES = ['PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'];
+  // The 'e' area (India to New Zealand) gets a hand-framed window: a
+  // computed fit reaches Iran in the west and empty Pacific in the east,
+  // since Afghanistan and Pakistan drag the frame while the window's
+  // wide aspect adds slack. This one starts at India and trims the ocean.
+  const E_VIEW = { x: 662, y: 368, w: 380 };
   const JUMP_KEYS = {
-    1: { area: () => CODES_BY_REGION['North America'], sub: () => zoomToCodes(SUB_CODES['Central America'], 220) },
-    2: { area: () => CODES_BY_REGION['Europe'], sub: () => zoomToZone(ZONE_BY_NAME['European microstates'], 220) },
-    3: { area: () => CODES_BY_REGION['Asia'], sub: () => zoomToZone(ZONE_BY_NAME['Middle East'], 220) },
-    q: { area: () => CODES_BY_REGION['South America'], sub: () => zoomToZone(ZONE_BY_NAME['Caribbean'], 220) },
-    w: { area: () => CODES_BY_REGION['Africa'], sub: () => zoomToZone(ZONE_BY_NAME['West African coast'], 220) },
+    1: { go: () => zoomToCodes(CODES_BY_REGION['North America'], 220), sub: () => zoomToCodes(SUB_CODES['Central America'], 220) },
+    2: { go: () => zoomToCodes(CODES_BY_REGION['Europe'], 220), sub: () => zoomToZone(ZONE_BY_NAME['European microstates'], 220) },
+    3: { go: () => zoomToCodes(CODES_BY_REGION['Asia'], 220), sub: () => zoomToZone(ZONE_BY_NAME['Middle East'], 220) },
+    // The 'q' view frames the Caribbean arc along with the continent —
+    // its buttons live at the top of this view, and fitting them keeps
+    // them out from under the challenge banner.
+    q: { go: () => zoomToCodes([...CODES_BY_REGION['South America'], ...ZONE_BY_NAME['Caribbean'].codes], 220), sub: () => zoomToZone(ZONE_BY_NAME['Caribbean'], 220) },
+    w: { go: () => zoomToCodes(CODES_BY_REGION['Africa'], 220), sub: () => zoomToZone(ZONE_BY_NAME['West African coast'], 220) },
     e: {
-      area: () => [...SUB_CODES['South Asia'], ...SUB_CODES['Southeast Asia'], ...CODES_BY_REGION['Oceania']],
+      go: () => animateView({ ...E_VIEW, h: E_VIEW.w * (fullVB.h / fullVB.w) }, 220),
       sub: () => zoomToCodes(PACIFIC_ISLES, 220),
     },
   };
@@ -1780,7 +1921,7 @@
     jumpState.stage = again ? (jumpState.stage + 1) % 2 : 0;
     jumpState.key = key;
     jumpState.t = now;
-    if (jumpState.stage === 0) zoomToCodes(j.area(), 220);
+    if (jumpState.stage === 0) j.go();
     else j.sub();
   };
   for (const b of el.jumpBar.querySelectorAll('button')) {
@@ -1822,8 +1963,13 @@
 
   // ————— boot —————
 
-  // Read-only hooks for testing from the console.
-  window.NAN_DEBUG = { state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod };
+  // Console hooks for testing (the zoom/fit ones move the view).
+  window.NAN_DEBUG = {
+    state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod,
+    scale: () => scaleFor(vb), fullVB: () => fullVB,
+    zoomToCodes, zoomToZone, animateView, fitCodes, mapToScreen, bake,
+    CODES_BY_REGION, SUB_CODES,
+  };
 
   loadPrefs();
   loadStats();
@@ -1835,6 +1981,7 @@
   initMap().then(() => {
     startLevel(CHALLENGE_BY_ID.world, 'name');
     el.hello.hidden = state.seenIntro;
+    setTimeout(loadFullDetail, 2500);   // warm the deep-zoom borders once boot has settled
   }).catch((err) => {
     el.map.innerHTML = `<p style="padding:2rem">Could not load the map (${err.message}). If you opened index.html directly, run it through a local web server instead.</p>`;
   });

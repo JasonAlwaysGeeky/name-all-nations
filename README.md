@@ -45,7 +45,9 @@ map, **you click a country and name it**.
 - Island nations (Fiji, the Bahamas, Micronesia, Kiribati…) get a quiet
   dotted outline around each island group — an ellipse for the halves of a
   nation split by the antimeridian — so you can see which islands belong
-  together without it reading as a box. The outline is clickable too.
+  together without it reading as a box. The outline is clickable too, and
+  once you're zoomed into the Caribbean or Pacific layer the outlines
+  (grown to a comfortable click size) replace the buttons entirely.
 - Every country also has 12px of invisible click padding, so coastal
   waters and archipelago gaps still hit the right country.
 

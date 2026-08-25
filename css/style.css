@@ -1105,8 +1105,10 @@ footer a { color: inherit; }
   left: 12px;
   top: 12px;
   z-index: 10;
-  width: 240px;
+  width: 440px;
 }
+
+#jump-bar button { white-space: nowrap; }
 
 #jump-bar button {
   display: flex;
@@ -1129,7 +1131,7 @@ footer a { color: inherit; }
 #jump-bar .jump-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: 5px;
 }
 
 #jump-bar .jump-grid button { justify-content: flex-start; border-radius: 9px; }

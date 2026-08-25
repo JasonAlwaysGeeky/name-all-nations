@@ -325,8 +325,12 @@ const BUTTON_OFFSETS = {
   ME: [0, 0], MK: [0, 0], CY: [-14, 2], LB: [0, -28], IL: [-26, 40], PS: [-54, 34],
   // Gulf
   KW: [-22, 12], BH: [10, -22], QA: [40, -12],
-  // Caribbean & Central America (the Bahamas' dotted outline is its button)
-  AG: [-14, -40], KN: [-38, -54], DM: [9, -90], LC: [20, -66], BB: [64, -46], VC: [68, -11], GD: [78, 16], TT: [48, 22],
+  // Caribbean & Central America (the Bahamas' dotted outline is its
+  // button). The Lesser Antilles never render individual buttons — their
+  // zone folds them into one numbered button right up to the zoom where
+  // the dotted outlines take over — but an entry here is what makes a
+  // country count as a zone member, so these stay.
+  KN: [66, 0], AG: [66, 0], DM: [60, 20], LC: [60, 20], VC: [58, 51], BB: [58, 51], GD: [71, 80], TT: [71, 80],
   JM: [0, 0], BZ: [0, -22], SV: [-22, 14],
   // Africa
   CV: [-4, -30], GM: [-22, 28], GW: [-40, 48], SL: [3, 27], TG: [-4, 26], GQ: [-23, 36], ST: [-48, 36],
@@ -344,16 +348,36 @@ const BUTTON_OFFSETS = {
 // clickable either.
 const BUTTON_MIN_SCALE = { LI: 2.2, ME: 5, MK: 5 };
 
+// Buttons that stay past the usual big-enough-to-click cutoff, up to
+// this zoom (px per map unit) — the West African slivers stay awkward
+// targets well into their zone's own layer (the Gambia above all).
+const BUTTON_KEEP = { GM: 20, GW: 10, TG: 10, GQ: 10 };
+
 // Zoom layers: below `minScale` a dense area's buttons collapse into one
 // numbered button at `at` (map units) that zooms to the layer where the
 // individual buttons are clickable. The keyed ones are also hotkeys.
 // The dense areas. Each is reached by tapping its parent area's hotkey
 // a second time (1 2 3 / Q W E lay the world out on the keyboard), or
 // by clicking its numbered button on the map.
+// `squareScale`: past this zoom the zone's island nations drop their
+// buttons entirely — the dotted island outlines (grown to a comfortable
+// click size) are the targets instead.
+// The minScales are also picked so no two member buttons ever sit close
+// enough to auto-merge into a numbered pair — a look that's been retired
+// from the standard views.
 const BUTTON_ZONES = [
-  { name: 'Caribbean', at: [299, 422], minScale: 3.2, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
+  // minScale equals squareScale on purpose: the arc goes straight from
+  // one numbered zone button to the dotted squares, with no in-between
+  // layer of individual buttons.
+  { name: 'Caribbean', at: [299, 422], minScale: 8, squareScale: 8, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
   { name: 'West African coast', at: [450, 470], minScale: 3.0, codes: ['CV', 'GM', 'GW', 'SL', 'TG', 'GQ', 'ST'] },
-  { name: 'European microstates', at: [504, 332], minScale: 3.4, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
-  { name: 'Middle East', at: [596, 390], minScale: 3.4, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA'] },
-  { name: 'Oceania', at: [949, 479], minScale: 2.6, codes: ['AU', 'NZ', 'PG', 'PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'] },
+  // pad/clear: this dive runs Luxembourg to Malta top-to-bottom, so it
+  // frames looser and keeps Malta well above the quiz card's spot.
+  // minScale sits where Vatican and San Marino's buttons (7.7 map units
+  // apart, both offset [0,0]) no longer merge.
+  { name: 'European microstates', at: [504, 332], minScale: 4.5, pad: 1.15, clear: 200, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
+  // Folded through the Asia view — below 6, Israel and Palestine's
+  // buttons sat close enough to merge.
+  { name: 'Middle East', at: [596, 390], minScale: 6, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA', 'AE'] },
+  { name: 'Oceania', at: [949, 479], minScale: 2.6, squareScale: 2.8, codes: ['AU', 'NZ', 'PG', 'PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'] },
 ];
