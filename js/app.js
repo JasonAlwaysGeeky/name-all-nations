@@ -30,10 +30,15 @@
   const LOD_FULL_HI = 8.5;     // …and above which the untouched full-detail borders swap in
   const LOD_FULL_LO = 7;       // (with their own hysteresis band on the way back out)
   const ANIM_BAKE_GAP = 80;    // min ms between mid-animation re-renders (2-3 per transition)
-  const BTN_R = 16;            // button radius, px
-  const BTN_HIT = 22;          // invisible click radius around a button, px
-  const TAIL_W = 7;            // half-width of a button's pointer where it leaves the circle, px
+  const BTN_R = 18;            // button radius, px
+  const BTN_HIT = 25;          // invisible click radius around a button, px
+  const BTN_MERGE = 34;        // two buttons closer than this merge into one numbered button, px
+  const BTN_LOCK = 5;          // px per map unit past which a button holds its place on the map
+  const BTN_TAIL_MAX = 88;     // …until its pointer would outgrow this, px
+  const TAIL_W = 8;            // half-width of a button's pointer where it leaves the circle, px
   const SQ_MIN = 40;           // min on-screen size of an island outline once it replaces the button, px
+  const SQ_PAD = 4;            // breathing room an outline keeps around its islands once zoomed in, px
+  const SQ_GAP = 3;            // clearance two island outlines keep from each other, px
   const TAP_SLOP = { mouse: 5, pen: 8, touch: 10 };
   // Flick momentum. A touch pan that ends while moving keeps gliding, its
   // speed decaying by e every FLING_TAU ms — so a flick travels roughly
@@ -71,7 +76,7 @@
     attempts: 0,
     micOn: false,
     seenIntro: false,
-    prefs: { flags: true },
+    prefs: { flags: true, keys: true },
     heat: false,
   };
   let stats = { games: 0, byCode: {}, bests: {}, history: [] };
@@ -139,7 +144,7 @@
 
   function savePrefs() {
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ seenIntro: state.seenIntro, flags: state.prefs.flags }));
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ seenIntro: state.seenIntro, flags: state.prefs.flags, keys: state.prefs.keys }));
     } catch { /* private mode etc. */ }
   }
 
@@ -148,6 +153,7 @@
       const d = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
       state.seenIntro = !!d.seenIntro;
       if (typeof d.flags === 'boolean') state.prefs.flags = d.flags;
+      if (typeof d.keys === 'boolean') state.prefs.keys = d.keys;
     } catch { /* corrupted — defaults */ }
   }
 
@@ -250,7 +256,7 @@
   const el = {};
   for (const id of [
     'map-wrap', 'map', 'tooltip', 'toast', 'progress-text', 'progress-fill', 'progress-wrap',
-    'mic-toggle', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'jump-bar',
+    'mic-toggle', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'jump-bar', 'jump-toggle',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
     'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
@@ -421,8 +427,13 @@
         x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
         x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h);
       }
+      // The padded box is what the rest of the app treats as the island
+      // group (where to look, how big a target it already is); `raw` and
+      // `pad` are kept so the drawn outline can hug the islands closer
+      // as you zoom in.
       const pad = Math.max(1.4, Math.max(x2 - x1, y2 - y1) * 0.12);
-      return { x: x1 - pad, y: y1 - pad, w: (x2 - x1) + 2 * pad, h: (y2 - y1) + 2 * pad };
+      const raw = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+      return { x: x1 - pad, y: y1 - pad, w: raw.w + 2 * pad, h: raw.h + 2 * pad, raw, pad };
     });
   }
 
@@ -445,6 +456,20 @@
     const z = ZONE_BY_CODE[code];
     if (z) m = Math.max(m, z.minScale);
     return m;
+  }
+
+  // Where a button sits, in map units, relative to the country it points
+  // at. Up to BTN_LOCK the authored offset is a plain pixel offset —
+  // that's what keeps buttons off each other at world and continent
+  // zoom, where the map is crowded. Past it the button holds the place
+  // on the map that offset gave it, so zooming in (or switching between
+  // two views of the same area) can't slide it onto a neighbour; only a
+  // pointer longer than BTN_TAIL_MAX starts pulling it back in.
+  function buttonOffset(off, s) {
+    const mag = Math.hypot(off[0], off[1]);
+    if (!mag) return { x: 0, y: 0, px: 0 };
+    const grow = Math.min(Math.max(s / BTN_LOCK, 1), BTN_TAIL_MAX / mag);
+    return { x: off[0] * grow / s, y: off[1] * grow / s, px: mag * grow };
   }
 
   // Where to look for a country: the biggest island group for
@@ -508,6 +533,7 @@
   function measure() {
     const r = el.map.getBoundingClientRect();
     W = r.width; H = r.height; rectLeft = r.left; rectTop = r.top;
+    updateSafe();
   }
 
   function scaleFor(v) {
@@ -780,6 +806,18 @@
   // border, so a framed area never starts life under the chrome (and
   // offset buttons and tails get breathing room too).
   const SAFE = { top: 60, bottom: 64, left: 40, right: 64 };
+  const SAFE_BASE = { ...SAFE };
+
+  // On a phone the jump keys are docked along the bottom of the map
+  // rather than tucked in a corner, so whatever they take is map a fit
+  // must not frame anything into. Re-read on every measure().
+  function updateSafe() {
+    let bottom = SAFE_BASE.bottom;
+    if (W <= 900 && state.prefs.keys && el.jumpBar) {
+      bottom += Math.round(el.jumpBar.getBoundingClientRect().height) + 12;
+    }
+    SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.35));
+  }
 
   // `extraBottom` reserves additional space above the bottom edge — the
   // quiz card lives bottom-centre, and a dense zone's south member
@@ -868,6 +906,67 @@
 
   // ————— overlay: island outlines & buttons —————
 
+  // Island outlines that would overlap first slide apart — each as far
+  // as it can while still keeping its own islands inside, so the outline
+  // never wanders off the land it stands for — and then, if that isn't
+  // enough, give back the growth that caused it. Islands whose bounding
+  // boxes genuinely interleave (Grenada and Trinidad, Antigua and
+  // Barbuda) still overlap; no layout can separate those.
+  function spreadBoxes(list, gap) {
+    const room = (b, axis) => Math.max(0, (axis === 'x' ? b.w - b.raw.w : b.h - b.raw.h) / 2 - b.pad);
+    const over = (a, b, axis) => axis === 'x'
+      ? Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2)
+      : Math.min(a.cy + a.h / 2, b.cy + b.h / 2) - Math.max(a.cy - a.h / 2, b.cy - b.h / 2);
+    // Split nations are drawn as an ellipse wider than their box and are
+    // usually vast (Kiribati's two halves swallow whole neighbours) —
+    // nothing useful comes of trying to slide anything clear of those.
+    const pairs = [];
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      if (list[i].split || list[j].split) continue;
+      pairs.push([list[i], list[j]]);
+    }
+
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (const [a, b] of pairs) {
+        const ox = over(a, b, 'x'), oy = over(a, b, 'y');
+        if (ox <= gap || oy <= gap) continue;
+        const axis = ox <= oy ? 'x' : 'y';                    // part along whichever they're closest to clearing
+        const c = axis === 'x' ? 'cx' : 'cy', home = axis === 'x' ? 'hx' : 'hy';
+        const dir = Math.sign(a[c] - b[c]) || 1;
+        const ra = Math.max(0, room(a, axis) - dir * (a[c] - a[home]));
+        const rb = Math.max(0, room(b, axis) + dir * (b[c] - b[home]));
+        if (ra + rb <= 0) continue;
+        const move = Math.min(Math.min(ox, oy) + gap, ra + rb);
+        a[c] += dir * move * (ra / (ra + rb));
+        b[c] -= dir * move * (rb / (ra + rb));
+        moved = true;
+      }
+      if (!moved) break;
+    }
+
+    for (let pass = 0; pass < 3; pass++) {
+      for (const [a, b] of pairs) {
+        const ox = over(a, b, 'x'), oy = over(a, b, 'y');
+        if (ox <= 0 || oy <= 0) continue;
+        const axis = ox <= oy ? 'x' : 'y', d = axis === 'x' ? 'w' : 'h', r = axis === 'x' ? 'w' : 'h';
+        const ca = Math.max(0, a[d] - (a.raw[r] + 2 * a.pad)), cb = Math.max(0, b[d] - (b.raw[r] + 2 * b.pad));
+        const cut = Math.min(ox, oy);
+        if (ca + cb < cut) continue;            // can't clear it — keep the target size rather than spend it for nothing
+        a[d] -= cut * (ca / (ca + cb));
+        b[d] -= cut * (cb / (ca + cb));
+      }
+    }
+
+    // A box that both slid and shrank could have left its islands
+    // behind; pull it back over them.
+    for (const b of list) {
+      const rx = room(b, 'x'), ry = room(b, 'y');
+      b.cx = Math.min(Math.max(b.cx, b.hx - rx), b.hx + rx);
+      b.cy = Math.min(Math.max(b.cy, b.hy - ry), b.hy + ry);
+    }
+  }
+
   const activeFlash = new Map();   // code -> Set of flash classes in progress
 
   function updateOverlay() {
@@ -898,33 +997,46 @@
     // Dotted outline around each island group — a rounded box for a
     // compact nation, an ellipse for the pieces of a split one (Kiribati
     // either side of the antimeridian) so the two halves read as a pair.
+    // The outline hugs its islands closer the further you zoom in; once
+    // it stands in for the button it also grows to a comfortable click
+    // size, and spreadBoxes keeps that growth from swallowing the
+    // neighbouring island.
+    const outlines = [];
     for (const code of codes) {
       const g = geom[code];
       if (!g?.groups) continue;
       const takeover = squared.has(code);
-      for (let b of g.groups) {
+      for (const b of g.groups) {
         if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
-        if (takeover && (b.w * s < SQ_MIN || b.h * s < SQ_MIN)) {
-          const w2 = Math.max(b.w, SQ_MIN / s), h2 = Math.max(b.h, SQ_MIN / s);
-          b = { x: b.x + (b.w - w2) / 2, y: b.y + (b.h - h2) / 2, w: w2, h: h2 };
-        }
-        const grp = document.createElementNS(SVG_NS, 'g');
-        grp.setAttribute('class', 'ov-box');
-        let shape;
-        if (g.groups.length > 1) {
-          shape = document.createElementNS(SVG_NS, 'ellipse');
-          shape.setAttribute('cx', b.x + b.w / 2); shape.setAttribute('cy', b.y + b.h / 2);
-          shape.setAttribute('rx', b.w * 0.72); shape.setAttribute('ry', b.h * 0.72);
-        } else {
-          shape = document.createElementNS(SVG_NS, 'rect');
-          shape.setAttribute('x', b.x); shape.setAttribute('y', b.y);
-          shape.setAttribute('width', b.w); shape.setAttribute('height', b.h);
-          shape.setAttribute('rx', Math.min(b.w, b.h) * 0.3);
-        }
-        grp.appendChild(shape);
-        decorate(grp, code);
-        overlayLayer.appendChild(grp);
+        const r = b.raw, pad = Math.min(b.pad, SQ_PAD / s);
+        const box = {
+          code, split: g.groups.length > 1, raw: r, pad,
+          cx: r.x + r.w / 2, cy: r.y + r.h / 2,
+          w: Math.max(r.w + 2 * pad, takeover ? SQ_MIN / s : 0),
+          h: Math.max(r.h + 2 * pad, takeover ? SQ_MIN / s : 0),
+        };
+        box.hx = box.cx; box.hy = box.cy;
+        outlines.push(box);
       }
+    }
+    spreadBoxes(outlines, SQ_GAP / s);
+    for (const b of outlines) {
+      const grp = document.createElementNS(SVG_NS, 'g');
+      grp.setAttribute('class', 'ov-box');
+      let shape;
+      if (b.split) {
+        shape = document.createElementNS(SVG_NS, 'ellipse');
+        shape.setAttribute('cx', b.cx); shape.setAttribute('cy', b.cy);
+        shape.setAttribute('rx', b.w * 0.72); shape.setAttribute('ry', b.h * 0.72);
+      } else {
+        shape = document.createElementNS(SVG_NS, 'rect');
+        shape.setAttribute('x', b.cx - b.w / 2); shape.setAttribute('y', b.cy - b.h / 2);
+        shape.setAttribute('width', b.w); shape.setAttribute('height', b.h);
+        shape.setAttribute('rx', Math.min(b.w, b.h) * 0.3);
+      }
+      grp.appendChild(shape);
+      decorate(grp, b.code);
+      overlayLayer.appendChild(grp);
     }
 
     // Zoom layers: below a zone's minScale its buttons collapse into one
@@ -944,7 +1056,7 @@
       face.setAttribute('r', (BTN_R + 3) / s);
       const t = document.createElementNS(SVG_NS, 'text');
       t.setAttribute('x', z.at[0]); t.setAttribute('y', z.at[1]);
-      t.setAttribute('font-size', 15 / s);
+      t.setAttribute('font-size', 17 / s);
       t.setAttribute('text-anchor', 'middle');
       t.setAttribute('dominant-baseline', 'central');
       t.textContent = members.length;
@@ -964,13 +1076,14 @@
       const off = BUTTON_OFFSETS[code];
       if (!off || !geom[code] || grouped.has(code) || squared.has(code) || s < (BUTTON_MIN_SCALE[code] || 0) || buttonRedundant(code, s)) continue;
       const f = focusPoint(code);
-      items.push({ code, fx: f.x, fy: f.y, x: f.x + off[0] / s, y: f.y + off[1] / s, offset: Math.hypot(off[0], off[1]) });
+      const d = buttonOffset(off, s);
+      items.push({ code, fx: f.x, fy: f.y, x: f.x + d.x, y: f.y + d.y, offset: d.px });
     }
     // Two buttons closer than their own width (tiny window, far zoomed
     // out) merge into one numbered button that zooms in on the pair.
     const parent = items.map((_, i) => i);
     const find = (i) => parent[i] === i ? i : (parent[i] = find(parent[i]));
-    const limit = (2 * BTN_R + 2) / s;
+    const limit = BTN_MERGE / s;
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
         if (Math.hypot(items[i].x - items[j].x, items[i].y - items[j].y) < limit) parent[find(i)] = find(j);
@@ -1020,7 +1133,7 @@
         face.setAttribute('r', (BTN_R + 2) / s);
         const t = document.createElementNS(SVG_NS, 'text');
         t.setAttribute('x', cx); t.setAttribute('y', cy);
-        t.setAttribute('font-size', 15 / s);
+        t.setAttribute('font-size', 17 / s);
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('dominant-baseline', 'central');
         t.textContent = group.length;
@@ -2064,9 +2177,20 @@
     },
   };
   const jumpState = { key: null, stage: 0, t: 0 };
+
+  // Which key you're standing on, and how deep — free on a keyboard
+  // (your fingers know), so it's drawn for the touch pad's sake.
+  function markJumpKeys() {
+    for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
+      const on = b.dataset.key === jumpState.key;
+      b.classList.toggle('armed', on && jumpState.stage === 0);
+      b.classList.toggle('deep', on && jumpState.stage === 1);
+    }
+  }
+
   const jumpTo = (key) => {
     if (!vb) return;
-    if (key === '0') { animateView({ ...fullVB }, 220); jumpState.key = null; return; }
+    if (key === '0') { animateView({ ...fullVB }, 220); jumpState.key = null; markJumpKeys(); return; }
     const j = JUMP_KEYS[key];
     if (!j) return;
     const now = performance.now();
@@ -2076,11 +2200,30 @@
     jumpState.t = now;
     if (jumpState.stage === 0) j.go();
     else j.sub();
+    markJumpKeys();
   };
-  for (const b of el.jumpBar.querySelectorAll('button')) {
+  for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
     b.addEventListener('mousedown', (e) => e.preventDefault());
     b.addEventListener('click', () => jumpTo(b.dataset.key));
   }
+
+  // Fold the pad away when the map matters more than the shortcut — the
+  // chip stays put so it's one tap back.
+  function applyKeysPref() {
+    document.body.classList.toggle('keys-off', !state.prefs.keys);
+    const label = state.prefs.keys ? 'Hide the jump keys' : 'Show the jump keys';
+    el.jumpToggle.setAttribute('aria-expanded', String(state.prefs.keys));
+    el.jumpToggle.setAttribute('aria-label', label);
+    el.jumpToggle.title = label;
+    measure();                                             // the map's safe area just changed
+    if (vb) { dirty = true; setView({ ...vb }); bake(); }
+  }
+  el.jumpToggle.addEventListener('mousedown', (e) => e.preventDefault());
+  el.jumpToggle.addEventListener('click', () => {
+    state.prefs.keys = !state.prefs.keys;
+    savePrefs();
+    applyKeysPref();
+  });
 
   document.addEventListener('keydown', (e) => {
     if (state.level?.pausedAt != null) {
@@ -2130,6 +2273,7 @@
   loadPrefs();
   loadStats();
   document.body.classList.toggle('no-flags', !state.prefs.flags);
+  applyKeysPref();
   updateProgress();
   el.micToggle.classList.add('off');
   el.hello.hidden = true;

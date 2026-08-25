@@ -39,6 +39,15 @@
   --bar-a: #123a5f;
   --bar-b: #1d5f8c;
 
+  /* the notch / gesture-bar cutouts, and the room the touch key pad
+     reserves along the bottom of the map (0 on desktop, where the jump
+     bar lives up in the corner instead) */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --keys-h: 0px;
+
   --shadow-sm: 0 2px 8px rgba(20, 45, 75, 0.16);
   --shadow-md: 0 6px 20px rgba(15, 40, 70, 0.22);
   --shadow-lg: 0 14px 40px rgba(12, 34, 60, 0.30);
@@ -80,7 +89,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 9px 16px;
+  padding: calc(9px + var(--safe-t)) calc(16px + var(--safe-r)) 9px calc(16px + var(--safe-l));
   background: linear-gradient(105deg, var(--bar-a), var(--bar-b));
   color: #fff;
   flex: 0 0 auto;
@@ -564,7 +573,7 @@ body.no-flags .flag { display: none; }
 /* ————— quiz card ————— */
 #card {
   left: 50%;
-  bottom: 20px;
+  bottom: calc(20px + var(--keys-h) + var(--safe-b));
   transform: translateX(-50%);
   width: min(440px, calc(100% - 24px));
 }
@@ -771,7 +780,7 @@ body.no-flags .flag { display: none; }
 #word-bank {
   position: absolute;
   left: 50%;
-  bottom: 18px;
+  bottom: calc(18px + var(--keys-h) + var(--safe-b));
   transform: translateX(-50%);
   width: min(720px, calc(100% - 24px));
   background: var(--panel-bg);
@@ -955,6 +964,10 @@ body.no-flags .flag { display: none; }
 }
 
 #levels-panel[hidden], #stats-panel[hidden], #help[hidden] { display: none; }
+
+/* the shortcut list is taller than a short phone — let it scroll rather
+   than clip (the challenge picker and stats already scroll inside) */
+#help { overflow-y: auto; }
 
 #levels-panel h2, #stats-panel h2, #help h2 { font-size: 1.15rem; margin-bottom: 6px; }
 
@@ -1153,6 +1166,14 @@ footer a { color: inherit; }
 #jump-bar button:active { transform: translateY(1px); }
 #jump-bar kbd { font-size: 0.68rem; padding: 0 5px; }
 
+/* the key you're standing on: one more tap dives into its dense pocket,
+   the affordance the keyboard gets for free from muscle memory */
+#jump-bar button.armed { background: #fff3d0; border-color: #e7b95a; }
+#jump-bar button.deep { background: #ffe1a0; border-color: #d99b28; }
+
+/* only the touch layout offers the show/hide chip */
+#jump-bar #jump-toggle { display: none; }
+
 /* place mode: the target row pulses whenever the name changes */
 #bank-target { border-radius: 10px; padding: 3px 8px; margin: -3px -8px; }
 #bank-target.switch { animation: targetSwitch 0.8s ease-out; }
@@ -1162,21 +1183,100 @@ footer a { color: inherit; }
   100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
 }
 
-/* ————— small screens ————— */
+/* ————— touch & small screens —————
+
+   No keyboard, so the same 1 2 3 / Q W E layer becomes a pad of key-caps
+   docked bottom-left, in reach of a thumb; the card, the word bank and
+   the zoom column all sit above whatever it reserves (--keys-h), which
+   drops to just the toggle chip when it's folded away. */
 @media (max-width: 900px) {
-  #jump-bar { display: none; }
+  :root { --keys-h: 104px; }
+  body.keys-off { --keys-h: 48px; }
+
+  #jump-bar {
+    top: auto;
+    left: calc(10px + var(--safe-l));
+    bottom: calc(10px + var(--safe-b));
+    width: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  #jump-keys { display: flex; align-items: stretch; gap: 4px; }
+  body.keys-off #jump-keys { display: none; }
+
+  #jump-bar .jump-grid { gap: 4px; }
+  #jump-bar .jump-grid button,
+  #jump-bar .jump-world {
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    width: 56px;
+    height: 44px;
+    padding: 2px 3px;
+    border-radius: 11px;
+    font-size: 0.55rem;
+    line-height: 1.1;
+    text-align: center;
+  }
+  #jump-bar .jump-world { margin: 0; width: 42px; height: auto; }
+  #jump-bar .jump-name { display: none; }
+  #jump-bar button[data-key]::after { content: attr(data-short); }
+  #jump-bar .jump-hint { display: none; }
+  #jump-bar kbd { font-size: 0.72rem; padding: 0 4px; }
+
+  #jump-bar #jump-toggle {
+    display: flex;
+    justify-content: center;
+    width: 40px;
+    height: 36px;
+    padding: 0;
+    font-size: 1rem;
+    border-radius: 11px;
+  }
+  body.keys-off #jump-toggle { opacity: 0.85; }
+}
+
+/* phone landscape: height is the scarce axis, so the caps go to one row
+   of bare glyphs and the card gives back the padding it can spare */
+@media (max-width: 900px) and (max-height: 520px) {
+  :root { --keys-h: 56px; }
+  #jump-bar .jump-grid { grid-template-columns: repeat(6, 1fr); }
+  #jump-bar .jump-grid button,
+  #jump-bar .jump-world { width: 40px; height: 40px; }
+  #jump-bar button[data-key]::after { display: none; }
+  #jump-bar #jump-toggle { height: 40px; }
+
+  footer { display: none; }
+  #card { padding: 11px 14px; }
+  #card-prompt { margin-bottom: 8px; font-size: 0.92rem; }
+  #guess-input, #guess-btn { padding: 8px 12px; }
+  #card-actions { margin-top: 8px; }
+  #bank-chips { max-height: 22vh; }
+  /* leave the zoom column its corner */
+  #word-bank { width: min(720px, calc(100% - 120px)); }
 }
 
 @media (max-width: 640px) {
   #topbar h1 { font-size: 0.92rem; }
-  #topbar { gap: 8px; padding: 8px 10px; }
+  #topbar { gap: 8px; padding: calc(8px + var(--safe-t)) calc(10px + var(--safe-r)) 8px calc(10px + var(--safe-l)); }
   #topbar-buttons .btn-label { display: none; }
-  #card { bottom: 10px; }
-  #zoom-controls { top: auto; bottom: 132px; }
+  /* the globe alone is wordmark enough here: the title was squeezing the
+     progress bar out of the bar entirely */
+  #topbar h1 .app-name { display: none; }
+  #progress-wrap { min-width: 96px; }
+  #topbar-buttons button { padding: 10px 12px; }
+  #card { bottom: calc(10px + var(--keys-h) + var(--safe-b)); }
+  #zoom-controls { top: auto; bottom: calc(132px + var(--keys-h) + var(--safe-b)); right: calc(14px + var(--safe-r)); }
+  /* the quiz card is nearly the width of the screen and twice the height
+     of the word bank — there is no room beside it for the zoom column,
+     and a pinch does the same job, so it steps aside while the card is up */
+  body:has(#card:not([hidden])) #zoom-controls { display: none; }
   footer { display: none; }
   #level-banner { top: 8px; gap: 4px; padding: 5px 6px; }
   #level-title { font-size: 0.85rem; }
-  #word-bank { bottom: 10px; }
+  #word-bank { bottom: calc(10px + var(--keys-h) + var(--safe-b)); }
   #bank-chips { max-height: 14vh; }
   #bank-name { font-size: 1.1rem; }
   .stat-tiles { grid-template-columns: repeat(2, 1fr); }
