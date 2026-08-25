@@ -34,7 +34,15 @@
   const BTN_HIT = 22;          // invisible click radius around a button, px
   const TAIL_W = 7;            // half-width of a button's pointer where it leaves the circle, px
   const SQ_MIN = 40;           // min on-screen size of an island outline once it replaces the button, px
-  const TAP_SLOP = { mouse: 5, pen: 5, touch: 9 };
+  const TAP_SLOP = { mouse: 5, pen: 8, touch: 10 };
+  // Flick momentum. A touch pan that ends while moving keeps gliding, its
+  // speed decaying by e every FLING_TAU ms — so a flick travels roughly
+  // v0 * FLING_TAU px. Shorter than a map app's (~325ms) on purpose: this
+  // is a game, and the map should settle where you threw it, not drift.
+  const FLING_TAU = 190;       // ms; momentum decay time constant
+  const FLING_MIN = 0.02;      // px/ms below which the glide stops
+  const FLING_MAX = 5;         // px/ms cap on the launch speed
+  const FLING_WINDOW = 90;     // ms of recent movement the launch speed is measured over
   const STRIKES = 3;           // wrong placements before the answer is shown
 
   // Island nations drawn with a dotted outline per island group — the
@@ -356,7 +364,8 @@
       }
       dirty = true;
       setView({ ...vb });
-      bake();
+      reanchor();
+      if (!interacting()) bake();
     }).observe(el.map);
   }
 
@@ -487,6 +496,14 @@
   let bakeTimer = null;
   let dirty = false;
   let lastBakeAt = 0;
+  let dragging = false;           // a finger/mouse is actively moving the view
+  let reanchor = () => {};        // set by bindMapEvents; re-bases a live gesture
+
+  // While the view is under the user's hand (or gliding after a flick),
+  // swapping every path's `d` for another detail level, or rebuilding the
+  // small-country overlay, costs far more than a frame's budget — which
+  // on a phone reads as the map lurching. Both wait for the settle bake.
+  function interacting() { return dragging || fling.id != null; }
 
   function measure() {
     const r = el.map.getBoundingClientRect();
@@ -554,6 +571,7 @@
     else if (s > LOD_HI) { if (lod !== 'full' || s < LOD_FULL_LO) want = 'hi'; }
     else if (s < LOD_LO) want = 'lo';
     if (want === 'full' && !dFull) { loadFullDetail(); want = 'hi'; }
+    if (interacting()) want = lod;
     if (want !== lod) {
       lod = want;
       const src = lod === 'full' ? dFull : lod === 'hi' ? dHi : dLo;
@@ -564,7 +582,7 @@
     svg.style.transform = '';
     // Rebuilding the overlay mid-animation would just add to the frame's
     // work; the landing bake redraws it at the final scale anyway.
-    if (animId == null && !zoomAnim.active) updateOverlay();
+    if (animId == null && !zoomAnim.active && !interacting()) updateOverlay();
   }
 
   // The untouched amCharts map (full border detail, 1.4MB) is fetched in
@@ -598,11 +616,50 @@
 
   let animId = null;
   const zoomAnim = { active: false, targetW: 0, ax: 0, ay: 0, cx: 0, cy: 0, last: 0 };
+  const fling = { id: null, vx: 0, vy: 0, last: 0 };
+
+  function stopFling() {
+    if (fling.id) cancelAnimationFrame(fling.id);
+    const was = fling.id != null;
+    fling.id = null;
+    fling.vx = fling.vy = 0;
+    return was;
+  }
 
   function cancelAnim() {
     if (animId) cancelAnimationFrame(animId);
     animId = null;
     zoomAnim.active = false;
+    stopFling();
+  }
+
+  // Glide on after a flick: velocity (client px/ms) decays exponentially
+  // and the view is pushed by it each frame. Running into a clamp edge
+  // kills that axis so the map never grinds against the boundary.
+  function flingStep(now) {
+    if (!fling.id) return;
+    const dt = Math.min(40, now - fling.last);
+    fling.last = now;
+    const s = scaleFor(vb);
+    const wantX = fling.vx * dt / s, wantY = fling.vy * dt / s;
+    const x0 = vb.x, y0 = vb.y;
+    setView({ x: vb.x - wantX, y: vb.y - wantY, w: vb.w, h: vb.h });
+    if (Math.abs(wantX) > 1e-9 && Math.abs(vb.x - x0) < Math.abs(wantX) * 0.5) fling.vx = 0;
+    if (Math.abs(wantY) > 1e-9 && Math.abs(vb.y - y0) < Math.abs(wantY) * 0.5) fling.vy = 0;
+    const k = Math.exp(-dt / FLING_TAU);
+    fling.vx *= k; fling.vy *= k;
+    if (Math.hypot(fling.vx, fling.vy) < FLING_MIN) { stopFling(); bake(); }
+    else fling.id = requestAnimationFrame(flingStep);
+  }
+
+  function startFling(vx, vy) {
+    const sp = Math.hypot(vx, vy);
+    if (!(sp > FLING_MIN * 4)) return false;
+    const c = Math.min(1, FLING_MAX / sp);
+    fling.vx = vx * c; fling.vy = vy * c;
+    fling.last = performance.now();
+    fling.id = requestAnimationFrame(flingStep);
+    return true;
   }
 
   function animateView(target, ms = 260) {
@@ -647,7 +704,7 @@
     if (!zoomAnim.active) return;
     const dt = Math.min(50, now - zoomAnim.last);
     zoomAnim.last = now;
-    const a = 1 - Math.exp(-dt / 55);
+    const a = 1 - Math.exp(-dt / 45);   // snappier than a map app's — this is a game
     let w = vb.w + (zoomAnim.targetW - vb.w) * a;
     const done = Math.abs(w - zoomAnim.targetW) / zoomAnim.targetW < 0.002;
     if (done) w = zoomAnim.targetW;
@@ -661,13 +718,6 @@
     });
     if (done) { zoomAnim.active = false; scheduleBake(); }
     else requestAnimationFrame(zoomStep);
-  }
-
-  function zoomAtClient(cx, cy, factor) {
-    const pt = clientToMap(cx, cy);
-    const w = vb.w * factor;
-    const k = w / vb.w;
-    setView({ x: pt.x - (pt.x - vb.x) * k, y: pt.y - (pt.y - vb.y) * k, w, h: vb.h * k });
   }
 
   // Two rectangles: x1…y2 caps a giant country's pull to 22 units past
@@ -1059,69 +1109,172 @@
       zoomTowards(e.clientX, e.clientY, f);
     }, { passive: false });
 
-    // Pointer-based pan + pinch. A press that moves less than TAP_SLOP
-    // is a tap on the element under the initial pointerdown — we can't
-    // rely on the click event because setPointerCapture retargets it.
+    // Pointer-based pan + pinch, run as one continuous gesture.
+    //
+    // Every pointer in play contributes to a centroid and a spread. The
+    // gesture keeps one anchor — the map point that sat under the centroid
+    // when the anchor was taken — and each move simply re-solves the view
+    // so that map point is back under the centroid, at a width scaled by
+    // how far the fingers have spread. One finger and two therefore run
+    // through exactly the same path, and two-finger drags pan as well as
+    // zoom, the way a map app does.
+    //
+    // The anchor is retaken whenever the set of pointers changes. That is
+    // what stops the classic jump: lift one finger out of a pinch and the
+    // centroid leaps across the screen, and a gesture anchored at the
+    // original touch-down would teleport the map by the same distance.
+    // Re-anchoring makes the remaining finger pick up from where the view
+    // already is.
+    //
+    // A press that never moves beyond TAP_SLOP is a tap on the element
+    // under the initial pointerdown — we can't rely on the click event
+    // because setPointerCapture retargets it.
     const pointers = new Map();
-    let down = null;
-    let panning = false;
-    let pinch = null;
+    let gest = null;
+    reanchor = () => { if (gest) anchorGesture(); };
+    const vel = [];   // recent centroid samples, for the release velocity
+
+    const centroidOf = (pts) => {
+      let cx = 0, cy = 0;
+      for (const p of pts) { cx += p.x; cy += p.y; }
+      return { x: cx / pts.length, y: cy / pts.length };
+    };
+
+    // Mean distance from the centroid: for two fingers that is half the
+    // pinch distance, and it keeps working if a third finger lands.
+    const spreadOf = (pts, c) => {
+      if (pts.length < 2) return 0;
+      let d = 0;
+      for (const p of pts) d += Math.hypot(p.x - c.x, p.y - c.y);
+      return d / pts.length;
+    };
+
+    function anchorGesture() {
+      const pts = [...pointers.values()];
+      if (!pts.length) { gest = null; return; }
+      const c = centroidOf(pts);
+      const pt = clientToMap(c.x, c.y);
+      gest = {
+        ax: pt.x, ay: pt.y, cx: c.x, cy: c.y,
+        spread: spreadOf(pts, c), w: vb.w,
+        moved: gest ? gest.moved : false,
+        target: gest ? gest.target : null,
+        type: gest ? gest.type : 'touch',
+        noTap: gest ? gest.noTap : false,
+      };
+      vel.length = 0;   // the centroid just jumped; old samples would fling
+    }
+
+    // Put the anchored map point back under `c`, at view width `w`.
+    function applyGesture(c, w) {
+      const h = w * (fullVB.h / fullVB.w);
+      const s = Math.min(W / w, H / h);
+      const ox = (W - w * s) / 2, oy = (H - h * s) / 2;
+      setView({
+        x: gest.ax - (c.x - rectLeft - ox) / s,
+        y: gest.ay - (c.y - rectTop - oy) / s,
+        w, h,
+      });
+    }
+
+    function sample(c) {
+      const now = performance.now();
+      vel.push({ t: now, x: c.x, y: c.y });
+      while (vel.length > 2 && now - vel[0].t > FLING_WINDOW) vel.shift();
+    }
+
+    function releaseVelocity() {
+      if (vel.length < 2) return null;
+      const a = vel[0], b = vel[vel.length - 1];
+      const dt = b.t - a.t;
+      // A finger that stopped before lifting should not fling.
+      if (dt < 8 || performance.now() - b.t > 70) return null;
+      return { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt };
+    }
 
     el.map.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // A touch that catches a glide should stop it, not also count as a
+      // tap on whatever happened to slide under the finger.
+      const caught = stopFling();
       cancelAnim();
       try { el.map.setPointerCapture(e.pointerId); } catch { /* synthetic / stale pointer */ }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
-        panning = false;
-        down = { x: e.clientX, y: e.clientY, vb: { ...vb }, target: e.target, type: e.pointerType };
-      }
-      if (pointers.size === 2) {
-        const [a, b] = [...pointers.values()];
-        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), vbw: vb.w };
-        panning = true;
+        gest = null;
+        anchorGesture();
+        gest.target = e.target;
+        gest.type = e.pointerType;
+        gest.noTap = caught;
+      } else {
+        anchorGesture();
+        gest.moved = true;      // a second finger is never a tap
+        gest.noTap = true;
+        dragging = true;
+        el.map.classList.add('panning');
+        el.tooltip.hidden = true;
       }
     });
 
     el.map.addEventListener('pointermove', (e) => {
       if (!pointers.has(e.pointerId)) { updateTooltip(e); return; }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!gest) return;
 
-      if (pointers.size === 1 && down) {
-        const dx = e.clientX - down.x, dy = e.clientY - down.y;
-        if (!panning && Math.hypot(dx, dy) > (TAP_SLOP[down.type] || 6)) {
-          panning = true;
-          el.map.classList.add('panning');
-          el.tooltip.hidden = true;
+      const pts = [...pointers.values()];
+      const c = centroidOf(pts);
+
+      if (!gest.moved) {
+        if (Math.hypot(c.x - gest.cx, c.y - gest.cy) <= (TAP_SLOP[gest.type] || 8)) {
+          updateTooltip(e);
+          return;
         }
-        if (panning) {
-          const s = scaleFor(down.vb);
-          setView({ x: down.vb.x - dx / s, y: down.vb.y - dy / s, w: down.vb.w, h: down.vb.h });
-        }
-      } else if (pointers.size === 2 && pinch) {
-        const [a, b] = [...pointers.values()];
-        const dist = Math.hypot(a.x - b.x, a.y - b.y);
-        if (dist > 0) {
-          zoomAtClient((a.x + b.x) / 2, (a.y + b.y) / 2, (pinch.dist / dist) * (pinch.vbw / vb.w));
-        }
+        gest.moved = true;
+        dragging = true;
+        el.map.classList.add('panning');
+        el.tooltip.hidden = true;
+        // Re-anchor at the point the drag actually broke loose, so the map
+        // doesn't snap by the slop distance on the first moved frame.
+        anchorGesture();
+        return;
       }
-      if (!panning) updateTooltip(e);
+
+      let w = gest.w;
+      if (gest.spread > 0) {
+        const sp = spreadOf(pts, c);
+        if (sp > 0) w = clampView({ x: vb.x, y: vb.y, w: gest.w * (gest.spread / sp) }).w;
+      }
+      applyGesture(c, w);
+      if (pts.length === 1) sample(c);
+      else vel.length = 0;      // don't fling out of a pinch
     });
 
     const endPointer = (e) => {
-      const wasTap = e.type === 'pointerup' && pointers.size === 1 && !panning && down;
+      const wasTap = e.type === 'pointerup' && pointers.size === 1 && gest && !gest.moved && !gest.noTap;
+      const tapTarget = gest?.target;
       pointers.delete(e.pointerId);
-      if (pointers.size < 2) pinch = null;
-      if (pointers.size === 0) {
+
+      if (pointers.size > 0) {
+        // Fingers still down (a pinch losing one): re-anchor rather than
+        // carry on from a centroid that no longer means anything.
+        anchorGesture();
+      } else {
+        const moved = gest?.moved;
+        const type = gest?.type;
+        gest = null;
         el.map.classList.remove('panning');
-        if (panning) bake();
-        panning = false;
+        dragging = false;
+        if (moved) {
+          const v = type !== 'mouse' ? releaseVelocity() : null;
+          if (!v || !startFling(v.vx, v.vy)) bake();
+        }
+        vel.length = 0;
       }
-      if (wasTap) {
-        const target = down.target.closest?.('[data-code], path[id], g.btn');
+
+      if (wasTap && tapTarget) {
+        const target = tapTarget.closest?.('[data-code], path[id], g.btn');
         if (target) handleTarget(target, { x: e.clientX - rectLeft, y: e.clientY - rectTop });
       }
-      if (pointers.size === 0) down = null;
     };
     el.map.addEventListener('pointerup', endPointer);
     el.map.addEventListener('pointercancel', endPointer);
@@ -1958,7 +2111,10 @@
     measure();
     dirty = true;
     setView({ ...vb });
-    bake();
+    // The scale just changed under the finger (on Android, usually the URL
+    // bar collapsing mid-drag) — rebase the gesture or it lurches.
+    reanchor();
+    if (!interacting()) bake();
   });
 
   // ————— boot —————
