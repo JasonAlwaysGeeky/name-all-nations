@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1c4b7a">
   <title>Name All Nations</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
@@ -11,7 +11,7 @@
 <body>
 
   <header id="topbar">
-    <h1>🌍 Name All Nations</h1>
+    <h1>🌍 <span class="app-name">Name All Nations</span></h1>
     <button id="progress-wrap" title="Choose a challenge" aria-label="Choose a challenge">
       <span id="progress-text">0 / 195</span>
       <span id="progress-bar"><span id="progress-fill"></span></span>
@@ -28,16 +28,19 @@
     <div id="map" aria-label="World map"></div>
 
     <nav id="jump-bar" aria-label="Jump around the map">
-      <div class="jump-grid">
-        <button data-key="1" title="North America — tap again: Central America"><kbd>1</kbd> North&nbsp;America</button>
-        <button data-key="2" title="Europe — tap again: the micro-states"><kbd>2</kbd> Europe</button>
-        <button data-key="3" title="Asia — tap again: the Middle East"><kbd>3</kbd> Asia</button>
-        <button data-key="q" title="South America — tap again: the Caribbean"><kbd>Q</kbd> South&nbsp;America</button>
-        <button data-key="w" title="Africa — tap again: the West African coast"><kbd>W</kbd> Africa</button>
-        <button data-key="e" title="India to New Zealand — tap again: the Pacific islands"><kbd>E</kbd> India–New&nbsp;Zealand</button>
+      <div id="jump-keys">
+        <div class="jump-grid">
+          <button data-key="1" data-short="N. America" title="North America — tap again: Central America"><kbd>1</kbd> <span class="jump-name">North&nbsp;America</span></button>
+          <button data-key="2" data-short="Europe" title="Europe — tap again: the micro-states"><kbd>2</kbd> <span class="jump-name">Europe</span></button>
+          <button data-key="3" data-short="Asia" title="Asia — tap again: the Middle East"><kbd>3</kbd> <span class="jump-name">Asia</span></button>
+          <button data-key="q" data-short="S. America" title="South America — tap again: the Caribbean"><kbd>Q</kbd> <span class="jump-name">South&nbsp;America</span></button>
+          <button data-key="w" data-short="Africa" title="Africa — tap again: the West African coast"><kbd>W</kbd> <span class="jump-name">Africa</span></button>
+          <button data-key="e" data-short="India–NZ" title="India to New Zealand — tap again: the Pacific islands"><kbd>E</kbd> <span class="jump-name">India–New&nbsp;Zealand</span></button>
+        </div>
+        <button data-key="0" class="jump-world" data-short="World" title="Whole world (0)"><kbd>0</kbd> <span class="jump-name">World</span></button>
+        <div class="jump-hint">tap again → its dense pocket</div>
       </div>
-      <button data-key="0" class="jump-world" title="Whole world (0)"><kbd>0</kbd> World</button>
-      <div class="jump-hint">tap again → its dense pocket</div>
+      <button id="jump-toggle" aria-expanded="true" aria-controls="jump-keys" title="Hide the jump keys" aria-label="Hide the jump keys">⌨</button>
     </nav>
 
     <div id="zoom-controls">
@@ -55,7 +58,8 @@
          Turn on the 🎤 to just say the names out loud.
          Pick a continent or region from 🎯 for a smaller, timed challenge.</p>
       <p class="hello-keys">Keys: <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> over <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd>
-         lay the world out on your keyboard — tap one again for its dense pocket ·
+         lay the world out on your keyboard — or on the pad in the corner if you're on a touch screen.
+         Tap one again for its dense pocket ·
          <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
       <button id="hello-close">Let's go</button>
     </div>
@@ -190,7 +194,9 @@
         <dd>The map on your keyboard — top row north: N. America · Europe · Asia;
           bottom row south: S. America · Africa · India-to-NZ.
           Tap the same key again for that area's dense pocket:
-          Central America · micro-states · Middle East · Caribbean · West coast · Pacific islands.</dd>
+          Central America · micro-states · Middle East · Caribbean · West coast · Pacific islands.
+          On a touch screen the same six keys sit in a pad at the bottom-left corner;
+          the ⌨ chip beside it folds the pad away when you want the whole map.</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
         <dt><kbd>P</kbd></dt><dd>Pause — hides the map and stops the clock (it starts on your first move)</dd>

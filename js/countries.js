@@ -306,15 +306,18 @@ const TERRITORIES = {
 };
 
 // Seterra-style buttons for countries too small to click. Values are the
-// button's screen offset from the country (px, +y is south) — a fixed
-// pixel offset so the button sits just off the coast at any zoom, with a
-// pointer back to the shape. Zero means the button sits on the country.
+// button's screen offset from the country (px, +y is south), read at
+// world and continent zoom: a fixed pixel offset, so the button sits
+// just off the coast with a pointer back to the shape. Zero means the
+// button sits on the country. Past BTN_LOCK the same offset is held as
+// a place on the map instead (see buttonOffset), so from a region view
+// on down the button keeps the spot picked for it here — which is why
+// every offset should land on open water or on a big neighbour, never
+// on another small country.
 // Laid out so no two buttons collide, and no button covers another
 // small country's centre, on anything from a 1280px-wide window to a
-// 1920px one (and as you zoom further in — an offset must never point
-// straight at a neighbour, or the button slides onto it as the map
-// grows). Should two ever overlap, they merge into one numbered button
-// that zooms in.
+// 1920px one. Should two ever overlap, they merge into one numbered
+// button that zooms in.
 const BUTTON_OFFSETS = {
   // Europe & the Levant. Vatican/San Marino/Monaco sit on their countries
   // and merge into one numbered button until you zoom to Europe — there
@@ -322,9 +325,9 @@ const BUTTON_OFFSETS = {
   // small country's centre. Montenegro / North Macedonia (see
   // BUTTON_MIN_SCALE) only get theirs once you're in on the Balkans.
   VA: [0, 0], SM: [0, 0], MC: [0, 0], AD: [-6, 34], LI: [0, -30], LU: [-30, 14], MT: [12, 22],
-  ME: [0, 0], MK: [0, 0], CY: [-14, 2], LB: [0, -28], IL: [-26, 40], PS: [-54, 34],
+  ME: [0, 0], MK: [0, 0], CY: [-14, 2], LB: [-31, 20], IL: [-26, 40], PS: [-54, 34],
   // Gulf
-  KW: [-22, 12], BH: [10, -22], QA: [40, -12],
+  KW: [20, 20], BH: [10, -22], QA: [40, -12],
   // Caribbean & Central America (the Bahamas' dotted outline is its
   // button). The Lesser Antilles never render individual buttons — their
   // zone folds them into one numbered button right up to the zoom where
@@ -333,7 +336,11 @@ const BUTTON_OFFSETS = {
   KN: [66, 0], AG: [66, 0], DM: [60, 20], LC: [60, 20], VC: [58, 51], BB: [58, 51], GD: [71, 80], TT: [71, 80],
   JM: [0, 0], BZ: [0, -22], SV: [-22, 14],
   // Africa
-  CV: [-4, -30], GM: [-22, 28], GW: [-40, 48], SL: [3, 27], TG: [-4, 26], GQ: [-23, 36], ST: [-48, 36],
+  // The Gambia and Guinea-Bissau both step out into the Atlantic, and
+  // Togo out into the Bight of Benin: anywhere south of the Gambia is
+  // Guinea-Bissau's own coast, and the short offsets these three used to
+  // carry parked their buttons on a neighbour once you zoomed in.
+  CV: [-4, -30], GM: [-36, 0], GW: [-25, 28], SL: [3, 27], TG: [4, 46], GQ: [-30, 42], ST: [-48, 36],
   DJ: [30, 6], RW: [-22, -14], BI: [-14, 20], SZ: [22, 0], LS: [16, 16], KM: [0, 0], MU: [0, 0], SC: [0, 0],
   // Asia
   MV: [0, 0], BT: [28, -30], SG: [0, 0], BN: [0, 0], TL: [0, 0],
@@ -378,6 +385,9 @@ const BUTTON_ZONES = [
   { name: 'European microstates', at: [504, 332], minScale: 4.5, pad: 1.15, clear: 200, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
   // Folded through the Asia view — below 6, Israel and Palestine's
   // buttons sat close enough to merge.
-  { name: 'Middle East', at: [596, 390], minScale: 6, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA', 'AE'] },
+  // Out in the Persian Gulf: the members are spread from Cyprus to the
+  // UAE, but the Gulf four are the dense half, and the old centre-of-mass
+  // spot sat right on Saudi Arabia's own click target.
+  { name: 'Middle East', at: [621, 385], minScale: 6, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA', 'AE'] },
   { name: 'Oceania', at: [949, 479], minScale: 2.6, squareScale: 2.8, codes: ['AU', 'NZ', 'PG', 'PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'] },
 ];
