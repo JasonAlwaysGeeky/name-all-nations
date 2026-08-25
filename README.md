@@ -1,5 +1,8 @@
 # 🌍 Name All Nations
 
+**Play it: https://jasonalwaysgeeky.github.io/name-all-nations/** (works on
+phones — tap a country and type or speak its name).
+
 A game that tests whether you can name all 195 countries — the reverse of
 the usual geography quiz. Instead of being shown a name and pointing at the
 map, **you click a country and name it**.
@@ -94,9 +97,11 @@ npx http-server -p 5173 .
 ```
 
 then open http://localhost:5173. (It can't run from `file://` because the
-map is fetched at runtime.) On a phone, host it anywhere static
-(GitHub Pages, Netlify, Cloudflare Pages) and it works as-is — the layout
-is responsive and touch/pinch are supported.
+map is fetched at runtime.) On a phone, use the live
+build above, or host it anywhere static (GitHub Pages, Netlify, Cloudflare
+Pages) and it works as-is — the layout is responsive and touch/pinch are
+supported. `.github/workflows/pages.yml` publishes every push to `main` to
+GitHub Pages (repo Settings → Pages → Source: GitHub Actions).
 
 ## How the map stays fast
 
