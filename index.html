@@ -4,44 +4,70 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1c4b7a">
+  <!-- Installed to the home screen, Chrome on Android drops the address
+       bar and the system bars entirely — the manifest's display mode is
+       what does it, no tap required. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Nations">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <title>Name All Nations</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <header id="topbar">
-    <h1>🌍 <span class="app-name">Name All Nations</span></h1>
-    <button id="progress-wrap" title="Choose a challenge" aria-label="Choose a challenge">
-      <span id="progress-text">0 / 195</span>
-      <span id="progress-bar"><span id="progress-fill"></span></span>
-    </button>
-    <div id="topbar-buttons">
-      <button id="levels-btn" title="Choose a challenge" aria-label="Challenges">🎯 <span class="btn-label">Challenges</span></button>
-      <button id="stats-btn" title="Stats &amp; heat map" aria-label="Stats">📊 <span class="btn-label">Stats</span></button>
-      <button id="help-btn" title="Shortcuts (?)" aria-label="Help">?</button>
-      <button id="mic-toggle" title="Voice input on/off" aria-label="Toggle voice input">🎤</button>
-    </div>
-  </header>
-
   <main id="map-wrap">
     <div id="map" aria-label="World map"></div>
+
+    <!-- the challenge's progress, as a hairline along the very top edge -->
+    <div id="progress-bar"><span id="progress-fill"></span></div>
 
     <nav id="jump-bar" aria-label="Jump around the map">
       <div id="jump-keys">
         <div class="jump-grid">
-          <button data-key="1" data-short="N. America" title="North America — tap again: Central America"><kbd>1</kbd> <span class="jump-name">North&nbsp;America</span></button>
-          <button data-key="2" data-short="Europe" title="Europe — tap again: the micro-states"><kbd>2</kbd> <span class="jump-name">Europe</span></button>
-          <button data-key="3" data-short="Asia" title="Asia — tap again: the Middle East"><kbd>3</kbd> <span class="jump-name">Asia</span></button>
-          <button data-key="q" data-short="S. America" title="South America — tap again: the Caribbean"><kbd>Q</kbd> <span class="jump-name">South&nbsp;America</span></button>
-          <button data-key="w" data-short="Africa" title="Africa — tap again: the West African coast"><kbd>W</kbd> <span class="jump-name">Africa</span></button>
-          <button data-key="e" data-short="India–NZ" title="India to New Zealand — tap again: the Pacific islands"><kbd>E</kbd> <span class="jump-name">India–New&nbsp;Zealand</span></button>
+          <button data-key="1" data-short="N. America" data-sub="Central America">
+            <kbd>1</kbd>
+            <span class="jump-lines"><span class="jump-name">North&nbsp;America</span><span class="jump-sub">Central&nbsp;America</span></span>
+          </button>
+          <button data-key="2" data-short="Europe" data-sub="Micro-states">
+            <kbd>2</kbd>
+            <span class="jump-lines"><span class="jump-name">Europe</span><span class="jump-sub">Micro-states</span></span>
+          </button>
+          <button data-key="3" data-short="Asia" data-sub="Middle East">
+            <kbd>3</kbd>
+            <span class="jump-lines"><span class="jump-name">Asia</span><span class="jump-sub">Middle&nbsp;East</span></span>
+          </button>
+          <button data-key="q" data-short="S. America" data-sub="Caribbean">
+            <kbd>Q</kbd>
+            <span class="jump-lines"><span class="jump-name">South&nbsp;America</span><span class="jump-sub">Caribbean</span></span>
+          </button>
+          <button data-key="w" data-short="Africa" data-sub="West coast">
+            <kbd>W</kbd>
+            <span class="jump-lines"><span class="jump-name">Africa</span><span class="jump-sub">West&nbsp;coast</span></span>
+          </button>
+          <button data-key="e" data-short="India–NZ" data-sub="Pacific isles">
+            <kbd>E</kbd>
+            <span class="jump-lines"><span class="jump-name">India–New&nbsp;Zealand</span><span class="jump-sub">Pacific&nbsp;isles</span></span>
+          </button>
         </div>
-        <button data-key="0" class="jump-world" data-short="World" title="Whole world (0)"><kbd>0</kbd> <span class="jump-name">World</span></button>
-        <div class="jump-hint">tap again → its dense pocket</div>
+        <button data-key="0" class="jump-world" data-short="World">
+          <kbd>0</kbd>
+          <span class="jump-lines"><span class="jump-name">Whole&nbsp;world</span></span>
+        </button>
+        <div class="jump-hint">top line = the area · bottom line = its dense pocket, one more tap in</div>
       </div>
       <button id="jump-toggle" aria-expanded="true" aria-controls="jump-keys" title="Hide the jump keys" aria-label="Hide the jump keys">⌨</button>
     </nav>
+
+    <div id="tools">
+      <button id="fs-btn" title="Full screen (F)" aria-label="Full screen" hidden>⛶</button>
+      <button id="stats-btn" title="Stats &amp; heat map" aria-label="Stats">📊</button>
+      <button id="help-btn" title="Shortcuts (?)" aria-label="Help">?</button>
+      <button id="mic-toggle" title="Voice input on/off" aria-label="Toggle voice input">🎤</button>
+    </div>
 
     <div id="zoom-controls">
       <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
@@ -51,16 +77,18 @@
 
     <div id="tooltip" hidden></div>
     <div id="toast" hidden></div>
+    <div id="jump-flash" hidden></div>
 
     <div id="hello" class="panel">
       <h2>Can you name all 195 countries?</h2>
       <p>Click any country and type its name — close spellings count.
          Turn on the 🎤 to just say the names out loud.
-         Pick a continent or region from 🎯 for a smaller, timed challenge.</p>
+         Pick a continent or region from the pill at the top for a smaller, timed challenge.</p>
       <p class="hello-keys">Keys: <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> over <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd>
          lay the world out on your keyboard — or on the pad in the corner if you're on a touch screen.
-         Tap one again for its dense pocket ·
-         <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>Space</kbd> skip (place mode)</p>
+         Every key has two floors: the area, and the dense pocket printed under it ·
+         <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>R</kbd> restart ·
+         <kbd>Space</kbd> skip (place mode)</p>
       <button id="hello-close">Let's go</button>
     </div>
 
@@ -91,17 +119,15 @@
       </div>
     </section>
 
+    <!-- the whole heads-up display while you play: where you are, the
+         clock, and pause. Everything else is one tap away in a panel. -->
     <div id="level-banner" hidden>
-      <button id="challenge-prev" title="Previous challenge ([)" aria-label="Previous challenge">‹</button>
-      <span id="level-info">
+      <button id="progress-wrap" title="Choose a challenge" aria-label="Choose a challenge">
         <span id="level-title"></span>
-        <span id="level-progress"></span>
-        <span id="level-timer">0:00.0</span>
-      </span>
-      <button id="challenge-next" title="Next challenge (])" aria-label="Next challenge">›</button>
-      <button id="level-restart" title="Restart this challenge" aria-label="Restart">↻</button>
+        <span id="progress-text">0 / 195</span>
+      </button>
+      <span id="level-timer">0:00.0</span>
       <button id="pause-timer" title="Pause — hides the map, stops the clock (P)" aria-label="Pause">⏸</button>
-      <button id="level-mode" title="Switch mode"></button>
     </div>
 
     <div id="pause-veil" hidden>
@@ -149,6 +175,13 @@
     <aside id="levels-panel" class="panel" hidden>
       <button id="levels-close" aria-label="Close">×</button>
       <h2>🎯 Challenges</h2>
+      <div id="now-playing">
+        <span class="np-label">Playing now</span>
+        <button id="challenge-prev" title="Previous challenge ([)" aria-label="Previous challenge">‹</button>
+        <button id="level-restart" title="Restart this challenge (R)" aria-label="Restart">↻</button>
+        <button id="level-mode" title="Switch mode"></button>
+        <button id="challenge-next" title="Next challenge (])" aria-label="Next challenge">›</button>
+      </div>
       <p class="levels-blurb">Pick how much of the world to take on. Every challenge starts fresh, and the
         clock starts on your first move.
         <strong>Place</strong> is level one — put the listed names on the map.
@@ -193,12 +226,16 @@
         <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd></dt>
         <dd>The map on your keyboard — top row north: N. America · Europe · Asia;
           bottom row south: S. America · Africa · India-to-NZ.
-          Tap the same key again for that area's dense pocket:
-          Central America · micro-states · Middle East · Caribbean · West coast · Pacific islands.
+          Every key has a second floor, printed on the second line of its button: tap the same key
+          again for that area's dense pocket — Central America · micro-states · Middle East ·
+          Caribbean · West coast · Pacific islands — and once more to come back out.
           On a touch screen the same six keys sit in a pad at the bottom-left corner;
           the ⌨ chip beside it folds the pad away when you want the whole map.</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
+        <dt><kbd>R</kbd></dt><dd>Restart this challenge</dd>
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
+        <dt><kbd>F</kbd></dt><dd>Full screen — on a phone this is what gets rid of the address bar and the
+          system bars; in landscape they cost more of the screen than the map does</dd>
         <dt><kbd>P</kbd></dt><dd>Pause — hides the map and stops the clock (it starts on your first move)</dd>
         <dt><kbd>Esc</kbd></dt><dd>Close panels</dd>
         <dt>Scroll / pinch</dt><dd>Zoom at the cursor</dd>
@@ -207,13 +244,12 @@
       <p class="help-note">Small countries have a round button with a pointer to the shape — click the button;
         it retires once you're zoomed in enough to click the country itself.
         A numbered button is a dense area (the Caribbean, the Pacific, the micro-states…) — click it to zoom
-        to the layer where each country has its own button. Dotted outlines group an island nation's islands and are clickable too.</p>
+        to the layer where each country has its own button. Dotted outlines group an island nation's islands
+        and are clickable too: a rounded square when the islands cluster, a tilted pill when they string out
+        across the sea (the Bahamas, Micronesia).</p>
+      <p class="help-note">Map © <a href="https://www.amcharts.com" target="_blank" rel="noopener">amCharts</a></p>
     </aside>
   </main>
-
-  <footer>
-    Map © <a href="https://www.amcharts.com" target="_blank" rel="noopener">amCharts</a>
-  </footer>
 
   <script src="js/countries.js"></script>
   <script src="js/app.js"></script>

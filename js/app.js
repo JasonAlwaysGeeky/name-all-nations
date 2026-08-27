@@ -36,9 +36,17 @@
   const BTN_LOCK = 5;          // px per map unit past which a button holds its place on the map
   const BTN_TAIL_MAX = 88;     // …until its pointer would outgrow this, px
   const TAIL_W = 8;            // half-width of a button's pointer where it leaves the circle, px
-  const SQ_MIN = 40;           // min on-screen size of an island outline once it replaces the button, px
+  const SQ_MIN = 56;           // min on-screen size of an island outline once it replaces the button, px
+  const SQ_THIN = 30;          // …except across a tilted pill, which is long enough to be an easy target, px
   const SQ_PAD = 4;            // breathing room an outline keeps around its islands once zoomed in, px
-  const SQ_GAP = 3;            // clearance two island outlines keep from each other, px
+  const SQ_GAP = 7;            // clearance two island outlines keep from each other, px
+  // An island chain strung out on a diagonal (the Bahamas down towards
+  // Cuba, Micronesia across the Pacific) is badly served by an upright
+  // box: the box has to swallow whole neighbours to reach the far
+  // island. Where a tilted fit is this much smaller than the upright
+  // one, the outline becomes a tilted pill along the chain instead.
+  const ROT_MAX = 0.75;        // tilted-fit area / upright-fit area, at or below which the pill wins
+  const ROT_THIN = 14;         // a pill never draws thinner than this on screen, px — a hairline reads as a coastline
   const TAP_SLOP = { mouse: 5, pen: 8, touch: 10 };
   // Flick momentum. A touch pan that ends while moving keeps gliding, its
   // speed decaying by e every FLING_TAU ms — so a flick travels roughly
@@ -76,6 +84,7 @@
     attempts: 0,
     micOn: false,
     seenIntro: false,
+    seenFs: false,       // the full-screen chip has drawn attention to itself once
     prefs: { flags: true, keys: true },
     heat: false,
   };
@@ -144,7 +153,7 @@
 
   function savePrefs() {
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ seenIntro: state.seenIntro, flags: state.prefs.flags, keys: state.prefs.keys }));
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ seenIntro: state.seenIntro, flags: state.prefs.flags, keys: state.prefs.keys, seenFs: state.seenFs }));
     } catch { /* private mode etc. */ }
   }
 
@@ -152,6 +161,7 @@
     try {
       const d = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
       state.seenIntro = !!d.seenIntro;
+      state.seenFs = !!d.seenFs;
       if (typeof d.flags === 'boolean') state.prefs.flags = d.flags;
       if (typeof d.keys === 'boolean') state.prefs.keys = d.keys;
     } catch { /* corrupted — defaults */ }
@@ -256,12 +266,13 @@
   const el = {};
   for (const id of [
     'map-wrap', 'map', 'tooltip', 'toast', 'progress-text', 'progress-fill', 'progress-wrap',
-    'mic-toggle', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'jump-bar', 'jump-toggle',
+    'mic-toggle', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'fs-btn',
+    'jump-bar', 'jump-toggle', 'jump-flash',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
     'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
-    'answer-meta', 'speak-btn', 'retry-btn', 'levels-btn', 'levels-panel', 'levels-close',
-    'levels-list', 'level-banner', 'level-title', 'level-progress', 'level-timer', 'level-mode',
+    'answer-meta', 'speak-btn', 'retry-btn', 'levels-panel', 'levels-close',
+    'levels-list', 'level-banner', 'level-title', 'level-timer', 'level-mode',
     'challenge-prev', 'challenge-next', 'level-restart',
     'word-bank', 'bank-target', 'bank-flag', 'bank-name', 'bank-strikes', 'bank-skip', 'bank-show', 'bank-collapse', 'bank-hint', 'bank-chips',
     'pause-timer', 'pause-veil',
@@ -355,7 +366,7 @@
     for (const id of Object.keys(allPaths)) allPaths[id].setAttribute('d', dLo[id]);
 
     measure();
-    setView({ ...fullVB });
+    setView(worldView());
     bindMapEvents();
 
     // A tab can load hidden (0x0 viewport) and be shown later; re-measure
@@ -365,7 +376,7 @@
       measure();
       if (W === w0 && H === h0) return;
       if (!vb || !isFinite(vb.x + vb.y + vb.w + vb.h)) {
-        if (W > 0 && H > 0) { base = null; setView({ ...fullVB }); }
+        if (W > 0 && H > 0) { base = null; setView(worldView()); }
         return;
       }
       dirty = true;
@@ -433,8 +444,40 @@
       // as you zoom in.
       const pad = Math.max(1.4, Math.max(x2 - x1, y2 - y1) * 0.12);
       const raw = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-      return { x: x1 - pad, y: y1 - pad, w: raw.w + 2 * pad, h: raw.h + 2 * pad, raw, pad };
+      return { x: x1 - pad, y: y1 - pad, w: raw.w + 2 * pad, h: raw.h + 2 * pad, raw, pad, tilt: tiltFit(list, raw) };
     });
+  }
+
+  // The smallest tilted box that still holds every island of a group.
+  // Rotating calipers over the islands' corners, one degree at a time —
+  // cheap, and it only runs once at load. `tight` is how much smaller
+  // that box is than the upright one: near 1 the islands cluster and an
+  // upright outline is honest, well under it they run in a line and the
+  // upright box is mostly other people's sea.
+  function tiltFit(list, raw) {
+    const pts = [];
+    for (const b of list) pts.push([b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]);
+    let best = null;
+    for (let deg = 0; deg < 180; deg++) {
+      const th = deg * Math.PI / 180, c = Math.cos(th), sn = Math.sin(th);
+      let u1 = Infinity, v1 = Infinity, u2 = -Infinity, v2 = -Infinity;
+      for (const [px, py] of pts) {
+        const u = px * c + py * sn, v = py * c - px * sn;
+        if (u < u1) u1 = u; if (u > u2) u2 = u;
+        if (v < v1) v1 = v; if (v > v2) v2 = v;
+      }
+      const w = u2 - u1, h = v2 - v1;
+      const area = Math.max(w, 1e-4) * Math.max(h, 1e-4);
+      if (!best || area < best.area) best = { area, w, h, deg, cu: (u1 + u2) / 2, cv: (v1 + v2) / 2, c, sn };
+    }
+    const box = Math.max(raw.w, 1e-4) * Math.max(raw.h, 1e-4);
+    return {
+      angle: best.deg,
+      w: best.w, h: best.h,
+      cx: best.cu * best.c - best.cv * best.sn,
+      cy: best.cu * best.sn + best.cv * best.c,
+      tight: best.area / box,
+    };
   }
 
   // A button earns its keep only while the country itself is too small
@@ -454,8 +497,14 @@
   function minScaleFor(code) {
     let m = BUTTON_MIN_SCALE[code] || 0;
     const z = ZONE_BY_CODE[code];
-    if (z) m = Math.max(m, z.minScale);
+    if (z) m = Math.max(m, ZONE_SOLO[code] ?? z.minScale);
     return m;
+  }
+
+  // A zone member is folded into the numbered button until it either
+  // earns its own (ZONE_SOLO) or the whole zone opens up.
+  function inZoneFold(code, s) {
+    return !(ZONE_SOLO[code] && s >= ZONE_SOLO[code]);
   }
 
   // Where a button sits, in map units, relative to the country it points
@@ -540,14 +589,33 @@
     return Math.min(W / v.w, H / v.h);
   }
 
+  // The view rect takes the *window's* shape, not the map's. Pinned to
+  // the map's own 3:2, a portrait phone letterboxed down to a 250px band
+  // of map inside an 800px screen — every region, however tall, framed
+  // into a third of the glass. Matching the window means a fit fills it.
+  function viewAspect() { return W > 0 && H > 0 ? H / W : fullVB.h / fullVB.w; }
+
+  // Zoomed all the way out is "the whole map is on screen", whichever
+  // axis ends up binding — on a tall window that is a wider rect than
+  // the map itself.
+  function worldView() {
+    const asp = viewAspect();
+    const w = Math.max(fullVB.w, fullVB.h / asp), h = w * asp;
+    return { x: fullVB.x + fullVB.w / 2 - w / 2, y: fullVB.y + fullVB.h / 2 - h / 2, w, h };
+  }
+
   function clampView(n) {
+    const asp = viewAspect();
     const minW = fullVB.w / MAX_ZOOM;
-    const w = Math.min(Math.max(n.w, minW), fullVB.w);
-    const h = w * (fullVB.h / fullVB.w);
+    const w = Math.min(Math.max(n.w, minW), Math.max(fullVB.w, fullVB.h / asp));
+    const h = w * asp;
     const mx = fullVB.w * 0.05, my = fullVB.h * 0.05;
+    // An axis the view already overflows has no travel left in it, so it
+    // centres on the map rather than pinning to one edge.
+    const span = (lo, hi, want, mid) => (hi < lo ? mid : Math.min(Math.max(want, lo), hi));
     return {
-      x: Math.min(Math.max(n.x, fullVB.x - mx), fullVB.x + fullVB.w + mx - w),
-      y: Math.min(Math.max(n.y, fullVB.y - my), fullVB.y + fullVB.h + my - h),
+      x: span(fullVB.x - mx, fullVB.x + fullVB.w + mx - w, n.x, fullVB.x + fullVB.w / 2 - w / 2),
+      y: span(fullVB.y - my, fullVB.y + fullVB.h + my - h, n.y, fullVB.y + fullVB.h / 2 - h / 2),
       w, h,
     };
   }
@@ -734,12 +802,11 @@
     let w = vb.w + (zoomAnim.targetW - vb.w) * a;
     const done = Math.abs(w - zoomAnim.targetW) / zoomAnim.targetW < 0.002;
     if (done) w = zoomAnim.targetW;
-    const h = w * (fullVB.h / fullVB.w);
-    const s = Math.min(W / w, H / h);
-    const ox = (W - w * s) / 2, oy = (H - h * s) / 2;
+    const h = w * viewAspect();
+    const s = W / w;                    // rect and window agree, so no letterbox offset
     setView({
-      x: zoomAnim.ax - (zoomAnim.cx - rectLeft - ox) / s,
-      y: zoomAnim.ay - (zoomAnim.cy - rectTop - oy) / s,
+      x: zoomAnim.ax - (zoomAnim.cx - rectLeft) / s,
+      y: zoomAnim.ay - (zoomAnim.cy - rectTop) / s,
       w, h,
     });
     if (done) { zoomAnim.active = false; scheduleBake(); }
@@ -831,19 +898,15 @@
   // The widest allowed fit is half of MAX_ZOOM, so a "zoom to this tiny
   // island" never lands at full magnification.
   function maxFitScale() {
-    const aspect = fullVB.h / fullVB.w;
-    return Math.min(W, H / aspect) / (fullVB.w / MAX_ZOOM * 2);
+    return W / (fullVB.w / MAX_ZOOM * 2);
   }
 
   // View rect that shows `f` at scale s, centred in the safe area.
   function frameAt(f, s, extraBottom = 0) {
-    const aspect = fullVB.h / fullVB.w;
-    const vw = Math.min(W, H / aspect) / s, vh = vw * aspect;
-    const ox = (W - vw * s) / 2, oy = (H - vh * s) / 2;
     return {
-      x: (f.x1 + f.x2) / 2 - (SAFE.left + (W - SAFE.left - SAFE.right) / 2 - ox) / s,
-      y: (f.y1 + f.y2) / 2 - (SAFE.top + (H - SAFE.top - SAFE.bottom - extraBottom) / 2 - oy) / s,
-      w: vw, h: vh,
+      x: (f.x1 + f.x2) / 2 - (SAFE.left + (W - SAFE.left - SAFE.right) / 2) / s,
+      y: (f.y1 + f.y2) / 2 - (SAFE.top + (H - SAFE.top - SAFE.bottom - extraBottom) / 2) / s,
+      w: W / s, h: H / s,
     };
   }
 
@@ -853,7 +916,7 @@
   // tip); the true extent is what gets centred, splitting any remaining
   // overflow evenly between the frame's edges.
   function zoomToCodes(codes, ms = 260, padFactor = 1.05) {
-    if (codes.length === WORLD_CODES.length) { animateView({ ...fullVB }, ms); return; }
+    if (codes.length === WORLD_CODES.length) { animateView(worldView(), ms); return; }
     const f = fitCodes(codes);
     if (!f) return;
     const tf = { x1: f.tx1, y1: f.ty1, x2: f.tx2, y2: f.ty2 };
@@ -897,7 +960,7 @@
                    f.y > vb.y + vb.h * pad && f.y < vb.y + vb.h * (1 - pad);
     const hasButton = BUTTON_OFFSETS[code] && s >= minScaleFor(code);
     if (inside && (f.dim * s >= 6 || hasButton)) return false;
-    const aspect = fullVB.h / fullVB.w;
+    const aspect = viewAspect();
     let w = vb.w;
     if (f.dim * s < 6 && !hasButton) w = Math.min(vb.w, Math.max(f.dim * 10, fullVB.w / 10));
     animateView({ x: f.x - w / 2, y: f.y - (w * aspect) / 2, w, h: w * aspect }, 300);
@@ -909,54 +972,73 @@
   // Island outlines that would overlap first slide apart — each as far
   // as it can while still keeping its own islands inside, so the outline
   // never wanders off the land it stands for — and then, if that isn't
-  // enough, give back the growth that caused it. Islands whose bounding
-  // boxes genuinely interleave (Grenada and Trinidad, Antigua and
-  // Barbuda) still overlap; no layout can separate those.
+  // enough, give back the growth that caused it, slide again with the
+  // room that frees, and repeat. Islands whose bounding boxes genuinely
+  // interleave (Grenada and Trinidad, Antigua and Barbuda) still touch;
+  // no layout can separate those.
   function spreadBoxes(list, gap) {
-    const room = (b, axis) => Math.max(0, (axis === 'x' ? b.w - b.raw.w : b.h - b.raw.h) / 2 - b.pad);
+    // How far a box can slide and still cover its own islands, keeping
+    // half its breathing room on the trailing side. A tilted pill has no
+    // such freedom — slide it sideways and the chain walks out of the end
+    // of it — so it holds still and the neighbour moves.
+    const room = (b, axis) => b.fixed ? 0
+      : Math.max(0, (axis === 'x' ? b.w - b.raw.w : b.h - b.raw.h) / 2 - b.pad / 2);
     const over = (a, b, axis) => axis === 'x'
       ? Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2)
       : Math.min(a.cy + a.h / 2, b.cy + b.h / 2) - Math.max(a.cy - a.h / 2, b.cy - b.h / 2);
-    // Split nations are drawn as an ellipse wider than their box and are
-    // usually vast (Kiribati's two halves swallow whole neighbours) —
-    // nothing useful comes of trying to slide anything clear of those.
+    // A half of a split nation stands for islands on the far side of the
+    // map, so sliding it means nothing — like a tilted pill, it holds
+    // still and its neighbours make way for it instead.
+    for (const b of list) if (b.split) b.fixed = true;
     const pairs = [];
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-      if (list[i].split || list[j].split) continue;
       pairs.push([list[i], list[j]]);
     }
+    // A tilted pill already hugs its chain, so there is no slack in it to
+    // give back; the shrink pass leaves those pairs alone.
+    const shrinkable = pairs.filter(([a, b]) => !a.tilt && !b.tilt);
 
-    for (let pass = 0; pass < 8; pass++) {
-      let moved = false;
-      for (const [a, b] of pairs) {
-        const ox = over(a, b, 'x'), oy = over(a, b, 'y');
-        if (ox <= gap || oy <= gap) continue;
-        const axis = ox <= oy ? 'x' : 'y';                    // part along whichever they're closest to clearing
-        const c = axis === 'x' ? 'cx' : 'cy', home = axis === 'x' ? 'hx' : 'hy';
-        const dir = Math.sign(a[c] - b[c]) || 1;
-        const ra = Math.max(0, room(a, axis) - dir * (a[c] - a[home]));
-        const rb = Math.max(0, room(b, axis) + dir * (b[c] - b[home]));
-        if (ra + rb <= 0) continue;
-        const move = Math.min(Math.min(ox, oy) + gap, ra + rb);
-        a[c] += dir * move * (ra / (ra + rb));
-        b[c] -= dir * move * (rb / (ra + rb));
-        moved = true;
+    const slide = (passes) => {
+      for (let pass = 0; pass < passes; pass++) {
+        let moved = false;
+        for (const [a, b] of pairs) {
+          const ox = over(a, b, 'x'), oy = over(a, b, 'y');
+          if (ox <= 0 || oy <= 0) continue;                   // clear on one axis is clear
+          const axis = ox <= oy ? 'x' : 'y';                  // part along whichever they're closest to clearing
+          const c = axis === 'x' ? 'cx' : 'cy', home = axis === 'x' ? 'hx' : 'hy';
+          const dir = Math.sign(a[c] - b[c]) || 1;
+          const ra = Math.max(0, room(a, axis) - dir * (a[c] - a[home]));
+          const rb = Math.max(0, room(b, axis) + dir * (b[c] - b[home]));
+          if (ra + rb <= 0) continue;
+          const move = Math.min(Math.min(ox, oy) + gap, ra + rb);
+          a[c] += dir * move * (ra / (ra + rb));
+          b[c] -= dir * move * (rb / (ra + rb));
+          moved = true;
+        }
+        if (!moved) return;
       }
-      if (!moved) break;
-    }
+    };
 
-    for (let pass = 0; pass < 3; pass++) {
-      for (const [a, b] of pairs) {
+    // Give back the growth that caused the overlap — and, past that, half
+    // the breathing room too, because two outlines this close are better
+    // off snug than crossed. As much as there is, even when that alone
+    // won't clear the pair: the slide that follows usually finishes the
+    // job with the room it frees.
+    const shrink = () => {
+      for (const [a, b] of shrinkable) {
         const ox = over(a, b, 'x'), oy = over(a, b, 'y');
         if (ox <= 0 || oy <= 0) continue;
-        const axis = ox <= oy ? 'x' : 'y', d = axis === 'x' ? 'w' : 'h', r = axis === 'x' ? 'w' : 'h';
-        const ca = Math.max(0, a[d] - (a.raw[r] + 2 * a.pad)), cb = Math.max(0, b[d] - (b.raw[r] + 2 * b.pad));
-        const cut = Math.min(ox, oy);
-        if (ca + cb < cut) continue;            // can't clear it — keep the target size rather than spend it for nothing
+        const axis = ox <= oy ? 'x' : 'y', d = axis === 'x' ? 'w' : 'h';
+        const ca = Math.max(0, a[d] - (a.raw[d] + a.pad)), cb = Math.max(0, b[d] - (b.raw[d] + b.pad));
+        if (ca + cb <= 0) continue;
+        const cut = Math.min(Math.min(ox, oy) + gap, ca + cb);
         a[d] -= cut * (ca / (ca + cb));
         b[d] -= cut * (cb / (ca + cb));
       }
-    }
+    };
+
+    slide(8);
+    for (let round = 0; round < 4; round++) { shrink(); slide(4); }
 
     // A box that both slid and shrank could have left its islands
     // behind; pull it back over them.
@@ -994,13 +1076,14 @@
       for (const c of z.codes) if (geom[c]?.groups) squared.add(c);
     }
 
-    // Dotted outline around each island group — a rounded box for a
-    // compact nation, an ellipse for the pieces of a split one (Kiribati
-    // either side of the antimeridian) so the two halves read as a pair.
-    // The outline hugs its islands closer the further you zoom in; once
-    // it stands in for the button it also grows to a comfortable click
-    // size, and spreadBoxes keeps that growth from swallowing the
-    // neighbouring island.
+    // Dotted outline around each island group — a rounded box when the
+    // islands cluster, a tilted pill along the chain when they don't
+    // (the Bahamas running down past Cuba, Micronesia strung across the
+    // Pacific): an upright box around either of those is mostly someone
+    // else's sea. The outline hugs its islands closer the further you
+    // zoom in; once it stands in for the button it also grows to a
+    // comfortable click size, and spreadBoxes keeps that growth from
+    // swallowing the neighbouring island.
     const outlines = [];
     for (const code of codes) {
       const g = geom[code];
@@ -1009,12 +1092,26 @@
       for (const b of g.groups) {
         if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
         const r = b.raw, pad = Math.min(b.pad, SQ_PAD / s);
-        const box = {
-          code, split: g.groups.length > 1, raw: r, pad,
-          cx: r.x + r.w / 2, cy: r.y + r.h / 2,
-          w: Math.max(r.w + 2 * pad, takeover ? SQ_MIN / s : 0),
-          h: Math.max(r.h + 2 * pad, takeover ? SQ_MIN / s : 0),
-        };
+        const box = { code, split: g.groups.length > 1, raw: r, pad };
+        const t = b.tilt;
+        if (t && t.tight <= ROT_MAX) {
+          // Long side gets the full comfortable size, short side only
+          // enough to stay a pill you can hit.
+          const long = Math.max(t.w, t.h) + 2 * pad, short = Math.min(t.w, t.h) + 2 * pad;
+          const across = Math.max(short, (takeover ? SQ_THIN : ROT_THIN) / s);
+          const along = Math.max(long, takeover ? SQ_MIN / s : 0);
+          const flip = t.w < t.h;                             // the tilt's own long axis
+          box.tilt = { angle: t.angle, w: flip ? across : along, h: flip ? along : across };
+          box.fixed = true;
+          box.cx = t.cx; box.cy = t.cy;
+          const th = t.angle * Math.PI / 180, c = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th));
+          box.w = box.tilt.w * c + box.tilt.h * sn;           // upright bounds, for keeping neighbours clear
+          box.h = box.tilt.w * sn + box.tilt.h * c;
+        } else {
+          box.cx = r.x + r.w / 2; box.cy = r.y + r.h / 2;
+          box.w = Math.max(r.w + 2 * pad, takeover ? SQ_MIN / s : 0);
+          box.h = Math.max(r.h + 2 * pad, takeover ? SQ_MIN / s : 0);
+        }
         box.hx = box.cx; box.hy = box.cy;
         outlines.push(box);
       }
@@ -1023,17 +1120,14 @@
     for (const b of outlines) {
       const grp = document.createElementNS(SVG_NS, 'g');
       grp.setAttribute('class', 'ov-box');
-      let shape;
-      if (b.split) {
-        shape = document.createElementNS(SVG_NS, 'ellipse');
-        shape.setAttribute('cx', b.cx); shape.setAttribute('cy', b.cy);
-        shape.setAttribute('rx', b.w * 0.72); shape.setAttribute('ry', b.h * 0.72);
-      } else {
-        shape = document.createElementNS(SVG_NS, 'rect');
-        shape.setAttribute('x', b.cx - b.w / 2); shape.setAttribute('y', b.cy - b.h / 2);
-        shape.setAttribute('width', b.w); shape.setAttribute('height', b.h);
-        shape.setAttribute('rx', Math.min(b.w, b.h) * 0.3);
-      }
+      const shape = document.createElementNS(SVG_NS, 'rect');
+      const t = b.tilt;
+      const w = t ? t.w : b.w, h = t ? t.h : b.h;
+      shape.setAttribute('x', b.cx - w / 2); shape.setAttribute('y', b.cy - h / 2);
+      shape.setAttribute('width', w); shape.setAttribute('height', h);
+      // Fully rounded ends on a pill, a soft-cornered square otherwise.
+      shape.setAttribute('rx', Math.min(w, h) * (t ? 0.5 : 0.3));
+      if (t) shape.setAttribute('transform', `rotate(${t.angle} ${b.cx} ${b.cy})`);
       grp.appendChild(shape);
       decorate(grp, b.code);
       overlayLayer.appendChild(grp);
@@ -1043,7 +1137,8 @@
     // numbered button that zooms to where they're clickable.
     const grouped = new Set();
     for (const z of BUTTON_ZONES) {
-      const members = z.codes.filter(c => codes.includes(c) && BUTTON_OFFSETS[c] && geom[c] && !buttonRedundant(c, s));
+      const members = z.codes.filter(c => codes.includes(c) && BUTTON_OFFSETS[c] && geom[c] &&
+        !buttonRedundant(c, s) && inZoneFold(c, s));
       if (s >= z.minScale || members.length < 2) continue;
       for (const c of members) grouped.add(c);
       const g = document.createElementNS(SVG_NS, 'g');
@@ -1487,8 +1582,7 @@
   function setStatus(code, st) {
     state.status[code] = st;
     applyStatus(code);
-    updateProgress();
-    updateLevelUI();
+    updateLevelUI();                 // …which refreshes the progress readout too
   }
 
   function submitGuess(guess, viaVoice = false) {
@@ -1553,9 +1647,12 @@
   function updateProgress() {
     const L = state.level;
     const codes = L ? L.codes : WORLD_CODES;
-    const want = L?.mode === 'place' ? 'placed' : 'named';
-    const n = codes.filter(c => state.status[c] === want).length;
-    el.progressText.textContent = `${n} / ${codes.length}`;
+    // Place mode counts everything that has been settled, however it
+    // got there; name mode only counts the ones you actually named.
+    const n = L?.mode === 'place'
+      ? codes.filter(c => state.status[c]).length
+      : codes.filter(c => state.status[c] === 'named').length;
+    el.progressText.textContent = n === codes.length ? `all ${codes.length} 🏆` : `${n} / ${codes.length}`;
     el.progressFill.style.width = `${(n / codes.length) * 100}%`;
   }
 
@@ -1658,7 +1755,6 @@
     if (mode === 'place') buildBank();
     else el.wordBank.hidden = true;
     updateLevelUI();
-    updateProgress();
     startTimer();
   }
 
@@ -1669,18 +1765,12 @@
   function updateLevelUI() {
     const L = state.level;
     if (!L) return;
-    const total = L.codes.length;
-    const icon = L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
+    // The HUD has room for one glyph, and which mode you're in matters
+    // more mid-run than which tier of challenge it is.
+    const icon = L.mode === 'place' ? '🧩' : L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
     el.levelTitle.textContent = `${icon} ${L.name}`;
-    if (L.mode === 'place') {
-      const done = L.codes.filter(c => state.status[c]).length;
-      el.levelProgress.textContent = done === total ? '🎉 all placed!' : `${done} / ${total} placed`;
-      el.levelMode.textContent = '✏️ Name mode';
-    } else {
-      const named = L.codes.filter(c => state.status[c] === 'named').length;
-      el.levelProgress.textContent = named === total ? '🏆 complete!' : `${named} / ${total} named`;
-      el.levelMode.textContent = '🧩 Place mode';
-    }
+    el.levelMode.textContent = L.mode === 'place' ? '✏️ Name mode' : '🧩 Place mode';
+    updateProgress();
   }
 
   function checkComplete() {
@@ -2081,7 +2171,6 @@
     if (el.levelsPanel.hidden) openLevels();
     else el.levelsPanel.hidden = true;
   };
-  el.levelsBtn.addEventListener('click', toggleLevels);
   el.progressWrap.addEventListener('click', toggleLevels);
   el.levelsClose.addEventListener('click', () => { el.levelsPanel.hidden = true; });
 
@@ -2148,9 +2237,53 @@
     updateMicUI();
   });
 
+  // ————— full screen —————
+  //
+  // On a phone this is the single biggest change to how much map you get:
+  // in landscape the address bar and the system bars between them eat
+  // more height than the map is left with. Fullscreen takes them all away.
+  const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const fsSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+
+  function toggleFullscreen() {
+    if (!fsSupported) return;
+    if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else {
+      const r = document.documentElement;
+      const req = (r.requestFullscreen || r.webkitRequestFullscreen).call(r, { navigationUI: 'hide' });
+      req?.catch?.(() => {});          // iOS Safari on iPhone has no element fullscreen
+    }
+  }
+
+  function markFullscreen() {
+    const on = fsOn();
+    el.fsBtn.classList.toggle('on', on);
+    const label = on ? 'Leave full screen' : 'Full screen';
+    el.fsBtn.title = `${label} (F)`;
+    el.fsBtn.setAttribute('aria-label', label);
+    if (on) {
+      el.fsBtn.classList.remove('nudge');
+      if (!state.seenFs) { state.seenFs = true; savePrefs(); }
+    }
+  }
+
+  if (fsSupported) {
+    el.fsBtn.hidden = false;
+    el.fsBtn.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', markFullscreen);
+    document.addEventListener('webkitfullscreenchange', markFullscreen);
+    // Point at it once, on the devices that need it — a phone, where the
+    // browser's own chrome is the thing crowding the map out.
+    if (!state.seenFs && matchMedia('(pointer: coarse)').matches) {
+      el.fsBtn.classList.add('nudge');
+      setTimeout(() => el.fsBtn.classList.remove('nudge'), 9000);
+    }
+    markFullscreen();
+  }
+
   el.zoomIn.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 0.6));
   el.zoomOut.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 1 / 0.6));
-  el.zoomReset.addEventListener('click', () => animateView({ ...fullVB }));
+  el.zoomReset.addEventListener('click', () => animateView(worldView()));
 
   // The keyboard is a little map: 1 2 3 across the north (N. America,
   // Europe, Asia), Q W E across the south (S. America, Africa, India to
@@ -2161,25 +2294,53 @@
   // computed fit reaches Iran in the west and empty Pacific in the east,
   // since Afghanistan and Pakistan drag the frame while the window's
   // wide aspect adds slack. This one starts at India and trims the ocean.
-  const E_VIEW = { x: 662, y: 368, w: 380 };
+  const E_VIEW = { x1: 662, y1: 368, x2: 1042, y2: 618 };
+
+  // India → New Zealand is framed by hand rather than by a code list: the
+  // list's bounding box drags in the whole Pacific. It still goes through
+  // the same fit, so it fills whatever shape the window is.
+  function zoomToBox(box, ms) {
+    const s = Math.min(safeScale(box, 1.02), maxFitScale());
+    if (!(s > 0)) return;
+    animateView(frameAt(box, s), ms);
+  }
   const JUMP_KEYS = {
-    1: { go: () => zoomToCodes(CODES_BY_REGION['North America'], 220), sub: () => zoomToCodes(SUB_CODES['Central America'], 220) },
-    2: { go: () => zoomToCodes(CODES_BY_REGION['Europe'], 220), sub: () => zoomToZone(ZONE_BY_NAME['European microstates'], 220) },
-    3: { go: () => zoomToCodes(CODES_BY_REGION['Asia'], 220), sub: () => zoomToZone(ZONE_BY_NAME['Middle East'], 220) },
+    1: {
+      name: 'North America', subName: 'Central America',
+      go: () => zoomToCodes(CODES_BY_REGION['North America'], 220), sub: () => zoomToCodes(SUB_CODES['Central America'], 220),
+    },
+    2: {
+      name: 'Europe', subName: 'The micro-states',
+      go: () => zoomToCodes(CODES_BY_REGION['Europe'], 220), sub: () => zoomToZone(ZONE_BY_NAME['European microstates'], 220),
+    },
+    3: {
+      name: 'Asia', subName: 'The Middle East',
+      go: () => zoomToCodes(CODES_BY_REGION['Asia'], 220), sub: () => zoomToZone(ZONE_BY_NAME['Middle East'], 220),
+    },
     // The 'q' view frames the Caribbean arc along with the continent —
     // its buttons live at the top of this view, and fitting them keeps
-    // them out from under the challenge banner.
-    q: { go: () => zoomToCodes([...CODES_BY_REGION['South America'], ...ZONE_BY_NAME['Caribbean'].codes], 220), sub: () => zoomToZone(ZONE_BY_NAME['Caribbean'], 220) },
-    w: { go: () => zoomToCodes(CODES_BY_REGION['Africa'], 220), sub: () => zoomToZone(ZONE_BY_NAME['West African coast'], 220) },
+    // them out from under the HUD.
+    q: {
+      name: 'South America', subName: 'The Caribbean',
+      go: () => zoomToCodes([...CODES_BY_REGION['South America'], ...ZONE_BY_NAME['Caribbean'].codes], 220),
+      sub: () => zoomToZone(ZONE_BY_NAME['Caribbean'], 220),
+    },
+    w: {
+      name: 'Africa', subName: 'The West African coast',
+      go: () => zoomToCodes(CODES_BY_REGION['Africa'], 220), sub: () => zoomToZone(ZONE_BY_NAME['West African coast'], 220),
+    },
     e: {
-      go: () => animateView({ ...E_VIEW, h: E_VIEW.w * (fullVB.h / fullVB.w) }, 220),
+      name: 'India → New Zealand', subName: 'The Pacific islands',
+      go: () => zoomToBox(E_VIEW, 220),
       sub: () => zoomToCodes(PACIFIC_ISLES, 220),
     },
   };
   const jumpState = { key: null, stage: 0, t: 0 };
 
-  // Which key you're standing on, and how deep — free on a keyboard
-  // (your fingers know), so it's drawn for the touch pad's sake.
+  // Which key you're standing on, and which of its two floors. On the
+  // pad that lights the cap; on either layout it moves the ▸ onto the
+  // line the next tap takes you to, so the second floor stops being a
+  // secret.
   function markJumpKeys() {
     for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
       const on = b.dataset.key === jumpState.key;
@@ -2188,9 +2349,28 @@
     }
   }
 
+  // Say out loud where that key just put you. Cheap to ignore, but it
+  // turns a jump that looked wrong into a jump you can read.
+  let jumpFlashTimer = null;
+  function flashJump(key, label, deep) {
+    el.jumpFlash.innerHTML =
+      `<span class="jf-key">${key.toUpperCase()}</span>${deep ? '<span class="jf-deep">▸ </span>' : ''}${label}`;
+    el.jumpFlash.hidden = true;
+    void el.jumpFlash.offsetWidth;                  // restart the fade on a repeat tap
+    el.jumpFlash.hidden = false;
+    clearTimeout(jumpFlashTimer);
+    jumpFlashTimer = setTimeout(() => { el.jumpFlash.hidden = true; }, 850);
+  }
+
   const jumpTo = (key) => {
     if (!vb) return;
-    if (key === '0') { animateView({ ...fullVB }, 220); jumpState.key = null; markJumpKeys(); return; }
+    if (key === '0') {
+      animateView(worldView(), 220);
+      jumpState.key = null;
+      markJumpKeys();
+      flashJump('0', 'Whole world', false);
+      return;
+    }
     const j = JUMP_KEYS[key];
     if (!j) return;
     const now = performance.now();
@@ -2198,9 +2378,10 @@
     jumpState.stage = again ? (jumpState.stage + 1) % 2 : 0;
     jumpState.key = key;
     jumpState.t = now;
-    if (jumpState.stage === 0) j.go();
-    else j.sub();
+    const deep = jumpState.stage === 1;
+    if (deep) j.sub(); else j.go();
     markJumpKeys();
+    flashJump(key, deep ? j.subName : j.name, deep);
   };
   for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
     b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -2242,6 +2423,13 @@
       if (L?.mode === 'place' && L.armed) { e.preventDefault(); skipTarget(); }
     }
     else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
+    else if (e.key === 'r' || e.key === 'R') {
+      // The restart button moved into the challenge panel; the key it
+      // used to sit next to is the one a run actually reaches for.
+      e.preventDefault();
+      if (L) startLevel(CHALLENGE_BY_ID[L.id], L.mode);
+    }
+    else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
     else if (e.key === '0' || JUMP_KEYS[e.key.toLowerCase()]) {
       e.preventDefault();
@@ -2265,8 +2453,9 @@
   // Console hooks for testing (the zoom/fit ones move the view).
   window.NAN_DEBUG = {
     state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod,
-    scale: () => scaleFor(vb), fullVB: () => fullVB,
+    scale: () => scaleFor(vb), fullVB: () => fullVB, size: () => ({ W, H }), SAFE,
     zoomToCodes, zoomToZone, animateView, fitCodes, mapToScreen, bake,
+    worldView, frameAt, safeScale, maxFitScale, viewAspect,
     CODES_BY_REGION, SUB_CODES,
   };
 
@@ -2277,6 +2466,16 @@
   updateProgress();
   el.micToggle.classList.add('off');
   el.hello.hidden = true;
+
+  // Offline play, and the fetch handler Chrome looks for before it will
+  // offer to install the game to the home screen — which is the version
+  // with no address bar. Rejects harmlessly over file:// and in private
+  // windows; nothing above depends on it.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+    });
+  }
 
   initMap().then(() => {
     startLevel(CHALLENGE_BY_ID.world, 'name');

@@ -1,5 +1,9 @@
 # 🌍 Name All Nations
 
+**Play it: https://jasonalwaysgeeky.github.io/name-all-nations/**
+— on a phone, open that once and use Chrome's ⋮ → *Add to Home screen*; it
+installs full-screen, with no address bar and no system bars.
+
 A game that tests whether you can name all 195 countries — the reverse of
 the usual geography quiz. Instead of being shown a name and pointing at the
 map, **you click a country and name it**.
