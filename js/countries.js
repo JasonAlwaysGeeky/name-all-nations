@@ -318,14 +318,26 @@ const TERRITORIES = {
 // small country's centre, on anything from a 1280px-wide window to a
 // 1920px one. Should two ever overlap, they merge into one numbered
 // button that zooms in.
+// Two tiers live here. The micro-states would be invisible without a
+// button at any zoom; the rest — Albania, Armenia, Haiti and friends —
+// are perfectly visible but still a fiddly click while you're playing a
+// whole continent, so they get one too. Nothing has to be pruned by
+// hand: buttonRedundant retires each of them the moment its country is
+// a fair target (32px across, 22px through the narrow way), which for
+// that second tier is somewhere between the continent view and the
+// sub-region below it. The line for earning an entry is that the button
+// still outlives its continent's own zoom — Slovenia, Liberia and
+// Guatemala miss it, and Slovenia has no free spot to stand in anyway.
 const BUTTON_OFFSETS = {
   // Europe & the Levant. Vatican/San Marino/Monaco sit on their countries
   // and merge into one numbered button until you zoom to Europe — there
   // is no free 26px spot around Italy at world zoom that isn't some other
   // small country's centre. Montenegro / North Macedonia (see
   // BUTTON_MIN_SCALE) only get theirs once you're in on the Balkans.
+  // Albania drops south into the Ionian: its own sea, the Adriatic, is
+  // where the micro-state zone button stands until Europe opens up.
   VA: [0, 0], SM: [0, 0], MC: [0, 0], AD: [-6, 34], LI: [0, -30], LU: [-30, 14], MT: [12, 22],
-  ME: [0, 0], MK: [0, 0], CY: [-14, 2], LB: [-31, 20], IL: [-26, 40], PS: [-54, 34],
+  ME: [0, 0], MK: [0, 0], AL: [0, 36], CY: [-14, 2], LB: [-31, 20], IL: [-26, 40], PS: [-54, 34],
   // Gulf
   KW: [20, 20], BH: [10, -22], QA: [40, -12],
   // Caribbean & Central America (the Bahamas' dotted outline is its
@@ -335,6 +347,12 @@ const BUTTON_OFFSETS = {
   // country count as a zone member, so these stay.
   KN: [66, 0], AG: [66, 0], DM: [60, 20], LC: [60, 20], VC: [58, 51], BB: [58, 51], GD: [71, 80], TT: [71, 80],
   JM: [0, 0], BZ: [0, -22], SV: [-22, 14],
+  // Costa Rica and Panama would stack on the isthmus if both stepped
+  // into the Pacific, so Panama takes Colombia instead. Haiti and the
+  // Dominican Republic split Hispaniola the same way, north and
+  // north-east — a button on the far side of either would have its
+  // pointer crossing the other one's half of the island.
+  CR: [-6, 35], PA: [28, 23], HT: [6, -44], DO: [40, -33],
   // Africa
   // The Gambia and Guinea-Bissau both step out into the Atlantic, and
   // Togo out into the Bight of Benin: anywhere south of the Gambia is
@@ -342,8 +360,10 @@ const BUTTON_OFFSETS = {
   // carry parked their buttons on a neighbour once you zoomed in.
   CV: [-4, -30], GM: [-36, 0], GW: [-25, 28], SL: [3, 27], TG: [4, 46], GQ: [-30, 42], ST: [-48, 36],
   DJ: [30, 6], RW: [-22, -14], BI: [-14, 20], SZ: [22, 0], LS: [16, 16], KM: [0, 0], MU: [0, 0], SC: [0, 0],
-  // Asia
-  MV: [0, 0], BT: [28, -30], SG: [0, 0], BN: [0, 0], TL: [0, 0],
+  // Asia. Sri Lanka steps east into the Bay of Bengal; Armenia sits on
+  // Turkey, the one neighbour in that corner big enough to spare the
+  // room — Georgia and Azerbaijan are awkward targets themselves.
+  MV: [0, 0], BT: [28, -30], LK: [26, 10], AM: [-32, -6], SG: [0, 0], BN: [0, 0], TL: [0, 0],
   // Pacific
   PW: [0, 0], FM: [0, 0], MH: [0, -26], NR: [0, -10], KI: [18, -24], TV: [0, 0], SB: [0, 0], VU: [0, 0],
   FJ: [0, 12], WS: [2, -26], TO: [14, 14],
@@ -360,6 +380,13 @@ const BUTTON_MIN_SCALE = { LI: 2.2, ME: 5, MK: 5 };
 // targets well into their zone's own layer (the Gambia above all).
 const BUTTON_KEEP = { GM: 20, GW: 10, TG: 10, GQ: 10 };
 
+// Zone members that step out of their pocket early, at this zoom (px
+// per map unit). Luxembourg is a hundred times the Vatican and sits on
+// its own patch of open border — folding it away with the micro-states
+// until you dive into them costs a whole extra keystroke for a country
+// you can see perfectly well from the Europe view.
+const ZONE_SOLO = { LU: 2.2 };
+
 // Zoom layers: below `minScale` a dense area's buttons collapse into one
 // numbered button at `at` (map units) that zooms to the layer where the
 // individual buttons are clickable. The keyed ones are also hotkeys.
@@ -375,8 +402,10 @@ const BUTTON_KEEP = { GM: 20, GW: 10, TG: 10, GQ: 10 };
 const BUTTON_ZONES = [
   // minScale equals squareScale on purpose: the arc goes straight from
   // one numbered zone button to the dotted squares, with no in-between
-  // layer of individual buttons.
-  { name: 'Caribbean', at: [299, 422], minScale: 8, squareScale: 8, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
+  // layer of individual buttons. It sits where those squares first fit —
+  // the Lesser Antilles are close enough together that a comfortable
+  // square for each of them simply will not go any further out.
+  { name: 'Caribbean', at: [299, 422], minScale: 12, squareScale: 12, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
   { name: 'West African coast', at: [450, 470], minScale: 3.0, codes: ['CV', 'GM', 'GW', 'SL', 'TG', 'GQ', 'ST'] },
   // pad/clear: this dive runs Luxembourg to Malta top-to-bottom, so it
   // frames looser and keeps Malta well above the quiz card's spot.

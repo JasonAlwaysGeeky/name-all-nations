@@ -1,0 +1,12 @@
+{
+  "name": "name-all-nations",
+  "private": true,
+  "scripts": {
+    "serve": "http-server -p 5173 -c-1 .",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "http-server": "^14.1.1"
+  }
+}
