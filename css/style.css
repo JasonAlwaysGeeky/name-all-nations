@@ -586,7 +586,40 @@ body.no-flags .flag { display: none; }
   font-size: 0.85rem;
   color: var(--danger);
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
+#mic-status[hidden] { display: none; }
+
+#mic-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Live VU meter — the bars track mic volume via --vol (0..1) from JS. */
+#voice-meter {
+  --vol: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+#voice-meter i {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--danger);
+}
+
+#voice-meter i:nth-child(1) { height: 5px;  opacity: max(0.25, calc((var(--vol) - 0.02) * 5)); }
+#voice-meter i:nth-child(2) { height: 8px;  opacity: max(0.25, calc((var(--vol) - 0.12) * 5)); }
+#voice-meter i:nth-child(3) { height: 11px; opacity: max(0.25, calc((var(--vol) - 0.28) * 5)); }
+#voice-meter i:nth-child(4) { height: 13px; opacity: max(0.25, calc((var(--vol) - 0.50) * 5)); }
+#voice-meter i:nth-child(5) { height: 14px; opacity: max(0.25, calc((var(--vol) - 0.72) * 5)); }
 
 #feedback {
   margin-top: 10px;

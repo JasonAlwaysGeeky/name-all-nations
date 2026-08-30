@@ -133,20 +133,26 @@
     for (const raw of [c.name, ...c.aliases]) ANSWERS.push({ norm: normalize(raw), code: c.code });
   }
 
-  // A guess is correct for `code` when that country is (one of) the
-  // closest matches overall and within the typo budget.
-  function matchGuess(guess, code) {
-    const g = normalize(guess);
-    if (!g) return false;
-    let best = Infinity;
+  // The country codes whose names are the closest match to the guess,
+  // within the typo budget; empty when it doesn't sound like any country.
+  function bestMatches(guess) {
     const bestCodes = new Set();
+    const g = normalize(guess);
+    if (!g) return bestCodes;
+    let best = Infinity;
     for (const a of ANSWERS) {
       const d = levenshtein(g, a.norm);
       if (d > typoBudget(a.norm.length)) continue;
       if (d < best) { best = d; bestCodes.clear(); }
       if (d <= best) bestCodes.add(a.code);
     }
-    return bestCodes.has(code);
+    return bestCodes;
+  }
+
+  // A guess is correct for `code` when that country is (one of) the
+  // closest matches overall and within the typo budget.
+  function matchGuess(guess, code) {
+    return bestMatches(guess).has(code);
   }
 
   // ————— persistence —————
@@ -223,30 +229,228 @@
 
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
+  let micErrors = 0;                    // consecutive failures since the last result
+  let heardSound = false;               // whether any session ever detected sound
+  const MIC_HINT = 'listening… just say the country’s name';
+
+  // Selection clicks build an ordered queue of countries; the transcript is
+  // parsed against that queue in the background, fuzzy-matching each queued
+  // name in sequence. Nothing depends on where the transcript had gotten to
+  // when a click happened, so the player never waits on the recognizer.
+  const voiceQueue = [];                // ordered {code, state: 'open'|'eager'|'done'}
+  let voiceBuf = [];                    // final transcript words not yet consumed
+  let tickerText = '';
+
+  function voiceWords(t) { return t.trim() ? t.trim().split(/\s+/) : []; }
+
+  function voicePush(code) {
+    if (!state.micOn || !code || state.status[code] === 'named') return;
+    // Re-clicking a country that's already waiting shouldn't double it up.
+    for (let i = voiceQueue.length - 1; i >= 0; i--) {
+      if (voiceQueue[i].state === 'done') break;
+      if (voiceQueue[i].code === code) return;
+    }
+    voiceQueue.push({ code, state: 'open' });
+    updateTicker();
+  }
+
+  // Does any window of these words sound like some country's name?
+  // Audio that doesn't clear this bar never counts as a submission.
+  function containsCountry(words) {
+    for (let start = 0; start < words.length; start++) {
+      for (let len = Math.min(6, words.length - start); len >= 1; len--) {
+        if (bestMatches(words.slice(start, start + len).join(' ')).size) return true;
+      }
+    }
+    return false;
+  }
+
+  // Find `code`'s name somewhere near words[from..]: a few words of leading
+  // noise are allowed, and windows are tried longest-first so multi-word
+  // names ("papua new guinea") beat their own fragments.
+  function findVoiceMatch(words, from, code) {
+    const lastStart = Math.min(from + 4, words.length - 1);
+    for (let start = from; start <= lastStart; start++) {
+      for (let len = Math.min(6, words.length - start); len >= 1; len--) {
+        if (matchGuess(words.slice(start, start + len).join(' '), code)) return { start, end: start + len };
+      }
+    }
+    return null;
+  }
+
+  // Walk the queue in order against the words we have. A committed pass
+  // (final transcript) consumes words, resolves skipped countries, and
+  // surfaces wrong attempts; an eager pass (interims) only banks correct
+  // answers so they pop the moment the words show up.
+  function alignVoice(extra, commit) {
+    if (state.level?.pausedAt != null) return;
+    const words = commit ? voiceBuf : voiceBuf.concat(extra);
+    let pos = 0;
+    let skipped = [];                   // open slots passed over without a match
+    for (const slot of voiceQueue) {
+      if (slot.state === 'done') continue;
+      const m = findVoiceMatch(words, pos, slot.code);
+      if (m) {
+        if (commit && skipped.length) {
+          // Later country matched first — the ones in between never got a
+          // recognizable answer. If the stray words sound like some (wrong)
+          // country, that's a real miss for the first of them; anything else
+          // was noise, and they all just stay unanswered on the map.
+          const noise = words.slice(pos, m.start);
+          if (noise.length && containsCountry(noise)) gradeVoiceGuess(noise.join(' '), skipped[0].code);
+          for (const s of skipped) s.state = 'done';
+          skipped = [];
+        }
+        if (slot.state === 'open') gradeVoiceGuess(words.slice(m.start, m.end).join(' '), slot.code);
+        slot.state = commit ? 'done' : 'eager';
+        pos = m.end;
+      } else if (slot.state === 'eager') {
+        if (commit) slot.state = 'done';   // graded from an interim the final revised away
+      } else if (commit) {
+        skipped.push(slot);
+      }
+    }
+    if (!commit) { updateTicker(); return; }
+    voiceBuf = words.slice(pos);
+    while (voiceQueue.length && voiceQueue[0].state === 'done') voiceQueue.shift();
+    // Leftover words with only the on-screen country still waiting: if they
+    // sound like some (wrong) country, that's a real miss. Otherwise no
+    // penalty — keep the words, since the next final may complete a
+    // half-heard name ("papua new" + "guinea").
+    const first = voiceQueue.find(s => s.state === 'open');
+    if (voiceBuf.length && first && first.code === state.selected) {
+      if (containsCountry(voiceBuf)) {
+        gradeVoiceGuess(voiceBuf.join(' '), first.code);
+        voiceBuf = [];
+      } else {
+        setFeedback(`Heard “${voiceBuf.join(' ')}” — not a country name, no penalty. Say it again?`, 'hint');
+      }
+    }
+    if (voiceBuf.length > 8) voiceBuf = voiceBuf.slice(-8);
+    updateTicker();
+  }
+
+  function updateTicker(text) {
+    if (text != null) tickerText = text.trim();
+    if (!el.micStatusText) return;
+    const waiting = voiceQueue.filter(s => s.state === 'open').length;
+    const shown = tickerText.length > 34 ? '…' + tickerText.slice(-34) : tickerText;
+    el.micStatusText.textContent = (shown ? `“${shown}…”` : MIC_HINT) + (waiting > 1 ? `  ·  ${waiting} to grade` : '');
+  }
+
+  // ————— mic level meter —————
+  // The recognizer doesn't expose audio levels, so a second capture of the
+  // same mic drives a little VU meter next to the guess box — live proof
+  // the mic is hearing you, independent of transcription.
+
+  let meterStream = null, meterCtx = null, meterRAF = 0;
+
+  async function startMeter() {
+    if (meterStream || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      meterStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch { return; }                 // no meter, but recognition still works
+    if (!state.micOn) { stopMeter(); return; }   // toggled off while we waited
+    meterCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = meterCtx.createAnalyser();
+    analyser.fftSize = 512;
+    meterCtx.createMediaStreamSource(meterStream).connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    const tick = () => {
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d; }
+      el.voiceMeter.style.setProperty('--vol', Math.min(1, Math.sqrt(sum / buf.length) * 4).toFixed(3));
+      meterRAF = requestAnimationFrame(tick);
+    };
+    meterRAF = requestAnimationFrame(tick);
+  }
+
+  function stopMeter() {
+    cancelAnimationFrame(meterRAF);
+    if (meterStream) for (const t of meterStream.getTracks()) t.stop();
+    if (meterCtx) meterCtx.close();
+    meterStream = null; meterCtx = null; meterRAF = 0;
+    el.voiceMeter?.style.setProperty('--vol', 0);
+  }
+
+  function gradeVoiceGuess(heard, code) {
+    if (code === state.selected) {
+      el.guessInput.value = heard;
+      submitGuess(heard, true);
+      return;
+    }
+    // Player has already moved on — settle this one quietly on the map.
+    if (state.status[code] === 'named' || state.level?.pausedAt != null) return;
+    const c = COUNTRY_BY_CODE[code];
+    const pt = mapToScreen(focusPoint(code).x, focusPoint(code).y);
+    if (matchGuess(heard, code)) {
+      settle(code, true);
+      setStatus(code, 'named');
+      flash(code, 'flash-good', 900);
+      popAt(pt, `✓ ${c.name}`, 'good');
+      checkComplete();
+    } else {
+      settle(code, false);
+      flash(code, 'flash-bad', 450);
+      popAt(pt, `✗ “${heard.replace(/[<>&]/g, '')}”`, 'bad');
+    }
+  }
 
   function ensureRecognition() {
     if (recognition || !SpeechRec) return recognition;
     recognition = new SpeechRec();
     recognition.lang = 'en-US';
     recognition.continuous = true;
-    recognition.interimResults = false;
+    // Interim results tell us when an utterance *began*, which is what lets
+    // each one be pinned to the country that was selected at that moment.
+    recognition.interimResults = true;
+    // The staged status line doubles as a mic diagnostic: if it never gets
+    // past "waiting for sound", the browser is capturing a silent device.
+    recognition.onstart = () => { el.micStatusText.textContent = 'mic open — waiting for sound…'; };
+    recognition.onsoundstart = () => { heardSound = true; el.micStatusText.textContent = 'hearing sound…'; };
+    recognition.onspeechstart = () => { el.micStatusText.textContent = 'hearing speech…'; };
     recognition.onresult = (e) => {
-      const last = e.results[e.results.length - 1];
-      if (!last.isFinal) return;
-      const heard = last[0].transcript.trim();
-      if (!heard || !state.selected) return;
-      el.guessInput.value = heard;
-      submitGuess(heard, true);
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        micErrors = 0;                  // results flowing — the pipeline works
+        const words = voiceWords(res[0].transcript);
+        if (!res.isFinal) {
+          updateTicker(res[0].transcript);
+          alignVoice(words, false);     // bank correct answers the moment they appear
+          continue;
+        }
+        updateTicker('');
+        voiceBuf.push(...words);
+        alignVoice(null, true);
+      }
     };
     recognition.onend = () => {
       if (state.micOn && state.selected) startListening();
     };
     recognition.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      if (e.error === 'no-speech') {
+        el.micStatusText.textContent = heardSound
+          ? 'heard sound, but no words — try again?'
+          : 'only silence — is the right microphone chosen in the browser’s mic settings?';
+        return;                                                       // onend restarts
+      }
+      if (e.error === 'aborted') return;                              // routine — onend restarts
+      micErrors++;
+      const why = {
+        'not-allowed': 'Microphone access was blocked — check browser permissions.',
+        'service-not-allowed': 'This browser blocked its speech service on this page.',
+        'audio-capture': 'No microphone found — is one connected and allowed?',
+        'network': 'The speech service is unreachable. Voice needs internet, and some Chromium-based browsers ship without a speech backend — try Chrome or Edge.',
+        'language-not-supported': 'This browser cannot recognize English speech.',
+      }[e.error] || `Voice input error: ${e.error}`;
+      // Permission errors are final; anything else gets three tries before
+      // the mic turns itself off instead of silently spinning.
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || micErrors >= 3) {
         state.micOn = false;
         updateMicUI();
-        setFeedback('Microphone access was blocked — check browser permissions.', 'bad');
       }
+      setFeedback(why, 'bad');
     };
     return recognition;
   }
@@ -266,7 +470,7 @@
   const el = {};
   for (const id of [
     'map-wrap', 'map', 'tooltip', 'toast', 'progress-text', 'progress-fill', 'progress-wrap',
-    'mic-toggle', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'fs-btn',
+    'mic-toggle', 'voice-meter', 'mic-status-text', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'fs-btn',
     'jump-bar', 'jump-toggle', 'jump-flash',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
@@ -1528,6 +1732,7 @@
 
   function selectCountry(code, pt) {
     ensureTimer();
+    voicePush(code);
     if (state.selected) setSelectedClass(state.selected, false);
     state.selected = code;
     state.selectedAt = pt;
@@ -1549,6 +1754,7 @@
       el.guessInput.value = '';
       setFeedback('', '');
       el.micStatus.hidden = !state.micOn;
+      updateTicker('');
       if (state.micOn) startListening();
       el.guessInput.focus();
     }
@@ -1571,7 +1777,7 @@
     if (state.selected) setSelectedClass(state.selected, false);
     state.selected = null;
     el.card.hidden = true;
-    stopListening();
+    stopListening();                    // pending finals still arrive and grade
   }
 
   function setFeedback(msg, cls) {
@@ -1603,6 +1809,7 @@
     } else {
       settle(code, false);
       state.attempts++;
+      flash(code, 'flash-bad', 450);
       el.card.classList.remove('shake');
       void el.card.offsetWidth;             // restart the animation
       el.card.classList.add('shake');
@@ -2138,6 +2345,8 @@
     el.micToggle.classList.toggle('listening', state.micOn);
     el.micToggle.classList.toggle('off', !state.micOn);
     el.micStatus.hidden = !(state.micOn && state.selected && !state.status[state.selected]);
+    if (state.micOn) startMeter(); else stopMeter();
+    updateTicker();
   }
 
   el.helloClose.addEventListener('click', () => {
@@ -2232,8 +2441,8 @@
       return;
     }
     state.micOn = !state.micOn;
-    if (state.micOn && state.selected) startListening();
-    if (!state.micOn) stopListening();
+    if (state.micOn && state.selected) { voicePush(state.selected); startListening(); }
+    if (!state.micOn) { stopListening(); voiceQueue.length = 0; voiceBuf = []; updateTicker(''); }
     updateMicUI();
   });
 
