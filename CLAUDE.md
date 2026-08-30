@@ -36,3 +36,7 @@ server, so the Browser pane can start it directly.
 - The map view rect follows the *window's* aspect, not the map's — pinning
   it to the map's shape letterboxed portrait phones down to a 250px band.
 - Mic input has never been tested outside a sandbox.
+- **Regenerating anything in `map/` means bumping `CACHE` in `sw.js`.** Those
+  files are the one cache-first exception, so an installed phone keeps
+  serving the old borders forever otherwise — and it looks like the deploy
+  simply didn't happen. Nothing enforces this; the version string is manual.
