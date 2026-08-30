@@ -344,13 +344,31 @@
   // the mic is hearing you, independent of transcription.
 
   let meterStream = null, meterCtx = null, meterRAF = 0;
+  // getUserMedia resolves long after the toggle that asked for it, so the
+  // "already running" guard can't just be `meterStream` — that's still null
+  // while a capture is in flight. Every start claims a token; a stop, or a
+  // later start, bumps it. A capture that lands after its moment has passed
+  // shuts itself down instead of overwriting a live one and leaking a hot
+  // mic (the browser's recording dot stays lit) plus an orphan rAF loop.
+  let meterGen = 0, meterPending = false;
 
   async function startMeter() {
-    if (meterStream || !navigator.mediaDevices?.getUserMedia) return;
+    if (meterStream || meterPending || !navigator.mediaDevices?.getUserMedia) return;
+    const gen = ++meterGen;
+    meterPending = true;
+    let stream;
     try {
-      meterStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch { return; }                 // no meter, but recognition still works
-    if (!state.micOn) { stopMeter(); return; }   // toggled off while we waited
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      if (gen === meterGen) meterPending = false;
+      return;                           // no meter, but recognition still works
+    }
+    if (gen !== meterGen || !state.micOn) {       // stopped while we waited
+      for (const t of stream.getTracks()) t.stop();
+      return;
+    }
+    meterPending = false;
+    meterStream = stream;
     meterCtx = new (window.AudioContext || window.webkitAudioContext)();
     const analyser = meterCtx.createAnalyser();
     analyser.fftSize = 512;
@@ -367,6 +385,8 @@
   }
 
   function stopMeter() {
+    meterGen++;                         // orphans any capture still in flight
+    meterPending = false;
     cancelAnimationFrame(meterRAF);
     if (meterStream) for (const t of meterStream.getTracks()) t.stop();
     if (meterCtx) meterCtx.close();
@@ -426,7 +446,8 @@
       }
     };
     recognition.onend = () => {
-      if (state.micOn && state.selected) startListening();
+      // Not while paused — that's the one case where ending is deliberate.
+      if (state.micOn && state.selected && state.level?.pausedAt == null) startListening();
     };
     recognition.onerror = (e) => {
       if (e.error === 'no-speech') {
@@ -1897,11 +1918,24 @@
       el.pauseVeil.hidden = false;
       el.pauseTimer.textContent = '▶';
       if (document.activeElement?.blur) document.activeElement.blur();
+      // Paused means the mic is actually off, not merely ignored. Leaving
+      // it open banked a transcript nothing was consuming — it grew for as
+      // long as the pause lasted, then graded itself against the queue the
+      // moment play resumed. The queue survives (those clicks are still
+      // owed an answer); the half-heard words do not.
+      stopListening();
+      stopMeter();
+      voiceBuf = [];
+      updateTicker('');
     } else {
       L.t0 += performance.now() - L.pausedAt;
       L.pausedAt = null;
       el.pauseVeil.hidden = true;
       el.pauseTimer.textContent = '⏸';
+      if (state.micOn) {
+        startMeter();
+        if (state.selected) startListening();
+      }
     }
     renderTimer();
   }
