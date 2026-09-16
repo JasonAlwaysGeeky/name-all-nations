@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "serve": "http-server -p 5173 -c-1 .",
+    "targets": "node tools/gen-targets.mjs",
     "test": "playwright test"
   },
   "devDependencies": {

@@ -318,16 +318,21 @@ const TERRITORIES = {
 // small country's centre, on anything from a 1280px-wide window to a
 // 1920px one. Should two ever overlap, they merge into one numbered
 // button that zooms in.
-// Two tiers live here. The micro-states would be invisible without a
+// This list is only *where* a button stands, never how long it lasts.
+// How long is one rule with no exceptions, and it lives in app.js:
+// buttonRedundant retires a button the moment a disc the size of the
+// button's own face fits inside the country on screen — measured
+// against the real borders (js/targets.js), so a sliver like the Gambia
+// keeps its button to a deep zoom and a fat little country like Lesotho
+// loses it early, without either being named anywhere.
+//
+// Two tiers earn an entry. The micro-states would be invisible without a
 // button at any zoom; the rest — Albania, Armenia, Haiti and friends —
 // are perfectly visible but still a fiddly click while you're playing a
-// whole continent, so they get one too. Nothing has to be pruned by
-// hand: buttonRedundant retires each of them the moment its country is
-// a fair target (32px across, 22px through the narrow way), which for
-// that second tier is somewhere between the continent view and the
-// sub-region below it. The line for earning an entry is that the button
-// still outlives its continent's own zoom — Slovenia, Liberia and
-// Guatemala miss it, and Slovenia has no free spot to stand in anyway.
+// whole continent. Being small enough is necessary but not sufficient:
+// a button also needs a patch of open water or big neighbour to stand
+// on, which is a judgement about the map, not a number. Slovenia is the
+// standing example — small enough on any measure, with nowhere to put it.
 const BUTTON_OFFSETS = {
   // Europe & the Levant. Vatican/San Marino/Monaco sit on their countries
   // and merge into one numbered button until you zoom to Europe — there
@@ -374,11 +379,6 @@ const BUTTON_OFFSETS = {
 // countries' centres at world zoom, where their neighbours aren't
 // clickable either.
 const BUTTON_MIN_SCALE = { LI: 2.2, ME: 5, MK: 5 };
-
-// Buttons that stay past the usual big-enough-to-click cutoff, up to
-// this zoom (px per map unit) — the West African slivers stay awkward
-// targets well into their zone's own layer (the Gambia above all).
-const BUTTON_KEEP = { GM: 20, GW: 10, TG: 10, GQ: 10 };
 
 // Zone members that step out of their pocket early, at this zoom (px
 // per map unit). Luxembourg is a hundred times the Vatican and sits on

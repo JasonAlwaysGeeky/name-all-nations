@@ -1247,12 +1247,24 @@ body.no-flags .flag { display: none; }
   margin-top: 4px;
   text-align: center;
   font-size: 0.62rem;
+  line-height: 1.5;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 1px 2px rgba(10, 30, 55, 0.5);
 }
 #jump-bar button:active { transform: translateY(1px); }
 #jump-bar kbd { font-size: 0.68rem; padding: 0 5px; }
+/* the hint sits on the dark bar, not on a card — a full keycap there
+   reads as a button you could press */
+#jump-bar .jump-hint kbd {
+  font-size: 0.95em;
+  padding: 0 4px;
+  border-width: 1px;
+  background: rgba(12, 35, 60, 0.55);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  text-shadow: none;
+}
 
 /* the key you're standing on, and which floor of it */
 #jump-bar button.armed,
@@ -1413,4 +1425,20 @@ body.no-flags .flag { display: none; }
   #bank-chips { max-height: 14vh; }
   #bank-name { font-size: 1.1rem; }
   .stat-tiles { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ————— bigger flags where there is room —————
+
+   On a desktop there is room to actually learn the flag, not just tell
+   two of them apart — and place mode spends its whole run looking at
+   one. A phone keeps the small sizes: the word bank is already docked
+   along the bottom edge there, and a 40px flag in it costs a row of
+   chips. This is the only breakpoint where flags differ, so it reads as
+   one rule rather than five. */
+@media (min-width: 901px) and (min-height: 561px) {
+  .flag { height: 19px; vertical-align: -4px; }
+  .pop .flag { height: 17px; }
+  .chip .flag { height: 15px; }
+  #answer-name .flag { height: 34px; }
+  #bank-flag .flag { height: 40px; border-radius: 3px; }
 }

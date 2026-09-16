@@ -57,7 +57,7 @@
           <kbd>0</kbd>
           <span class="jump-lines"><span class="jump-name">Whole&nbsp;world</span></span>
         </button>
-        <div class="jump-hint">top line = the area · bottom line = its dense pocket, one more tap in</div>
+        <div class="jump-hint">top line = the area · bottom line = its dense pocket<br>tap the key again to dive · <kbd>Shift</kbd> to land straight on it</div>
       </div>
       <button id="jump-toggle" aria-expanded="true" aria-controls="jump-keys" title="Hide the jump keys" aria-label="Hide the jump keys">⌨</button>
     </nav>
@@ -229,6 +229,9 @@
           Every key has a second floor, printed on the second line of its button: tap the same key
           again for that area's dense pocket — Central America · micro-states · Middle East ·
           Caribbean · West coast · Pacific islands — and once more to come back out.
+          Hold <kbd>Shift</kbd> (or shift-click the button) to drop straight onto that second floor
+          in one move, with no stop at the area view on the way — the same key without Shift
+          steps back out of it.
           On a touch screen the same six keys sit in a pad at the bottom-left corner;
           the ⌨ chip beside it folds the pad away when you want the whole map.</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
@@ -252,6 +255,7 @@
   </main>
 
   <script src="js/countries.js"></script>
+  <script src="js/targets.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

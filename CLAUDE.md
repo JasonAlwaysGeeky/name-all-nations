@@ -25,7 +25,11 @@ server, so the Browser pane can start it directly.
 - `js/app.js` — everything else. Transform-based SVG pan/zoom (the viewBox
   is only rewritten once a gesture settles), three levels of border detail,
   the rings/boxes/clusters overlay, timed Name/Place modes, stats + heat map
-- `js/countries.js` — the 195 (193 UN + Vatican + Palestine), aliases, regions
+- `js/countries.js` — the 195 (193 UN + Vatican + Palestine), aliases, regions,
+  and where each assist button stands (never how long it lasts)
+- `js/targets.js` — generated: how big a target each country really is, as the
+  radius of the largest circle that fits inside its borders. One rule decides
+  every button's life from it, so there are no per-country exceptions
 - `map/` — the simplified amCharts world map, plus the 1.4MB full-detail
   version fetched lazily for deep zoom
 - `sw.js` — offline play. **Network-first for app code on purpose**, so a
@@ -40,3 +44,5 @@ server, so the Browser pane can start it directly.
   files are the one cache-first exception, so an installed phone keeps
   serving the old borders forever otherwise — and it looks like the deploy
   simply didn't happen. Nothing enforces this; the version string is manual.
+- Regenerating `map/world.svg` also means `npm run targets`, which rewrites
+  `js/targets.js` from it. That one *is* enforced — CI fails on a stale table.
