@@ -71,6 +71,8 @@
   }
   const ZONE_BY_NAME = Object.fromEntries(BUTTON_ZONES.map(z => [z.name, z]));
   const SUB_CODES = Object.fromEntries(SUBREGIONS.map(x => [x.name, x.codes]));
+  const SUBREGION_BY_CODE = {};
+  for (const sub of SUBREGIONS) for (const c of sub.codes) SUBREGION_BY_CODE[c] = sub.name;
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -615,6 +617,18 @@
       reanchor();
       if (!interacting()) bake();
     }).observe(el.map);
+
+    // The quiz card and the word bank come and go, and on a phone each
+    // one changes how much of the glass the map actually has. Watching
+    // them keeps the *next* fit honest, without yanking the view you are
+    // already looking at.
+    // …but never in the middle of a gesture. The safe area feeds the
+    // clamp's travel limits, so moving it while a finger is down tugs
+    // the map out from under that finger.
+    const chrome = new ResizeObserver(() => { if (!interacting()) updateSafe(); });
+    chrome.observe(el.card);
+    chrome.observe(el.wordBank);
+    chrome.observe(el.jumpBar);
   }
 
   // A country's bounding box lies about where it "is" when its islands
@@ -834,27 +848,38 @@
   // into a third of the glass. Matching the window means a fit fills it.
   function viewAspect() { return W > 0 && H > 0 ? H / W : fullVB.h / fullVB.w; }
 
-  // Zoomed all the way out is "the whole map is on screen", whichever
-  // axis ends up binding — on a tall window that is a wider rect than
-  // the map itself.
+  // The whole map, as a fit box.
+  const mapBox = () => ({ x1: fullVB.x, y1: fullVB.y, x2: fullVB.x + fullVB.w, y2: fullVB.y + fullVB.h });
+
+  // Zoomed all the way out is "the whole map is somewhere I can see it",
+  // and on a phone that is not the same as "on screen": the jump pad and
+  // the word bank own a third of the glass between them, so a world view
+  // centred in the *window* hands them the bottom half of the map. It
+  // goes through the same safe-area fit every other view does.
   function worldView() {
-    const asp = viewAspect();
-    const w = Math.max(fullVB.w, fullVB.h / asp), h = w * asp;
-    return { x: fullVB.x + fullVB.w / 2 - w / 2, y: fullVB.y + fullVB.h / 2 - h / 2, w, h };
+    const box = mapBox();
+    return frameAt(box, safeScale(box, 1));
   }
 
   function clampView(n) {
     const asp = viewAspect();
+    const box = mapBox();
     const minW = fullVB.w / MAX_ZOOM;
-    const w = Math.min(Math.max(n.w, minW), Math.max(fullVB.w, fullVB.h / asp));
+    const maxW = Math.max(W / safeScale(box, 1), minW);
+    const w = Math.min(Math.max(n.w, minW), maxW);
     const h = w * asp;
+    const s = W / w;
+    // Where the map comes to rest on an axis with no travel left: the
+    // middle of what the map has to itself, not the middle of the window.
+    const rest = frameAt(box, s);
+    // The travel limits stretch by the safe insets, so anything on the
+    // map can always be dragged out from under the UI — otherwise a
+    // country near the south edge can never leave the word bank's shadow.
     const mx = fullVB.w * 0.05, my = fullVB.h * 0.05;
-    // An axis the view already overflows has no travel left in it, so it
-    // centres on the map rather than pinning to one edge.
     const span = (lo, hi, want, mid) => (hi < lo ? mid : Math.min(Math.max(want, lo), hi));
     return {
-      x: span(fullVB.x - mx, fullVB.x + fullVB.w + mx - w, n.x, fullVB.x + fullVB.w / 2 - w / 2),
-      y: span(fullVB.y - my, fullVB.y + fullVB.h + my - h, n.y, fullVB.y + fullVB.h / 2 - h / 2),
+      x: span(fullVB.x - mx - SAFE.left / s, fullVB.x + fullVB.w + mx - w + SAFE.right / s, n.x, rest.x),
+      y: span(fullVB.y - my - SAFE.top / s, fullVB.y + fullVB.h + my - h + SAFE.bottom / s, n.y, rest.y),
       w, h,
     };
   }
@@ -1117,12 +1142,27 @@
   // On a phone the jump keys are docked along the bottom of the map
   // rather than tucked in a corner, so whatever they take is map a fit
   // must not frame anything into. Re-read on every measure().
+  // On a phone everything docks along the bottom edge — the jump pad, and
+  // whichever of the word bank or the quiz card is open — so what the map
+  // actually has to itself is measured rather than guessed at. A fit that
+  // does not know the word bank is 130px tall frames the country it is
+  // asking you to find underneath it.
   function updateSafe() {
     let bottom = SAFE_BASE.bottom;
-    if (W <= 900 && state.prefs.keys && el.jumpBar) {
-      bottom += Math.round(el.jumpBar.getBoundingClientRect().height) + 12;
+    if (W <= 900) {
+      // The left inset exists for the jump bar, which on a phone is
+      // docked along the bottom instead — and 40px of a 412px screen is
+      // a tenth of the map given away for nothing.
+      SAFE.left = 10;
+      for (const e of [state.prefs.keys ? el.jumpBar : null, el.wordBank, el.card]) {
+        if (!e || e.hidden || !e.offsetParent) continue;
+        const top = e.getBoundingClientRect().top - rectTop;
+        if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
+      }
+    } else {
+      SAFE.left = SAFE_BASE.left;
     }
-    SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.35));
+    SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
   }
 
   // `extraBottom` reserves additional space above the bottom edge — the
@@ -1613,14 +1653,21 @@
     }
 
     // Put the anchored map point back under `c`, at view width `w`.
+    //
+    // The view rect takes the window's shape (viewAspect), which means it
+    // always fills the glass and the scale is simply W/w, with nothing
+    // letterboxed. This used to solve with the *map's* shape instead, and
+    // subtract letterbox offsets that no longer exist, so the grabbed
+    // point jumped the moment you moved it — by nothing at all dead
+    // centre, and by more the further out you grabbed, which on a phone
+    // is every drag. clientToMap is the other half of this same sum, and
+    // the two have to stay in step.
     function applyGesture(c, w) {
-      const h = w * (fullVB.h / fullVB.w);
-      const s = Math.min(W / w, H / h);
-      const ox = (W - w * s) / 2, oy = (H - h * s) / 2;
+      const s = W / w;
       setView({
-        x: gest.ax - (c.x - rectLeft - ox) / s,
-        y: gest.ay - (c.y - rectTop - oy) / s,
-        w, h,
+        x: gest.ax - (c.x - rectLeft) / s,
+        y: gest.ay - (c.y - rectTop) / s,
+        w, h: w * viewAspect(),
       });
     }
 
@@ -1660,6 +1707,7 @@
         dragging = true;
         el.map.classList.add('panning');
         el.tooltip.hidden = true;
+        clearHot();
       }
     });
 
@@ -1680,6 +1728,7 @@
         dragging = true;
         el.map.classList.add('panning');
         el.tooltip.hidden = true;
+        clearHot();
         // Re-anchor at the point the drag actually broke loose, so the map
         // doesn't snap by the slop distance on the first moved frame.
         anchorGesture();
@@ -1711,6 +1760,7 @@
         gest = null;
         el.map.classList.remove('panning');
         dragging = false;
+        updateSafe();                 // deferred while the gesture was live
         if (moved) {
           const v = type !== 'mouse' ? releaseVelocity() : null;
           if (!v || !startFling(v.vx, v.vy)) bake();
@@ -1725,14 +1775,39 @@
     };
     el.map.addEventListener('pointerup', endPointer);
     el.map.addEventListener('pointercancel', endPointer);
-    el.map.addEventListener('pointerleave', () => { el.tooltip.hidden = true; });
+    el.map.addEventListener('pointerleave', () => { el.tooltip.hidden = true; clearHot(); });
   }
 
-  // ————— tooltip (hover, desktop) —————
+  // ————— tooltip & hover (desktop) —————
+
+  // What a click here would arm. Buttons and island outlines sit above
+  // the map; below it, every country carries a fat invisible stroke of
+  // click padding, so a point just offshore still resolves to its
+  // country. The tooltip and the highlight both run off this one answer,
+  // because a highlight that disagrees with the click is how you end up
+  // naming the wrong country.
+  let hotEls = [];
+  function setHot(target) {
+    for (const e of hotEls) e.classList.remove('hot');
+    hotEls = [];
+    const grp = target?.closest?.('g.btn, g.ov-box');
+    if (grp) {
+      hotEls = [grp];
+    } else if (target) {
+      const code = target.dataset?.code || target.id;
+      if (code && (COUNTRY_BY_CODE[code] || TERRITORIES[code])) {
+        hotEls = allElems(code).slice();
+        if (!hotEls.length && allPaths[code]) hotEls = [allPaths[code]];
+      }
+    }
+    for (const e of hotEls) e.classList.add('hot');
+  }
+  const clearHot = () => setHot(null);
 
   function updateTooltip(e) {
     if (e.pointerType !== 'mouse') return;
     const target = e.target.closest?.('[data-code], path[id], g.btn');
+    setHot(target);
     let text = null;
     if (target?.closest('g.btn.zone')) {
       const zg2 = target.closest('g.btn.zone');
@@ -1772,6 +1847,7 @@
     state.selected = code;
     state.selectedAt = pt;
     state.hintLevel = 0;
+    updateHintBtn();
     state.attempts = 0;
     setSelectedClass(code, true);
     el.helloClose.click();
@@ -1858,21 +1934,45 @@
     }
   }
 
+  // Three hints, each a different *kind* of clue, and none of them worth
+  // more than two letters. The old ladder handed over one more letter
+  // every time and ran to half the name, so a country you did not know
+  // could simply be spelled out of it — which is no answer at all to
+  // someone who knew it cold. It also charged you for that silently: the
+  // first hint settles the country as not-first-try, and nothing said so
+  // until the results called it a miss. Now the first one says it out
+  // loud, and the fourth one does not exist.
+  const MAX_HINTS = 3;
+
+  function hintText(c, level) {
+    const name = c.name;
+    if (level === 1) {
+      const words = name.split(' ').length;
+      return `${c.region} · ${words > 1 ? `${words} words` : `${name.length} letters`}`;
+    }
+    if (level === 2) return `${SUBREGION_BY_CODE[c.code] || c.region} · starts with “${name[0]}”`;
+    return `“${name.slice(0, 2)}…” · ${name.length} letters — that is the last one`;
+  }
+
+  function updateHintBtn() {
+    if (!el.hintBtn) return;
+    const left = MAX_HINTS - state.hintLevel;
+    el.hintBtn.disabled = left <= 0;
+    el.hintBtn.textContent = left > 0
+      ? `💡 Hint ${state.hintLevel + 1}/${MAX_HINTS}`
+      : '💡 No hints left';
+  }
+
   function giveHint() {
     const c = COUNTRY_BY_CODE[state.selected];
-    if (!c) return;
+    if (!c || state.hintLevel >= MAX_HINTS) return;
     ensureTimer();
+    const costsNow = state.level && state.level.result[c.code] === undefined;
     settle(c.code, false);
     state.hintLevel++;
-    const name = c.name;
-    const words = name.split(' ').length;
-    if (state.hintLevel === 1) {
-      const shape = words > 1 ? `${words} words` : `${name.length} letters`;
-      setFeedback(`Starts with “${name[0]}” · ${shape} · ${c.region}`, 'hint');
-    } else {
-      const reveal = Math.min(2 + state.hintLevel, Math.ceil(name.length / 2));
-      setFeedback(`“${name.slice(0, reveal)}…”`, 'hint');
-    }
+    setFeedback(hintText(c, state.hintLevel) +
+      (costsNow ? ' — no longer counts as first-try' : ''), 'hint');
+    updateHintBtn();
   }
 
   function revealAnswer() {
@@ -1924,12 +2024,29 @@
   }
 
   // Pause stops the clock but also hides the map — no scouting for free.
+  // The veil transitions now, so `hidden` (display: none) can only go on
+  // after the fade out has run — and has to come off a frame before the
+  // fade in starts, or there is nothing to transition from.
+  let veilTimer = null;
+  function showVeil(on) {
+    clearTimeout(veilTimer);
+    if (on) {
+      el.pauseVeil.hidden = false;
+      requestAnimationFrame(() => el.pauseVeil.classList.add('on'));
+    } else {
+      el.pauseVeil.classList.remove('on');
+      veilTimer = setTimeout(() => {
+        if (!el.pauseVeil.classList.contains('on')) el.pauseVeil.hidden = true;
+      }, 300);
+    }
+  }
+
   function togglePause() {
     const L = state.level;
     if (!L || L.done || L.t0 == null) return;
     if (L.pausedAt == null) {
       L.pausedAt = performance.now();
-      el.pauseVeil.hidden = false;
+      showVeil(true);
       el.pauseTimer.textContent = '▶';
       if (document.activeElement?.blur) document.activeElement.blur();
       // Paused means the mic is actually off, not merely ignored. Leaving
@@ -1944,7 +2061,7 @@
     } else {
       L.t0 += performance.now() - L.pausedAt;
       L.pausedAt = null;
-      el.pauseVeil.hidden = true;
+      showVeil(false);
       el.pauseTimer.textContent = '⏸';
       if (state.micOn) {
         startMeter();
@@ -2173,7 +2290,7 @@
     L.done = true;
     L.elapsed = L.t0 == null ? 0 : (L.pausedAt != null ? L.pausedAt : performance.now()) - L.t0;
     L.pausedAt = null;
-    el.pauseVeil.hidden = true;
+    showVeil(false);
     el.pauseTimer.textContent = '⏸';
     stopTimer();
     const total = L.codes.length;
@@ -2212,11 +2329,20 @@
         ? (newClean ? (prev.clean ? '🎉 New clean best!' : 'Flawless!') : `best ${fmtTime(prev.clean)}`)
         : (prev.clean ? `best ${fmtTime(prev.clean)}` : 'all first-try to set one'), isClean && newClean);
 
-    const misses = L.codes.filter(c => L.result[c] !== true);
-    if (misses.length) {
-      el.resultsMisses.innerHTML = `<h3>Missed (${misses.length}) — click one to see it</h3><div class="chips"></div>`;
-      const box = el.resultsMisses.querySelector('.chips');
-      for (const code of misses) {
+    // "Missed" used to mean everything that was not first-try, which put
+    // a country you took one hint on and then named right next to one you
+    // never got at all. Since a hint still leaves the map green, that
+    // read as the results contradicting the map you had just been
+    // looking at. They are different things, and they are listed as
+    // different things.
+    const got = (c) => state.status[c] === 'named' || state.status[c] === 'placed';
+    const lost = L.codes.filter(c => L.result[c] !== true && !got(c));
+    const helped = L.codes.filter(c => L.result[c] !== true && got(c));
+
+    const chipsFor = (codes) => {
+      const box = document.createElement('div');
+      box.className = 'chips';
+      for (const code of codes) {
         const b = document.createElement('button');
         b.className = 'chip';
         b.innerHTML = `${flagHTML(code)}<span></span>`;
@@ -2224,8 +2350,23 @@
         b.addEventListener('click', () => { el.results.hidden = true; zoomToCodes([code]); });
         box.appendChild(b);
       }
-    } else {
+      return box;
+    };
+
+    el.resultsMisses.innerHTML = '';
+    if (!lost.length && !helped.length) {
       el.resultsMisses.innerHTML = `<p class="clean">✨ Every single one on the first try.</p>`;
+    } else {
+      for (const [codes, title] of [
+        [lost, `Never got it (${lost.length}) — click one to see it`],
+        [helped, `Got there, but not first try (${helped.length}) — a hint, a wrong guess, or both`],
+      ]) {
+        if (!codes.length) continue;
+        const h = document.createElement('h3');
+        h.textContent = title;
+        el.resultsMisses.appendChild(h);
+        el.resultsMisses.appendChild(chipsFor(codes));
+      }
     }
     el.resultsMode.textContent = L.mode === 'place' ? '✏️ Now name them' : '🧩 Place mode';
     el.results.hidden = false;
@@ -2730,6 +2871,7 @@
     zoomToCodes, zoomToZone, animateView, fitCodes, mapToScreen, bake,
     worldView, frameAt, safeScale, maxFitScale, viewAspect,
     CODES_BY_REGION, SUB_CODES,
+    startLevel, CHALLENGE_BY_ID,
   };
 
   loadPrefs();
