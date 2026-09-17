@@ -580,11 +580,12 @@
     'jump-bar', 'jump-toggle', 'jump-flash',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
-    'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
+    'card-actions', 'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
     'answer-meta', 'speak-btn', 'retry-btn', 'levels-panel', 'levels-close',
     'levels-list', 'level-banner', 'level-title', 'level-timer', 'level-mode',
     'challenge-prev', 'challenge-next', 'level-restart',
     'word-bank', 'bank-target', 'bank-flag', 'bank-name', 'bank-strikes', 'bank-skip', 'bank-show', 'bank-collapse', 'bank-hint', 'bank-chips',
+    'hardcore-bar', 'hc-find', 'hc-giveup',
     'pause-timer', 'pause-veil',
     'results', 'results-close', 'results-title', 'results-sub', 'results-tiles', 'results-misses', 'results-again', 'results-mode', 'results-next', 'confetti',
     'stats-panel', 'stats-close', 'stat-tiles', 'heat-toggle', 'heat-mode-note', 'flags-toggle', 'best-times', 'region-mastery', 'stats-reset',
@@ -705,6 +706,7 @@
     const chrome = new ResizeObserver(() => { if (!interacting()) updateSafe(); });
     chrome.observe(el.card);
     chrome.observe(el.wordBank);
+    chrome.observe(el.hardcoreBar);
     chrome.observe(el.jumpBar);
   }
 
@@ -1225,19 +1227,21 @@
   // does not know the word bank is 130px tall frames the country it is
   // asking you to find underneath it.
   function updateSafe() {
+    // The left inset exists for the jump bar, which on a phone is docked
+    // along the bottom instead — and 40px of a 412px screen is a tenth
+    // of the map given away for nothing.
+    const phone = W <= 900;
+    SAFE.left = phone ? 10 : SAFE_BASE.left;
+    // Whatever is docked along the bottom right now. The mode bars and
+    // the quiz card are there on any screen; the jump pad only on a
+    // phone, where it moves out of the corner. A fit that does not know
+    // the word bank is 130px tall frames the country it is asking you to
+    // find underneath it.
     let bottom = SAFE_BASE.bottom;
-    if (W <= 900) {
-      // The left inset exists for the jump bar, which on a phone is
-      // docked along the bottom instead — and 40px of a 412px screen is
-      // a tenth of the map given away for nothing.
-      SAFE.left = 10;
-      for (const e of [state.prefs.keys ? el.jumpBar : null, el.wordBank, el.card]) {
-        if (!e || e.hidden || !e.offsetParent) continue;
-        const top = e.getBoundingClientRect().top - rectTop;
-        if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
-      }
-    } else {
-      SAFE.left = SAFE_BASE.left;
+    for (const e of [phone && state.prefs.keys ? el.jumpBar : null, el.wordBank, el.hardcoreBar, el.card]) {
+      if (!e || e.hidden || !e.offsetParent) continue;
+      const top = e.getBoundingClientRect().top - rectTop;
+      if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
     }
     SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
   }
@@ -2060,6 +2064,8 @@
 
   function updateHintBtn() {
     if (!el.hintBtn) return;
+    el.cardActions.hidden = isHardcore();
+    if (isHardcore()) return;
     const left = MAX_HINTS - state.hintLevel;
     el.hintBtn.disabled = left <= 0;
     el.hintBtn.textContent = left > 0
@@ -2069,7 +2075,7 @@
 
   function giveHint() {
     const c = COUNTRY_BY_CODE[state.selected];
-    if (!c || state.hintLevel >= MAX_HINTS) return;
+    if (!c || isHardcore() || state.hintLevel >= MAX_HINTS) return;
     ensureTimer();
     const costsNow = state.level && state.level.result[c.code] === undefined;
     settle(c.code, false);
@@ -2081,11 +2087,46 @@
 
   function revealAnswer() {
     const code = state.selected;
-    if (!code || state.status[code] === 'named') return;
+    if (!code || isHardcore() || state.status[code] === 'named') return;
     settle(code, false);
     if (state.status[code] !== 'revealed') setStatus(code, 'revealed');
     showAnswerPane('Revealed — name it yourself later to turn it green', 'meh');
     checkComplete();
+  }
+
+  // ————— hardcore mode —————
+
+  // Somewhere you have not named yet. Which one is chosen at random, so
+  // it cannot be worked backwards into an ordering of the map, and it
+  // selects the country as if you had clicked it — asking the question
+  // without answering it.
+  function findGap() {
+    const L = state.level;
+    if (!L || L.done) return;
+    const left = L.codes.filter(c => !state.status[c]);
+    if (!left.length) return;
+    const code = left[Math.floor(Math.random() * left.length)];
+    zoomToCodes([code], 300);
+    setTimeout(() => selectCountry(code, mapToScreen(focusPoint(code).x, focusPoint(code).y)), 320);
+  }
+
+  // Giving up ends the run for good, so the button asks once — and then
+  // disarms itself rather than waiting for an answer, because a dialog
+  // in the middle of a timed run is worse than the misclick it prevents.
+  let giveUpTimer = null;
+  function armGiveUp(on) {
+    clearTimeout(giveUpTimer);
+    el.hcGiveup.classList.toggle('arming', on);
+    el.hcGiveup.textContent = on ? '— sure? this ends it' : "🏁 I'm done";
+    if (on) giveUpTimer = setTimeout(() => armGiveUp(false), 4000);
+  }
+
+  function giveUp() {
+    const L = state.level;
+    if (!L || L.done) return;
+    if (!el.hcGiveup.classList.contains('arming')) { armGiveUp(true); return; }
+    armGiveUp(false);
+    finishLevel();
   }
 
   // ————— progress —————
@@ -2199,6 +2240,18 @@
     startLevel(CHALLENGES[n], state.level?.mode || 'name');
   }
 
+  // Three modes, in the order the mode button cycles them. Hardcore is
+  // name mode with the safety net taken away: no hints, no reveals, and
+  // nothing forcing you to finish — you stop when you are done, and
+  // whatever you never got is what you never got. Its one concession is
+  // that it will take you to a country you have not named yet, because
+  // "which of the 195 have I missed" is a search problem rather than a
+  // knowledge one, and hunting for gaps is not the game.
+  const MODES = ['name', 'place', 'hardcore'];
+  const MODE_LABEL = { name: '✏️ Name mode', place: '🧩 Place mode', hardcore: '🏴 Hardcore' };
+  const nextMode = (m) => MODES[(MODES.indexOf(m) + 1) % MODES.length];
+  const isHardcore = () => state.level?.mode === 'hardcore';
+
   function startLevel(def, mode = 'name') {
     clearLevelClasses();
     const wasMarked = Object.keys(state.status);
@@ -2223,13 +2276,26 @@
     for (const code of state.level.codes) {
       for (const e of elemsByCode[code] || []) e.classList.add('in-level');
     }
+    // The mode's own dock goes up *before* the camera moves, and the safe
+    // area is re-read on the spot: the observer that usually does that
+    // fires a frame later, which is a frame after the fit has already
+    // framed a country underneath the bar that just appeared.
+    if (mode === 'place') buildBank();
+    else el.wordBank.hidden = true;
+    el.hardcoreBar.hidden = mode !== 'hardcore';
+    document.body.classList.toggle('hardcore', mode === 'hardcore');
+    armGiveUp(false);
+    // The card stacks above the bar rather than under it; the CSS needs
+    // the bar's real height to do that, and only the layout knows it.
+    document.documentElement.style.setProperty('--hc-h',
+      mode === 'hardcore' ? `${Math.round(el.hardcoreBar.getBoundingClientRect().height) + 10}px` : '0px');
+    updateSafe();
+
     updateOverlay();
     zoomToCodes(state.level.codes);
     el.levelBanner.hidden = false;
     el.pauseVeil.hidden = true;
     el.pauseTimer.textContent = '⏸';
-    if (mode === 'place') buildBank();
-    else el.wordBank.hidden = true;
     updateLevelUI();
     startTimer();
   }
@@ -2243,9 +2309,10 @@
     if (!L) return;
     // The HUD has room for one glyph, and which mode you're in matters
     // more mid-run than which tier of challenge it is.
-    const icon = L.mode === 'place' ? '🧩' : L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
+    const icon = L.mode === 'place' ? '🧩' : L.mode === 'hardcore' ? '🏴'
+      : L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
     el.levelTitle.textContent = `${icon} ${L.name}`;
-    el.levelMode.textContent = L.mode === 'place' ? '✏️ Name mode' : '🧩 Place mode';
+    el.levelMode.textContent = MODE_LABEL[nextMode(L.mode)];
     updateProgress();
   }
 
@@ -2396,6 +2463,9 @@
     L.pausedAt = null;
     showVeil(false);
     el.pauseTimer.textContent = '⏸';
+    el.hardcoreBar.hidden = true;
+    document.body.classList.remove('hardcore');
+    document.documentElement.style.setProperty('--hc-h', '0px');
     stopTimer();
     const total = L.codes.length;
     const clean = L.codes.filter(c => L.result[c] === true).length;
@@ -2472,7 +2542,7 @@
         el.resultsMisses.appendChild(chipsFor(codes));
       }
     }
-    el.resultsMode.textContent = L.mode === 'place' ? '✏️ Now name them' : '🧩 Place mode';
+    el.resultsMode.textContent = MODE_LABEL[nextMode(L.mode)];
     el.results.hidden = false;
   }
 
@@ -2712,8 +2782,12 @@
   el.levelMode.addEventListener('click', () => {
     const L = state.level;
     if (!L) return;
-    startLevel(CHALLENGE_BY_ID[L.id], L.mode === 'place' ? 'name' : 'place');
+    startLevel(CHALLENGE_BY_ID[L.id], nextMode(L.mode));
   });
+
+  for (const b of [el.hcFind, el.hcGiveup]) b.addEventListener('mousedown', (e) => e.preventDefault());
+  el.hcFind.addEventListener('click', findGap);
+  el.hcGiveup.addEventListener('click', giveUp);
 
   for (const b of [el.bankSkip, el.bankShow, el.bankCollapse]) b.addEventListener('mousedown', (e) => e.preventDefault());
   el.bankSkip.addEventListener('click', skipTarget);
@@ -2726,7 +2800,7 @@
   el.resultsClose.addEventListener('click', () => { el.results.hidden = true; });
   el.resultsAgain.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], L.mode); });
   el.resultsNext.addEventListener('click', () => stepChallenge(1));
-  el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], L.mode === 'place' ? 'name' : 'place'); });
+  el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], nextMode(L.mode)); });
 
   el.micToggle.addEventListener('click', () => {
     if (!SpeechRec) {
@@ -2948,6 +3022,8 @@
       if (L) startLevel(CHALLENGE_BY_ID[L.id], L.mode);
     }
     else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
+    else if ((e.key === 'm' || e.key === 'M') && isHardcore()) { e.preventDefault(); findGap(); }
+    else if ((e.key === 'g' || e.key === 'G') && isHardcore()) { e.preventDefault(); giveUp(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
     else {
       const key = jumpKeyFor(e);
@@ -2975,7 +3051,7 @@
     zoomToCodes, zoomToZone, animateView, fitCodes, mapToScreen, bake,
     worldView, frameAt, safeScale, maxFitScale, viewAspect,
     CODES_BY_REGION, SUB_CODES,
-    startLevel, CHALLENGE_BY_ID,
+    startLevel, CHALLENGE_BY_ID, selectCountry,
   };
 
   loadPrefs();

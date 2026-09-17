@@ -582,6 +582,11 @@ body.no-flags .flag { display: none; }
   width: min(440px, calc(100% - 24px));
 }
 
+/* Hardcore's bar docks where the card already is, so the card steps up
+   over it — they are both in play at once, unlike the word bank, which
+   only ever appears in a mode the card is not used in. */
+body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var(--safe-b)); }
+
 #card-prompt { font-weight: 650; margin-bottom: 12px; padding-right: 22px; }
 
 #guess-form { display: flex; gap: 8px; }
@@ -664,6 +669,7 @@ body.no-flags .flag { display: none; }
 }
 
 #card-actions { display: flex; gap: 8px; margin-top: 12px; }
+#card-actions[hidden] { display: none; }
 
 .btn-soft,
 #card-actions button,
@@ -909,6 +915,48 @@ body.no-flags .flag { display: none; }
 }
 
 #word-bank[hidden] { display: none; }
+
+/* ————— hardcore mode's bar —————
+
+   Same dock as the word bank, deliberately slimmer: there is nothing to
+   read here, only the two things the mode gives you. */
+#hardcore-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + var(--keys-h) + var(--safe-b));
+  width: min(640px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--panel-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 10px 14px;
+  z-index: 25;
+}
+
+#hardcore-bar[hidden] { display: none; }
+
+#hc-title { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em; }
+#hc-note { font-size: 0.8rem; color: var(--ink-soft); }
+.hc-buttons { margin-left: auto; display: flex; gap: 6px; }
+.hc-buttons button { padding: 6px 11px; font-size: 0.82rem; }
+.hc-buttons kbd { margin-left: 5px; font-size: 0.72em; }
+
+/* The second click is the one that ends the run, so it has to look like
+   a different button from the one that only asked. */
+#hc-giveup.arming {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  #hc-note { display: none; }
+  .hc-buttons kbd { display: none; }
+}
 
 #bank-target {
   display: flex;
