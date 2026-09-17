@@ -209,9 +209,15 @@
 
   // ————— flags —————
 
-  function flagHTML(code, cls = 'flag') {
+  // `w` is the CDN's width bucket, not a CSS size: the two places a flag
+  // is big enough to actually study — the place-mode target and the
+  // answer card — ask for the next size up so a desktop-sized flag isn't
+  // a 40px thumbnail stretched over 60. Everywhere else (chips, toasts,
+  // map pops) stays on w40, which matters when a whole-world word bank
+  // asks for all 195 at once.
+  function flagHTML(code, cls = 'flag', w = 40) {
     const cc = code.toLowerCase();
-    return `<img class="${cls}" src="https://flagcdn.com/w40/${cc}.png" srcset="https://flagcdn.com/w80/${cc}.png 2x" alt="" loading="lazy" onerror="this.remove()">`;
+    return `<img class="${cls}" src="https://flagcdn.com/w${w}/${cc}.png" srcset="https://flagcdn.com/w${w * 2}/${cc}.png 2x" alt="" loading="lazy" onerror="this.remove()">`;
   }
 
   // ————— speech (out) —————
@@ -635,7 +641,7 @@
       let big = boxes[0];
       for (const b of boxes) if (b.w * b.h > big.w * big.h) big = b;
       const g = {
-        anchor: { x: big.x + big.w / 2, y: big.y + big.h / 2, dim: Math.max(big.w, big.h), thin: Math.min(big.w, big.h) },
+        anchor: { x: big.x + big.w / 2, y: big.y + big.h / 2, dim: Math.max(big.w, big.h) },
         boxes,
       };
       if (ARCHIPELAGOS.has(code)) g.groups = groupIslands(boxes);
@@ -705,16 +711,24 @@
     };
   }
 
-  // A button earns its keep only while the country itself is too small
-  // to click; past that it's clutter. Archipelagos drop theirs once the
-  // dotted group outline is a big target of its own. The thin threshold
-  // is generous so slivers (the Gambia, Togo) keep their buttons deep
-  // into a zone's own layer.
+  // One rule, no exceptions: a button stands in for a country only while
+  // the country is the smaller target of the two. The moment a disc the
+  // size of the button's own face fits inside the borders on screen, the
+  // country can be clicked for itself and the button is clutter.
+  //
+  // TARGET_R (js/targets.js, generated from the map) is that fit in map
+  // units — the largest circle inside the country, which is honest about
+  // the shapes a bounding box flatters: slivers like the Gambia, hollows
+  // and crescents wrapped around a bay. It is why Burundi keeps its
+  // button a whole sub-region layer longer than its box says it should,
+  // and why the hand-written "keep this one anyway" list is gone.
+  //
+  // Archipelagos are the one different case, because their target isn't
+  // the country: it's the dotted group outline, which the overlay grows
+  // to a comfortable size of its own.
   function buttonRedundant(code, s) {
-    if (s < (BUTTON_KEEP[code] || 0)) return false;
-    const g = geom[code];
-    if (g.groups) return focusPoint(code).dim * s >= 48;
-    return g.anchor.dim * s >= 32 && g.anchor.thin * s >= 22;
+    if (geom[code].groups) return focusPoint(code).dim * s >= 48;
+    return (TARGET_R[code] || 0) * s >= BTN_R;
   }
 
   // Zoom needed before this country's own button shows (zone layers and
@@ -1787,7 +1801,7 @@
     el.cardAnswer.hidden = false;
     el.answerResult.textContent = resultText;
     el.answerResult.className = resultClass;
-    el.answerName.innerHTML = `${flagHTML(c.code)}<span></span>`;
+    el.answerName.innerHTML = `${flagHTML(c.code, 'flag', 80)}<span></span>`;
     el.answerName.querySelector('span').textContent = c.name;
     el.answerMeta.textContent = c.region;
     el.speakBtn.hidden = false;
@@ -2062,7 +2076,7 @@
     L.strikes = 0;
     el.bankChips.querySelectorAll('.chip').forEach(c => c.classList.toggle('armed', c.dataset.code === code));
     el.bankChips.querySelector('.chip.armed')?.scrollIntoView({ block: 'nearest' });
-    el.bankFlag.innerHTML = flagHTML(code);
+    el.bankFlag.innerHTML = flagHTML(code, 'flag', 80);
     el.bankName.textContent = COUNTRY_BY_CODE[code].name;
     el.bankStrikes.textContent = '';
     // Make the switch unmissable — the whole target row pulses.
@@ -2580,6 +2594,17 @@
   };
   const jumpState = { key: null, stage: 0, t: 0 };
 
+  // Which jump key a keystroke means. Shift+W still reads as 'w', but
+  // Shift+1 arrives as '!' on a US layout and as something else again
+  // elsewhere — so for the digits, fall back to the physical key, which
+  // every layout agrees on.
+  function jumpKeyFor(e) {
+    const k = e.key.toLowerCase();
+    if (k === '0' || JUMP_KEYS[k]) return k;
+    const digit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '')?.[1];
+    return digit && (digit === '0' || JUMP_KEYS[digit]) ? digit : null;
+  }
+
   // Which key you're standing on, and which of its two floors. On the
   // pad that lights the cap; on either layout it moves the ▸ onto the
   // line the next tap takes you to, so the second floor stops being a
@@ -2605,7 +2630,12 @@
     jumpFlashTimer = setTimeout(() => { el.jumpFlash.hidden = true; }, 850);
   }
 
-  const jumpTo = (key) => {
+  // `straight` skips the first floor: Shift (or shift-click) lands you in
+  // the dense pocket in one move, instead of a jump to the area and a
+  // second jump out of it that the camera has to animate through. The
+  // stage is still set to the deep floor afterwards, so the same key
+  // without Shift steps back out exactly as it always did.
+  const jumpTo = (key, straight = false) => {
     if (!vb) return;
     if (key === '0') {
       animateView(worldView(), 220);
@@ -2618,7 +2648,7 @@
     if (!j) return;
     const now = performance.now();
     const again = jumpState.key === key && now - jumpState.t < 15000;
-    jumpState.stage = again ? (jumpState.stage + 1) % 2 : 0;
+    jumpState.stage = straight ? 1 : (again ? (jumpState.stage + 1) % 2 : 0);
     jumpState.key = key;
     jumpState.t = now;
     const deep = jumpState.stage === 1;
@@ -2628,7 +2658,7 @@
   };
   for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
     b.addEventListener('mousedown', (e) => e.preventDefault());
-    b.addEventListener('click', () => jumpTo(b.dataset.key));
+    b.addEventListener('click', (e) => jumpTo(b.dataset.key, e.shiftKey));
   }
 
   // Fold the pad away when the map matters more than the shortcut — the
@@ -2674,9 +2704,9 @@
     }
     else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
-    else if (e.key === '0' || JUMP_KEYS[e.key.toLowerCase()]) {
-      e.preventDefault();
-      jumpTo(e.key === '0' ? '0' : e.key.toLowerCase());
+    else {
+      const key = jumpKeyFor(e);
+      if (key) { e.preventDefault(); jumpTo(key, e.shiftKey); }
     }
   });
 
