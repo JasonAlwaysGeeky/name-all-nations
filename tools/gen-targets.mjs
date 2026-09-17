@@ -210,8 +210,13 @@ const out = build();
 const check = process.argv.includes('--check');
 const current = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : null;
 
+// The table's content is what has to match, not its line endings: a
+// Windows checkout gets this file back with CRLF, and comparing that to
+// freshly generated LF reports every line as changed.
+const same = (a, b) => a !== null && a.split('\r\n').join('\n') === b;
+
 if (check) {
-  if (current !== out) {
+  if (!same(current, out)) {
     console.error('js/targets.js is out of date — run `npm run targets`.');
     process.exit(1);
   }
