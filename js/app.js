@@ -38,7 +38,7 @@
   const TAIL_W = 8;            // half-width of a button's pointer where it leaves the circle, px
   const SQ_MIN = 56;           // min on-screen size of an island outline once it replaces the button, px
   const SQ_THIN = 30;          // …except across a tilted pill, which is long enough to be an easy target, px
-  const SQ_PAD = 4;            // breathing room an outline keeps around its islands once zoomed in, px
+  const SQ_ROUND = 0.3;        // corner radius of an island outline, as a share of its short side
   const SQ_GAP = 7;            // clearance two island outlines keep from each other, px
   // An island chain strung out on a diagonal (the Bahamas down towards
   // Cuba, Micronesia across the Pacific) is badly served by an upright
@@ -1436,10 +1436,16 @@
     // islands cluster, a tilted pill along the chain when they don't
     // (the Bahamas running down past Cuba, Micronesia strung across the
     // Pacific): an upright box around either of those is mostly someone
-    // else's sea. The outline hugs its islands closer the further you
-    // zoom in; once it stands in for the button it also grows to a
-    // comfortable click size, and spreadBoxes keeps that growth from
-    // swallowing the neighbouring island.
+    // else's sea.
+    //
+    // The outline is a fixed *geographic* shape: the islands plus a pad
+    // that is a share of the group's own size. It used to hug closer the
+    // further you zoomed in, which meant the outline quietly changed
+    // shape under you as you moved around — the one thing on the map
+    // that did. The only thing zoom still decides is growth: once the
+    // outline stands in for the button it inflates to a comfortable
+    // click size when it would otherwise be a speck, and spreadBoxes
+    // keeps that growth from swallowing the neighbouring island.
     const outlines = [];
     for (const code of codes) {
       const g = geom[code];
@@ -1447,15 +1453,23 @@
       const takeover = squared.has(code);
       for (const b of g.groups) {
         if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
-        const r = b.raw, pad = Math.min(b.pad, SQ_PAD / s);
+        const r = b.raw, pad = b.pad;
         const box = { code, split: g.groups.length > 1, raw: r, pad };
         const t = b.tilt;
         if (t && t.tight <= ROT_MAX) {
           // Long side gets the full comfortable size, short side only
           // enough to stay a pill you can hit.
-          const long = Math.max(t.w, t.h) + 2 * pad, short = Math.min(t.w, t.h) + 2 * pad;
-          const across = Math.max(short, (takeover ? SQ_THIN : ROT_THIN) / s);
-          const along = Math.max(long, takeover ? SQ_MIN / s : 0);
+          const il = Math.max(t.w, t.h), iw = Math.min(t.w, t.h);   // the islands' own rect
+          const across = Math.max(iw + 2 * pad, (takeover ? SQ_THIN : ROT_THIN) / s);
+          let along = Math.max(il + 2 * pad, takeover ? SQ_MIN / s : 0);
+          // A pill has semicircular ends, and a semicircle no wider than
+          // the chain cuts the corners off the rect the chain sits in —
+          // which is exactly where the island at the end of the chain
+          // is. The pad above is usually enough to save it, but "usually"
+          // is what lost Trinidad a corner; solving the end cap against
+          // the corner gives the length that always clears it.
+          const R = across / 2, half = Math.min(iw / 2, R);
+          along = Math.max(along, il + 2 * (R - Math.sqrt(Math.max(0, R * R - half * half))));
           const flip = t.w < t.h;                             // the tilt's own long axis
           box.tilt = { angle: t.angle, w: flip ? across : along, h: flip ? along : across };
           box.fixed = true;
@@ -1482,7 +1496,17 @@
       shape.setAttribute('x', b.cx - w / 2); shape.setAttribute('y', b.cy - h / 2);
       shape.setAttribute('width', w); shape.setAttribute('height', h);
       // Fully rounded ends on a pill, a soft-cornered square otherwise.
-      shape.setAttribute('rx', Math.min(w, h) * (t ? 0.5 : 0.3));
+      // Fully rounded ends on a pill (its length already accounts for
+      // them); on a square, a radius that stops where the islands start.
+      // The same corner-cutting arithmetic as above, read the other way:
+      // with margins a and b around the islands, a corner radius up to
+      // a + b + sqrt(2ab) still leaves the island corner inside.
+      let rx = Math.min(w, h) * (t ? 0.5 : SQ_ROUND);
+      if (!t) {
+        const a = Math.max(0, (w - b.raw.w) / 2), c = Math.max(0, (h - b.raw.h) / 2);
+        rx = Math.min(rx, a + c + Math.sqrt(2 * a * c));
+      }
+      shape.setAttribute('rx', rx);
       if (t) shape.setAttribute('transform', `rotate(${t.angle} ${b.cx} ${b.cy})`);
       grp.appendChild(shape);
       decorate(grp, b.code);
