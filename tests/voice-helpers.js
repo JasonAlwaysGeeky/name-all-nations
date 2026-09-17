@@ -60,12 +60,16 @@ async function stubVoice(page) {
       rec: null,
       log,
       // Push one recognition result, the way the browser does: the whole
-      // list so far, plus the index of what's new.
+      // list so far, plus the index of what's new. `text` may be an array
+      // of alternatives, which is what the real thing returns once
+      // maxAlternatives is set — ranked by plausible English, so the
+      // country is often not the first one.
       say(text, isFinal = true) {
         const rec = window.__voice.rec;
         if (!rec || !rec.running) return false;   // nothing is listening
         const results = window.__voice._results || (window.__voice._results = []);
-        const entry = [{ transcript: text, confidence: 0.9 }];
+        const alts = Array.isArray(text) ? text : [text];
+        const entry = alts.map((t, i) => ({ transcript: t, confidence: 0.9 - i * 0.1 }));
         entry.isFinal = isFinal;
         const idx = results.length;
         results.push(entry);

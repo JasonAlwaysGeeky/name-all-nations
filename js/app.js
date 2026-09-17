@@ -135,9 +135,63 @@
     for (const raw of [c.name, ...c.aliases]) ANSWERS.push({ norm: normalize(raw), code: c.code });
   }
 
+  // How a word sounds, roughly: the spellings English is inconsistent
+  // about folded together, and every vowel folded to one placeholder.
+  //
+  // This exists because a speech recognizer is guessing at English, not
+  // at geography, and it will happily hand back a common word that
+  // sounds like the country you said: "molly" for Mali, "cypress" for
+  // Cyprus. Those are nowhere near each other as letters — Levenshtein
+  // never gets there — but they are the same sound, which is the thing
+  // that was actually right about what you said.
+  //
+  // Vowels fold rather than drop. Dropping them is the classic trick and
+  // it is too lossy on short names: without the placeholders "people"
+  // comes out as Palau.
+  function soundKey(s) {
+    const t = normalize(s).replace(/ /g, '')
+      .replace(/ph/g, 'f')
+      .replace(/gh/g, 'g')
+      .replace(/ck/g, 'k')
+      .replace(/x/g, 'ks')
+      .replace(/sch/g, 'sk')
+      .replace(/ch/g, 'q')          // q stands in for the ch / sh sound
+      .replace(/sh/g, 'q')
+      .replace(/c([eiy])/g, 's$1')
+      .replace(/c/g, 'k')
+      .replace(/z/g, 's')
+      .replace(/w/g, 'v')
+      .replace(/j/g, 'y');
+    return t ? t.replace(/[aeiouy]/g, 'a').replace(/(.)\1+/g, '$1') : '';
+  }
+
+  // key -> the countries that sound like it. Two keys are shared (Ghana
+  // with Guinea and Guyana; Oman with Yemen) and those are refused
+  // outright: a sound that could be either is not evidence of one.
+  const BY_SOUND = new Map();
+  for (const a of ANSWERS) {
+    const k = soundKey(a.norm);
+    if (!k) continue;
+    if (!BY_SOUND.has(k)) BY_SOUND.set(k, new Set());
+    BY_SOUND.get(k).add(a.code);
+  }
+
+  // Words a player says *at* the game rather than *to* it. Only one of
+  // them collides with a country by sound ("sorry" lands on Syria), but
+  // none of them should ever be an answer, so they never reach the
+  // phonetic pass at all.
+  const FILLER = new Set(['sorry', 'oops', 'wait', 'hang on', 'hold on', 'um', 'uh', 'erm', 'hmm',
+    'okay', 'ok', 'right', 'next', 'skip', 'what', 'damn', 'oh no', 'no idea', 'dunno',
+    'i dont know', 'no', 'yes', 'yeah', 'nope', 'hello', 'testing']);
+
   // The country codes whose names are the closest match to the guess,
   // within the typo budget; empty when it doesn't sound like any country.
-  function bestMatches(guess) {
+  //
+  // `heard` opens the phonetic fallback, and only the voice path sets it.
+  // Typing is exact enough that the typo budget is the right amount of
+  // forgiveness; a microphone is not, and the same leniency applied to
+  // the keyboard would start accepting spellings nobody typed.
+  function bestMatches(guess, heard = false) {
     const bestCodes = new Set();
     const g = normalize(guess);
     if (!g) return bestCodes;
@@ -148,13 +202,17 @@
       if (d < best) { best = d; bestCodes.clear(); }
       if (d <= best) bestCodes.add(a.code);
     }
+    if (bestCodes.size || !heard || FILLER.has(g)) return bestCodes;
+    // Nothing looked like a country. Does it sound like exactly one?
+    const codes = BY_SOUND.get(soundKey(g));
+    if (codes && codes.size === 1) bestCodes.add([...codes][0]);
     return bestCodes;
   }
 
   // A guess is correct for `code` when that country is (one of) the
   // closest matches overall and within the typo budget.
-  function matchGuess(guess, code) {
-    return bestMatches(guess).has(code);
+  function matchGuess(guess, code, heard = false) {
+    return bestMatches(guess, heard).has(code);
   }
 
   // ————— persistence —————
@@ -251,6 +309,19 @@
 
   function voiceWords(t) { return t.trim() ? t.trim().split(/\s+/) : []; }
 
+  // Of the recognizer's ranked guesses, the first one that contains a
+  // country name — otherwise its own favourite. The recognizer ranks by
+  // plausible English, so its favourite is the one most likely to be a
+  // common word that happens to sound like the country you said.
+  function pickAlternative(res) {
+    const n = Math.min(res.length || 1, 5);
+    for (let i = 0; i < n; i++) {
+      const words = voiceWords(res[i].transcript);
+      if (words.length && containsCountry(words)) return res[i].transcript;
+    }
+    return res[0].transcript;
+  }
+
   function voicePush(code) {
     if (!state.micOn || !code || state.status[code] === 'named') return;
     // Re-clicking a country that's already waiting shouldn't double it up.
@@ -267,7 +338,7 @@
   function containsCountry(words) {
     for (let start = 0; start < words.length; start++) {
       for (let len = Math.min(6, words.length - start); len >= 1; len--) {
-        if (bestMatches(words.slice(start, start + len).join(' ')).size) return true;
+        if (bestMatches(words.slice(start, start + len).join(' '), true).size) return true;
       }
     }
     return false;
@@ -280,7 +351,7 @@
     const lastStart = Math.min(from + 4, words.length - 1);
     for (let start = from; start <= lastStart; start++) {
       for (let len = Math.min(6, words.length - start); len >= 1; len--) {
-        if (matchGuess(words.slice(start, start + len).join(' '), code)) return { start, end: start + len };
+        if (matchGuess(words.slice(start, start + len).join(' '), code, true)) return { start, end: start + len };
       }
     }
     return null;
@@ -412,7 +483,7 @@
     if (state.status[code] === 'named' || state.level?.pausedAt != null) return;
     const c = COUNTRY_BY_CODE[code];
     const pt = mapToScreen(focusPoint(code).x, focusPoint(code).y);
-    if (matchGuess(heard, code)) {
+    if (matchGuess(heard, code, true)) {
       settle(code, true);
       setStatus(code, 'named');
       flash(code, 'flash-good', 900);
@@ -433,6 +504,12 @@
     // Interim results tell us when an utterance *began*, which is what lets
     // each one be pinned to the country that was selected at that moment.
     recognition.interimResults = true;
+    // The recognizer ranks its guesses by what makes an English sentence,
+    // which is not the job here: asked for one answer it returns
+    // "everybody" and keeps Kiribati in second place. Asked for five, the
+    // country is usually in the list, and pickAlternative below takes the
+    // one that actually contains country names.
+    recognition.maxAlternatives = 5;
     // The staged status line doubles as a mic diagnostic: if it never gets
     // past "waiting for sound", the browser is capturing a silent device.
     recognition.onstart = () => { el.micStatusText.textContent = 'mic open — waiting for sound…'; };
@@ -442,7 +519,7 @@
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
         micErrors = 0;                  // results flowing — the pipeline works
-        const words = voiceWords(res[0].transcript);
+        const words = voiceWords(pickAlternative(res));
         if (!res.isFinal) {
           updateTicker(res[0].transcript);
           alignVoice(words, false);     // bank correct answers the moment they appear
@@ -1910,7 +1987,10 @@
     if (!guess.trim()) return;
     const c = COUNTRY_BY_CODE[code];
 
-    if (matchGuess(guess, code)) {
+    // viaVoice also opens the phonetic pass: this is the same submission
+    // path the keyboard uses, and a spoken answer has to be forgiven the
+    // same way here as it is when the queue grades it off screen.
+    if (matchGuess(guess, code, viaVoice)) {
       settle(code, true);
       setStatus(code, 'named');
       flash(code, 'flash-good', 900);

@@ -32,6 +32,10 @@ async function clickCountry(page, code) {
   }, code);
   expect(pt, `no clickable point inside ${code}`).not.toBeNull();
   await page.mouse.click(pt.x, pt.y);
+  // Under a loaded runner a click can land while the view is still
+  // animating, so confirm the game agrees about what got selected before
+  // answering for it.
+  await expect.poll(() => page.evaluate(() => window.NAN_DEBUG.state.selected)).toBe(code);
 }
 
 const answer = async (page, text) => {
@@ -79,7 +83,11 @@ test('the results tell "needed a hint" apart from "never got it"', async ({ page
     const D = window.NAN_DEBUG;
     D.startLevel(D.CHALLENGE_BY_ID['sub:Central America'], 'name');
   });
-  await page.waitForTimeout(500);
+  await expect.poll(async () => {
+    const a = await page.evaluate(() => window.NAN_DEBUG.view().x);
+    await page.waitForTimeout(60);
+    return a === await page.evaluate(() => window.NAN_DEBUG.view().x);
+  }, { timeout: 5000 }).toBe(true);
 
   const names = {
     BZ: 'belize', CR: 'costa rica', SV: 'el salvador',
