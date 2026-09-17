@@ -139,6 +139,18 @@
       </div>
     </div>
 
+    <!-- Hardcore mode's whole interface: no hints, no reveal, and the two
+         things you do need — a way to find a gap without being told what
+         fills it, and a way to stop. -->
+    <section id="hardcore-bar" hidden>
+      <span id="hc-title">🏴 Hardcore</span>
+      <span id="hc-note">No hints, no reveals. Stop when you're done.</span>
+      <span class="hc-buttons">
+        <button id="hc-find" title="Pan to one you haven't named yet (M)">🔍 Find a gap <kbd>M</kbd></button>
+        <button id="hc-giveup" title="End the run and see the results (G)">🏁 I'm done <kbd>G</kbd></button>
+      </span>
+    </section>
+
     <section id="word-bank" hidden>
       <div id="bank-target">
         <span id="bank-find">Find</span>
@@ -239,6 +251,10 @@
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
         <dt><kbd>F</kbd></dt><dd>Full screen — on a phone this is what gets rid of the address bar and the
           system bars; in landscape they cost more of the screen than the map does</dd>
+        <dt><kbd>M</kbd> <kbd>G</kbd></dt><dd>Hardcore mode only — <kbd>M</kbd> takes you to a country you
+          haven't named yet (without telling you which), <kbd>G</kbd> ends the run. Hardcore is the third
+          setting of the mode button in the challenge panel: no hints, no reveals, and nothing making you
+          finish — you stop when you're done and whatever you never got is what you never got.</dd>
         <dt><kbd>P</kbd></dt><dd>Pause — hides the map and stops the clock (it starts on your first move)</dd>
         <dt><kbd>Esc</kbd></dt><dd>Close panels</dd>
         <dt>Scroll / pinch</dt><dd>Zoom at the cursor</dd>

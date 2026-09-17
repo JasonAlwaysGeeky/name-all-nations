@@ -38,7 +38,7 @@
   const TAIL_W = 8;            // half-width of a button's pointer where it leaves the circle, px
   const SQ_MIN = 56;           // min on-screen size of an island outline once it replaces the button, px
   const SQ_THIN = 30;          // …except across a tilted pill, which is long enough to be an easy target, px
-  const SQ_PAD = 4;            // breathing room an outline keeps around its islands once zoomed in, px
+  const SQ_ROUND = 0.3;        // corner radius of an island outline, as a share of its short side
   const SQ_GAP = 7;            // clearance two island outlines keep from each other, px
   // An island chain strung out on a diagonal (the Bahamas down towards
   // Cuba, Micronesia across the Pacific) is badly served by an upright
@@ -71,6 +71,8 @@
   }
   const ZONE_BY_NAME = Object.fromEntries(BUTTON_ZONES.map(z => [z.name, z]));
   const SUB_CODES = Object.fromEntries(SUBREGIONS.map(x => [x.name, x.codes]));
+  const SUBREGION_BY_CODE = {};
+  for (const sub of SUBREGIONS) for (const c of sub.codes) SUBREGION_BY_CODE[c] = sub.name;
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -133,9 +135,63 @@
     for (const raw of [c.name, ...c.aliases]) ANSWERS.push({ norm: normalize(raw), code: c.code });
   }
 
+  // How a word sounds, roughly: the spellings English is inconsistent
+  // about folded together, and every vowel folded to one placeholder.
+  //
+  // This exists because a speech recognizer is guessing at English, not
+  // at geography, and it will happily hand back a common word that
+  // sounds like the country you said: "molly" for Mali, "cypress" for
+  // Cyprus. Those are nowhere near each other as letters — Levenshtein
+  // never gets there — but they are the same sound, which is the thing
+  // that was actually right about what you said.
+  //
+  // Vowels fold rather than drop. Dropping them is the classic trick and
+  // it is too lossy on short names: without the placeholders "people"
+  // comes out as Palau.
+  function soundKey(s) {
+    const t = normalize(s).replace(/ /g, '')
+      .replace(/ph/g, 'f')
+      .replace(/gh/g, 'g')
+      .replace(/ck/g, 'k')
+      .replace(/x/g, 'ks')
+      .replace(/sch/g, 'sk')
+      .replace(/ch/g, 'q')          // q stands in for the ch / sh sound
+      .replace(/sh/g, 'q')
+      .replace(/c([eiy])/g, 's$1')
+      .replace(/c/g, 'k')
+      .replace(/z/g, 's')
+      .replace(/w/g, 'v')
+      .replace(/j/g, 'y');
+    return t ? t.replace(/[aeiouy]/g, 'a').replace(/(.)\1+/g, '$1') : '';
+  }
+
+  // key -> the countries that sound like it. Two keys are shared (Ghana
+  // with Guinea and Guyana; Oman with Yemen) and those are refused
+  // outright: a sound that could be either is not evidence of one.
+  const BY_SOUND = new Map();
+  for (const a of ANSWERS) {
+    const k = soundKey(a.norm);
+    if (!k) continue;
+    if (!BY_SOUND.has(k)) BY_SOUND.set(k, new Set());
+    BY_SOUND.get(k).add(a.code);
+  }
+
+  // Words a player says *at* the game rather than *to* it. Only one of
+  // them collides with a country by sound ("sorry" lands on Syria), but
+  // none of them should ever be an answer, so they never reach the
+  // phonetic pass at all.
+  const FILLER = new Set(['sorry', 'oops', 'wait', 'hang on', 'hold on', 'um', 'uh', 'erm', 'hmm',
+    'okay', 'ok', 'right', 'next', 'skip', 'what', 'damn', 'oh no', 'no idea', 'dunno',
+    'i dont know', 'no', 'yes', 'yeah', 'nope', 'hello', 'testing']);
+
   // The country codes whose names are the closest match to the guess,
   // within the typo budget; empty when it doesn't sound like any country.
-  function bestMatches(guess) {
+  //
+  // `heard` opens the phonetic fallback, and only the voice path sets it.
+  // Typing is exact enough that the typo budget is the right amount of
+  // forgiveness; a microphone is not, and the same leniency applied to
+  // the keyboard would start accepting spellings nobody typed.
+  function bestMatches(guess, heard = false) {
     const bestCodes = new Set();
     const g = normalize(guess);
     if (!g) return bestCodes;
@@ -146,13 +202,17 @@
       if (d < best) { best = d; bestCodes.clear(); }
       if (d <= best) bestCodes.add(a.code);
     }
+    if (bestCodes.size || !heard || FILLER.has(g)) return bestCodes;
+    // Nothing looked like a country. Does it sound like exactly one?
+    const codes = BY_SOUND.get(soundKey(g));
+    if (codes && codes.size === 1) bestCodes.add([...codes][0]);
     return bestCodes;
   }
 
   // A guess is correct for `code` when that country is (one of) the
   // closest matches overall and within the typo budget.
-  function matchGuess(guess, code) {
-    return bestMatches(guess).has(code);
+  function matchGuess(guess, code, heard = false) {
+    return bestMatches(guess, heard).has(code);
   }
 
   // ————— persistence —————
@@ -249,6 +309,19 @@
 
   function voiceWords(t) { return t.trim() ? t.trim().split(/\s+/) : []; }
 
+  // Of the recognizer's ranked guesses, the first one that contains a
+  // country name — otherwise its own favourite. The recognizer ranks by
+  // plausible English, so its favourite is the one most likely to be a
+  // common word that happens to sound like the country you said.
+  function pickAlternative(res) {
+    const n = Math.min(res.length || 1, 5);
+    for (let i = 0; i < n; i++) {
+      const words = voiceWords(res[i].transcript);
+      if (words.length && containsCountry(words)) return res[i].transcript;
+    }
+    return res[0].transcript;
+  }
+
   function voicePush(code) {
     if (!state.micOn || !code || state.status[code] === 'named') return;
     // Re-clicking a country that's already waiting shouldn't double it up.
@@ -265,7 +338,7 @@
   function containsCountry(words) {
     for (let start = 0; start < words.length; start++) {
       for (let len = Math.min(6, words.length - start); len >= 1; len--) {
-        if (bestMatches(words.slice(start, start + len).join(' ')).size) return true;
+        if (bestMatches(words.slice(start, start + len).join(' '), true).size) return true;
       }
     }
     return false;
@@ -278,7 +351,7 @@
     const lastStart = Math.min(from + 4, words.length - 1);
     for (let start = from; start <= lastStart; start++) {
       for (let len = Math.min(6, words.length - start); len >= 1; len--) {
-        if (matchGuess(words.slice(start, start + len).join(' '), code)) return { start, end: start + len };
+        if (matchGuess(words.slice(start, start + len).join(' '), code, true)) return { start, end: start + len };
       }
     }
     return null;
@@ -410,7 +483,7 @@
     if (state.status[code] === 'named' || state.level?.pausedAt != null) return;
     const c = COUNTRY_BY_CODE[code];
     const pt = mapToScreen(focusPoint(code).x, focusPoint(code).y);
-    if (matchGuess(heard, code)) {
+    if (matchGuess(heard, code, true)) {
       settle(code, true);
       setStatus(code, 'named');
       flash(code, 'flash-good', 900);
@@ -431,6 +504,12 @@
     // Interim results tell us when an utterance *began*, which is what lets
     // each one be pinned to the country that was selected at that moment.
     recognition.interimResults = true;
+    // The recognizer ranks its guesses by what makes an English sentence,
+    // which is not the job here: asked for one answer it returns
+    // "everybody" and keeps Kiribati in second place. Asked for five, the
+    // country is usually in the list, and pickAlternative below takes the
+    // one that actually contains country names.
+    recognition.maxAlternatives = 5;
     // The staged status line doubles as a mic diagnostic: if it never gets
     // past "waiting for sound", the browser is capturing a silent device.
     recognition.onstart = () => { el.micStatusText.textContent = 'mic open — waiting for sound…'; };
@@ -440,7 +519,7 @@
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
         micErrors = 0;                  // results flowing — the pipeline works
-        const words = voiceWords(res[0].transcript);
+        const words = voiceWords(pickAlternative(res));
         if (!res.isFinal) {
           updateTicker(res[0].transcript);
           alignVoice(words, false);     // bank correct answers the moment they appear
@@ -501,11 +580,12 @@
     'jump-bar', 'jump-toggle', 'jump-flash',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
-    'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
+    'card-actions', 'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
     'answer-meta', 'speak-btn', 'retry-btn', 'levels-panel', 'levels-close',
     'levels-list', 'level-banner', 'level-title', 'level-timer', 'level-mode',
     'challenge-prev', 'challenge-next', 'level-restart',
     'word-bank', 'bank-target', 'bank-flag', 'bank-name', 'bank-strikes', 'bank-skip', 'bank-show', 'bank-collapse', 'bank-hint', 'bank-chips',
+    'hardcore-bar', 'hc-find', 'hc-giveup',
     'pause-timer', 'pause-veil',
     'results', 'results-close', 'results-title', 'results-sub', 'results-tiles', 'results-misses', 'results-again', 'results-mode', 'results-next', 'confetti',
     'stats-panel', 'stats-close', 'stat-tiles', 'heat-toggle', 'heat-mode-note', 'flags-toggle', 'best-times', 'region-mastery', 'stats-reset',
@@ -615,6 +695,19 @@
       reanchor();
       if (!interacting()) bake();
     }).observe(el.map);
+
+    // The quiz card and the word bank come and go, and on a phone each
+    // one changes how much of the glass the map actually has. Watching
+    // them keeps the *next* fit honest, without yanking the view you are
+    // already looking at.
+    // …but never in the middle of a gesture. The safe area feeds the
+    // clamp's travel limits, so moving it while a finger is down tugs
+    // the map out from under that finger.
+    const chrome = new ResizeObserver(() => { if (!interacting()) updateSafe(); });
+    chrome.observe(el.card);
+    chrome.observe(el.wordBank);
+    chrome.observe(el.hardcoreBar);
+    chrome.observe(el.jumpBar);
   }
 
   // A country's bounding box lies about where it "is" when its islands
@@ -834,27 +927,38 @@
   // into a third of the glass. Matching the window means a fit fills it.
   function viewAspect() { return W > 0 && H > 0 ? H / W : fullVB.h / fullVB.w; }
 
-  // Zoomed all the way out is "the whole map is on screen", whichever
-  // axis ends up binding — on a tall window that is a wider rect than
-  // the map itself.
+  // The whole map, as a fit box.
+  const mapBox = () => ({ x1: fullVB.x, y1: fullVB.y, x2: fullVB.x + fullVB.w, y2: fullVB.y + fullVB.h });
+
+  // Zoomed all the way out is "the whole map is somewhere I can see it",
+  // and on a phone that is not the same as "on screen": the jump pad and
+  // the word bank own a third of the glass between them, so a world view
+  // centred in the *window* hands them the bottom half of the map. It
+  // goes through the same safe-area fit every other view does.
   function worldView() {
-    const asp = viewAspect();
-    const w = Math.max(fullVB.w, fullVB.h / asp), h = w * asp;
-    return { x: fullVB.x + fullVB.w / 2 - w / 2, y: fullVB.y + fullVB.h / 2 - h / 2, w, h };
+    const box = mapBox();
+    return frameAt(box, safeScale(box, 1));
   }
 
   function clampView(n) {
     const asp = viewAspect();
+    const box = mapBox();
     const minW = fullVB.w / MAX_ZOOM;
-    const w = Math.min(Math.max(n.w, minW), Math.max(fullVB.w, fullVB.h / asp));
+    const maxW = Math.max(W / safeScale(box, 1), minW);
+    const w = Math.min(Math.max(n.w, minW), maxW);
     const h = w * asp;
+    const s = W / w;
+    // Where the map comes to rest on an axis with no travel left: the
+    // middle of what the map has to itself, not the middle of the window.
+    const rest = frameAt(box, s);
+    // The travel limits stretch by the safe insets, so anything on the
+    // map can always be dragged out from under the UI — otherwise a
+    // country near the south edge can never leave the word bank's shadow.
     const mx = fullVB.w * 0.05, my = fullVB.h * 0.05;
-    // An axis the view already overflows has no travel left in it, so it
-    // centres on the map rather than pinning to one edge.
     const span = (lo, hi, want, mid) => (hi < lo ? mid : Math.min(Math.max(want, lo), hi));
     return {
-      x: span(fullVB.x - mx, fullVB.x + fullVB.w + mx - w, n.x, fullVB.x + fullVB.w / 2 - w / 2),
-      y: span(fullVB.y - my, fullVB.y + fullVB.h + my - h, n.y, fullVB.y + fullVB.h / 2 - h / 2),
+      x: span(fullVB.x - mx - SAFE.left / s, fullVB.x + fullVB.w + mx - w + SAFE.right / s, n.x, rest.x),
+      y: span(fullVB.y - my - SAFE.top / s, fullVB.y + fullVB.h + my - h + SAFE.bottom / s, n.y, rest.y),
       w, h,
     };
   }
@@ -1117,12 +1221,29 @@
   // On a phone the jump keys are docked along the bottom of the map
   // rather than tucked in a corner, so whatever they take is map a fit
   // must not frame anything into. Re-read on every measure().
+  // On a phone everything docks along the bottom edge — the jump pad, and
+  // whichever of the word bank or the quiz card is open — so what the map
+  // actually has to itself is measured rather than guessed at. A fit that
+  // does not know the word bank is 130px tall frames the country it is
+  // asking you to find underneath it.
   function updateSafe() {
+    // The left inset exists for the jump bar, which on a phone is docked
+    // along the bottom instead — and 40px of a 412px screen is a tenth
+    // of the map given away for nothing.
+    const phone = W <= 900;
+    SAFE.left = phone ? 10 : SAFE_BASE.left;
+    // Whatever is docked along the bottom right now. The mode bars and
+    // the quiz card are there on any screen; the jump pad only on a
+    // phone, where it moves out of the corner. A fit that does not know
+    // the word bank is 130px tall frames the country it is asking you to
+    // find underneath it.
     let bottom = SAFE_BASE.bottom;
-    if (W <= 900 && state.prefs.keys && el.jumpBar) {
-      bottom += Math.round(el.jumpBar.getBoundingClientRect().height) + 12;
+    for (const e of [phone && state.prefs.keys ? el.jumpBar : null, el.wordBank, el.hardcoreBar, el.card]) {
+      if (!e || e.hidden || !e.offsetParent) continue;
+      const top = e.getBoundingClientRect().top - rectTop;
+      if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
     }
-    SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.35));
+    SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
   }
 
   // `extraBottom` reserves additional space above the bottom edge — the
@@ -1319,10 +1440,16 @@
     // islands cluster, a tilted pill along the chain when they don't
     // (the Bahamas running down past Cuba, Micronesia strung across the
     // Pacific): an upright box around either of those is mostly someone
-    // else's sea. The outline hugs its islands closer the further you
-    // zoom in; once it stands in for the button it also grows to a
-    // comfortable click size, and spreadBoxes keeps that growth from
-    // swallowing the neighbouring island.
+    // else's sea.
+    //
+    // The outline is a fixed *geographic* shape: the islands plus a pad
+    // that is a share of the group's own size. It used to hug closer the
+    // further you zoomed in, which meant the outline quietly changed
+    // shape under you as you moved around — the one thing on the map
+    // that did. The only thing zoom still decides is growth: once the
+    // outline stands in for the button it inflates to a comfortable
+    // click size when it would otherwise be a speck, and spreadBoxes
+    // keeps that growth from swallowing the neighbouring island.
     const outlines = [];
     for (const code of codes) {
       const g = geom[code];
@@ -1330,15 +1457,23 @@
       const takeover = squared.has(code);
       for (const b of g.groups) {
         if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
-        const r = b.raw, pad = Math.min(b.pad, SQ_PAD / s);
+        const r = b.raw, pad = b.pad;
         const box = { code, split: g.groups.length > 1, raw: r, pad };
         const t = b.tilt;
         if (t && t.tight <= ROT_MAX) {
           // Long side gets the full comfortable size, short side only
           // enough to stay a pill you can hit.
-          const long = Math.max(t.w, t.h) + 2 * pad, short = Math.min(t.w, t.h) + 2 * pad;
-          const across = Math.max(short, (takeover ? SQ_THIN : ROT_THIN) / s);
-          const along = Math.max(long, takeover ? SQ_MIN / s : 0);
+          const il = Math.max(t.w, t.h), iw = Math.min(t.w, t.h);   // the islands' own rect
+          const across = Math.max(iw + 2 * pad, (takeover ? SQ_THIN : ROT_THIN) / s);
+          let along = Math.max(il + 2 * pad, takeover ? SQ_MIN / s : 0);
+          // A pill has semicircular ends, and a semicircle no wider than
+          // the chain cuts the corners off the rect the chain sits in —
+          // which is exactly where the island at the end of the chain
+          // is. The pad above is usually enough to save it, but "usually"
+          // is what lost Trinidad a corner; solving the end cap against
+          // the corner gives the length that always clears it.
+          const R = across / 2, half = Math.min(iw / 2, R);
+          along = Math.max(along, il + 2 * (R - Math.sqrt(Math.max(0, R * R - half * half))));
           const flip = t.w < t.h;                             // the tilt's own long axis
           box.tilt = { angle: t.angle, w: flip ? across : along, h: flip ? along : across };
           box.fixed = true;
@@ -1365,7 +1500,17 @@
       shape.setAttribute('x', b.cx - w / 2); shape.setAttribute('y', b.cy - h / 2);
       shape.setAttribute('width', w); shape.setAttribute('height', h);
       // Fully rounded ends on a pill, a soft-cornered square otherwise.
-      shape.setAttribute('rx', Math.min(w, h) * (t ? 0.5 : 0.3));
+      // Fully rounded ends on a pill (its length already accounts for
+      // them); on a square, a radius that stops where the islands start.
+      // The same corner-cutting arithmetic as above, read the other way:
+      // with margins a and b around the islands, a corner radius up to
+      // a + b + sqrt(2ab) still leaves the island corner inside.
+      let rx = Math.min(w, h) * (t ? 0.5 : SQ_ROUND);
+      if (!t) {
+        const a = Math.max(0, (w - b.raw.w) / 2), c = Math.max(0, (h - b.raw.h) / 2);
+        rx = Math.min(rx, a + c + Math.sqrt(2 * a * c));
+      }
+      shape.setAttribute('rx', rx);
       if (t) shape.setAttribute('transform', `rotate(${t.angle} ${b.cx} ${b.cy})`);
       grp.appendChild(shape);
       decorate(grp, b.code);
@@ -1613,14 +1758,21 @@
     }
 
     // Put the anchored map point back under `c`, at view width `w`.
+    //
+    // The view rect takes the window's shape (viewAspect), which means it
+    // always fills the glass and the scale is simply W/w, with nothing
+    // letterboxed. This used to solve with the *map's* shape instead, and
+    // subtract letterbox offsets that no longer exist, so the grabbed
+    // point jumped the moment you moved it — by nothing at all dead
+    // centre, and by more the further out you grabbed, which on a phone
+    // is every drag. clientToMap is the other half of this same sum, and
+    // the two have to stay in step.
     function applyGesture(c, w) {
-      const h = w * (fullVB.h / fullVB.w);
-      const s = Math.min(W / w, H / h);
-      const ox = (W - w * s) / 2, oy = (H - h * s) / 2;
+      const s = W / w;
       setView({
-        x: gest.ax - (c.x - rectLeft - ox) / s,
-        y: gest.ay - (c.y - rectTop - oy) / s,
-        w, h,
+        x: gest.ax - (c.x - rectLeft) / s,
+        y: gest.ay - (c.y - rectTop) / s,
+        w, h: w * viewAspect(),
       });
     }
 
@@ -1660,6 +1812,7 @@
         dragging = true;
         el.map.classList.add('panning');
         el.tooltip.hidden = true;
+        clearHot();
       }
     });
 
@@ -1680,6 +1833,7 @@
         dragging = true;
         el.map.classList.add('panning');
         el.tooltip.hidden = true;
+        clearHot();
         // Re-anchor at the point the drag actually broke loose, so the map
         // doesn't snap by the slop distance on the first moved frame.
         anchorGesture();
@@ -1711,6 +1865,7 @@
         gest = null;
         el.map.classList.remove('panning');
         dragging = false;
+        updateSafe();                 // deferred while the gesture was live
         if (moved) {
           const v = type !== 'mouse' ? releaseVelocity() : null;
           if (!v || !startFling(v.vx, v.vy)) bake();
@@ -1725,14 +1880,39 @@
     };
     el.map.addEventListener('pointerup', endPointer);
     el.map.addEventListener('pointercancel', endPointer);
-    el.map.addEventListener('pointerleave', () => { el.tooltip.hidden = true; });
+    el.map.addEventListener('pointerleave', () => { el.tooltip.hidden = true; clearHot(); });
   }
 
-  // ————— tooltip (hover, desktop) —————
+  // ————— tooltip & hover (desktop) —————
+
+  // What a click here would arm. Buttons and island outlines sit above
+  // the map; below it, every country carries a fat invisible stroke of
+  // click padding, so a point just offshore still resolves to its
+  // country. The tooltip and the highlight both run off this one answer,
+  // because a highlight that disagrees with the click is how you end up
+  // naming the wrong country.
+  let hotEls = [];
+  function setHot(target) {
+    for (const e of hotEls) e.classList.remove('hot');
+    hotEls = [];
+    const grp = target?.closest?.('g.btn, g.ov-box');
+    if (grp) {
+      hotEls = [grp];
+    } else if (target) {
+      const code = target.dataset?.code || target.id;
+      if (code && (COUNTRY_BY_CODE[code] || TERRITORIES[code])) {
+        hotEls = allElems(code).slice();
+        if (!hotEls.length && allPaths[code]) hotEls = [allPaths[code]];
+      }
+    }
+    for (const e of hotEls) e.classList.add('hot');
+  }
+  const clearHot = () => setHot(null);
 
   function updateTooltip(e) {
     if (e.pointerType !== 'mouse') return;
     const target = e.target.closest?.('[data-code], path[id], g.btn');
+    setHot(target);
     let text = null;
     if (target?.closest('g.btn.zone')) {
       const zg2 = target.closest('g.btn.zone');
@@ -1772,6 +1952,7 @@
     state.selected = code;
     state.selectedAt = pt;
     state.hintLevel = 0;
+    updateHintBtn();
     state.attempts = 0;
     setSelectedClass(code, true);
     el.helloClose.click();
@@ -1834,7 +2015,10 @@
     if (!guess.trim()) return;
     const c = COUNTRY_BY_CODE[code];
 
-    if (matchGuess(guess, code)) {
+    // viaVoice also opens the phonetic pass: this is the same submission
+    // path the keyboard uses, and a spoken answer has to be forgiven the
+    // same way here as it is when the queue grades it off screen.
+    if (matchGuess(guess, code, viaVoice)) {
       settle(code, true);
       setStatus(code, 'named');
       flash(code, 'flash-good', 900);
@@ -1858,30 +2042,91 @@
     }
   }
 
+  // Three hints, each a different *kind* of clue, and none of them worth
+  // more than two letters. The old ladder handed over one more letter
+  // every time and ran to half the name, so a country you did not know
+  // could simply be spelled out of it — which is no answer at all to
+  // someone who knew it cold. It also charged you for that silently: the
+  // first hint settles the country as not-first-try, and nothing said so
+  // until the results called it a miss. Now the first one says it out
+  // loud, and the fourth one does not exist.
+  const MAX_HINTS = 3;
+
+  function hintText(c, level) {
+    const name = c.name;
+    if (level === 1) {
+      const words = name.split(' ').length;
+      return `${c.region} · ${words > 1 ? `${words} words` : `${name.length} letters`}`;
+    }
+    if (level === 2) return `${SUBREGION_BY_CODE[c.code] || c.region} · starts with “${name[0]}”`;
+    return `“${name.slice(0, 2)}…” · ${name.length} letters — that is the last one`;
+  }
+
+  function updateHintBtn() {
+    if (!el.hintBtn) return;
+    el.cardActions.hidden = isHardcore();
+    if (isHardcore()) return;
+    const left = MAX_HINTS - state.hintLevel;
+    el.hintBtn.disabled = left <= 0;
+    el.hintBtn.textContent = left > 0
+      ? `💡 Hint ${state.hintLevel + 1}/${MAX_HINTS}`
+      : '💡 No hints left';
+  }
+
   function giveHint() {
     const c = COUNTRY_BY_CODE[state.selected];
-    if (!c) return;
+    if (!c || isHardcore() || state.hintLevel >= MAX_HINTS) return;
     ensureTimer();
+    const costsNow = state.level && state.level.result[c.code] === undefined;
     settle(c.code, false);
     state.hintLevel++;
-    const name = c.name;
-    const words = name.split(' ').length;
-    if (state.hintLevel === 1) {
-      const shape = words > 1 ? `${words} words` : `${name.length} letters`;
-      setFeedback(`Starts with “${name[0]}” · ${shape} · ${c.region}`, 'hint');
-    } else {
-      const reveal = Math.min(2 + state.hintLevel, Math.ceil(name.length / 2));
-      setFeedback(`“${name.slice(0, reveal)}…”`, 'hint');
-    }
+    setFeedback(hintText(c, state.hintLevel) +
+      (costsNow ? ' — no longer counts as first-try' : ''), 'hint');
+    updateHintBtn();
   }
 
   function revealAnswer() {
     const code = state.selected;
-    if (!code || state.status[code] === 'named') return;
+    if (!code || isHardcore() || state.status[code] === 'named') return;
     settle(code, false);
     if (state.status[code] !== 'revealed') setStatus(code, 'revealed');
     showAnswerPane('Revealed — name it yourself later to turn it green', 'meh');
     checkComplete();
+  }
+
+  // ————— hardcore mode —————
+
+  // Somewhere you have not named yet. Which one is chosen at random, so
+  // it cannot be worked backwards into an ordering of the map, and it
+  // selects the country as if you had clicked it — asking the question
+  // without answering it.
+  function findGap() {
+    const L = state.level;
+    if (!L || L.done) return;
+    const left = L.codes.filter(c => !state.status[c]);
+    if (!left.length) return;
+    const code = left[Math.floor(Math.random() * left.length)];
+    zoomToCodes([code], 300);
+    setTimeout(() => selectCountry(code, mapToScreen(focusPoint(code).x, focusPoint(code).y)), 320);
+  }
+
+  // Giving up ends the run for good, so the button asks once — and then
+  // disarms itself rather than waiting for an answer, because a dialog
+  // in the middle of a timed run is worse than the misclick it prevents.
+  let giveUpTimer = null;
+  function armGiveUp(on) {
+    clearTimeout(giveUpTimer);
+    el.hcGiveup.classList.toggle('arming', on);
+    el.hcGiveup.textContent = on ? '— sure? this ends it' : "🏁 I'm done";
+    if (on) giveUpTimer = setTimeout(() => armGiveUp(false), 4000);
+  }
+
+  function giveUp() {
+    const L = state.level;
+    if (!L || L.done) return;
+    if (!el.hcGiveup.classList.contains('arming')) { armGiveUp(true); return; }
+    armGiveUp(false);
+    finishLevel();
   }
 
   // ————— progress —————
@@ -1924,12 +2169,29 @@
   }
 
   // Pause stops the clock but also hides the map — no scouting for free.
+  // The veil transitions now, so `hidden` (display: none) can only go on
+  // after the fade out has run — and has to come off a frame before the
+  // fade in starts, or there is nothing to transition from.
+  let veilTimer = null;
+  function showVeil(on) {
+    clearTimeout(veilTimer);
+    if (on) {
+      el.pauseVeil.hidden = false;
+      requestAnimationFrame(() => el.pauseVeil.classList.add('on'));
+    } else {
+      el.pauseVeil.classList.remove('on');
+      veilTimer = setTimeout(() => {
+        if (!el.pauseVeil.classList.contains('on')) el.pauseVeil.hidden = true;
+      }, 300);
+    }
+  }
+
   function togglePause() {
     const L = state.level;
     if (!L || L.done || L.t0 == null) return;
     if (L.pausedAt == null) {
       L.pausedAt = performance.now();
-      el.pauseVeil.hidden = false;
+      showVeil(true);
       el.pauseTimer.textContent = '▶';
       if (document.activeElement?.blur) document.activeElement.blur();
       // Paused means the mic is actually off, not merely ignored. Leaving
@@ -1944,7 +2206,7 @@
     } else {
       L.t0 += performance.now() - L.pausedAt;
       L.pausedAt = null;
-      el.pauseVeil.hidden = true;
+      showVeil(false);
       el.pauseTimer.textContent = '⏸';
       if (state.micOn) {
         startMeter();
@@ -1978,6 +2240,18 @@
     startLevel(CHALLENGES[n], state.level?.mode || 'name');
   }
 
+  // Three modes, in the order the mode button cycles them. Hardcore is
+  // name mode with the safety net taken away: no hints, no reveals, and
+  // nothing forcing you to finish — you stop when you are done, and
+  // whatever you never got is what you never got. Its one concession is
+  // that it will take you to a country you have not named yet, because
+  // "which of the 195 have I missed" is a search problem rather than a
+  // knowledge one, and hunting for gaps is not the game.
+  const MODES = ['name', 'place', 'hardcore'];
+  const MODE_LABEL = { name: '✏️ Name mode', place: '🧩 Place mode', hardcore: '🏴 Hardcore' };
+  const nextMode = (m) => MODES[(MODES.indexOf(m) + 1) % MODES.length];
+  const isHardcore = () => state.level?.mode === 'hardcore';
+
   function startLevel(def, mode = 'name') {
     clearLevelClasses();
     const wasMarked = Object.keys(state.status);
@@ -2002,13 +2276,26 @@
     for (const code of state.level.codes) {
       for (const e of elemsByCode[code] || []) e.classList.add('in-level');
     }
+    // The mode's own dock goes up *before* the camera moves, and the safe
+    // area is re-read on the spot: the observer that usually does that
+    // fires a frame later, which is a frame after the fit has already
+    // framed a country underneath the bar that just appeared.
+    if (mode === 'place') buildBank();
+    else el.wordBank.hidden = true;
+    el.hardcoreBar.hidden = mode !== 'hardcore';
+    document.body.classList.toggle('hardcore', mode === 'hardcore');
+    armGiveUp(false);
+    // The card stacks above the bar rather than under it; the CSS needs
+    // the bar's real height to do that, and only the layout knows it.
+    document.documentElement.style.setProperty('--hc-h',
+      mode === 'hardcore' ? `${Math.round(el.hardcoreBar.getBoundingClientRect().height) + 10}px` : '0px');
+    updateSafe();
+
     updateOverlay();
     zoomToCodes(state.level.codes);
     el.levelBanner.hidden = false;
     el.pauseVeil.hidden = true;
     el.pauseTimer.textContent = '⏸';
-    if (mode === 'place') buildBank();
-    else el.wordBank.hidden = true;
     updateLevelUI();
     startTimer();
   }
@@ -2022,9 +2309,10 @@
     if (!L) return;
     // The HUD has room for one glyph, and which mode you're in matters
     // more mid-run than which tier of challenge it is.
-    const icon = L.mode === 'place' ? '🧩' : L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
+    const icon = L.mode === 'place' ? '🧩' : L.mode === 'hardcore' ? '🏴'
+      : L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
     el.levelTitle.textContent = `${icon} ${L.name}`;
-    el.levelMode.textContent = L.mode === 'place' ? '✏️ Name mode' : '🧩 Place mode';
+    el.levelMode.textContent = MODE_LABEL[nextMode(L.mode)];
     updateProgress();
   }
 
@@ -2173,8 +2461,11 @@
     L.done = true;
     L.elapsed = L.t0 == null ? 0 : (L.pausedAt != null ? L.pausedAt : performance.now()) - L.t0;
     L.pausedAt = null;
-    el.pauseVeil.hidden = true;
+    showVeil(false);
     el.pauseTimer.textContent = '⏸';
+    el.hardcoreBar.hidden = true;
+    document.body.classList.remove('hardcore');
+    document.documentElement.style.setProperty('--hc-h', '0px');
     stopTimer();
     const total = L.codes.length;
     const clean = L.codes.filter(c => L.result[c] === true).length;
@@ -2212,11 +2503,20 @@
         ? (newClean ? (prev.clean ? '🎉 New clean best!' : 'Flawless!') : `best ${fmtTime(prev.clean)}`)
         : (prev.clean ? `best ${fmtTime(prev.clean)}` : 'all first-try to set one'), isClean && newClean);
 
-    const misses = L.codes.filter(c => L.result[c] !== true);
-    if (misses.length) {
-      el.resultsMisses.innerHTML = `<h3>Missed (${misses.length}) — click one to see it</h3><div class="chips"></div>`;
-      const box = el.resultsMisses.querySelector('.chips');
-      for (const code of misses) {
+    // "Missed" used to mean everything that was not first-try, which put
+    // a country you took one hint on and then named right next to one you
+    // never got at all. Since a hint still leaves the map green, that
+    // read as the results contradicting the map you had just been
+    // looking at. They are different things, and they are listed as
+    // different things.
+    const got = (c) => state.status[c] === 'named' || state.status[c] === 'placed';
+    const lost = L.codes.filter(c => L.result[c] !== true && !got(c));
+    const helped = L.codes.filter(c => L.result[c] !== true && got(c));
+
+    const chipsFor = (codes) => {
+      const box = document.createElement('div');
+      box.className = 'chips';
+      for (const code of codes) {
         const b = document.createElement('button');
         b.className = 'chip';
         b.innerHTML = `${flagHTML(code)}<span></span>`;
@@ -2224,10 +2524,25 @@
         b.addEventListener('click', () => { el.results.hidden = true; zoomToCodes([code]); });
         box.appendChild(b);
       }
-    } else {
+      return box;
+    };
+
+    el.resultsMisses.innerHTML = '';
+    if (!lost.length && !helped.length) {
       el.resultsMisses.innerHTML = `<p class="clean">✨ Every single one on the first try.</p>`;
+    } else {
+      for (const [codes, title] of [
+        [lost, `Never got it (${lost.length}) — click one to see it`],
+        [helped, `Got there, but not first try (${helped.length}) — a hint, a wrong guess, or both`],
+      ]) {
+        if (!codes.length) continue;
+        const h = document.createElement('h3');
+        h.textContent = title;
+        el.resultsMisses.appendChild(h);
+        el.resultsMisses.appendChild(chipsFor(codes));
+      }
     }
-    el.resultsMode.textContent = L.mode === 'place' ? '✏️ Now name them' : '🧩 Place mode';
+    el.resultsMode.textContent = MODE_LABEL[nextMode(L.mode)];
     el.results.hidden = false;
   }
 
@@ -2467,8 +2782,12 @@
   el.levelMode.addEventListener('click', () => {
     const L = state.level;
     if (!L) return;
-    startLevel(CHALLENGE_BY_ID[L.id], L.mode === 'place' ? 'name' : 'place');
+    startLevel(CHALLENGE_BY_ID[L.id], nextMode(L.mode));
   });
+
+  for (const b of [el.hcFind, el.hcGiveup]) b.addEventListener('mousedown', (e) => e.preventDefault());
+  el.hcFind.addEventListener('click', findGap);
+  el.hcGiveup.addEventListener('click', giveUp);
 
   for (const b of [el.bankSkip, el.bankShow, el.bankCollapse]) b.addEventListener('mousedown', (e) => e.preventDefault());
   el.bankSkip.addEventListener('click', skipTarget);
@@ -2481,7 +2800,7 @@
   el.resultsClose.addEventListener('click', () => { el.results.hidden = true; });
   el.resultsAgain.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], L.mode); });
   el.resultsNext.addEventListener('click', () => stepChallenge(1));
-  el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], L.mode === 'place' ? 'name' : 'place'); });
+  el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], nextMode(L.mode)); });
 
   el.micToggle.addEventListener('click', () => {
     if (!SpeechRec) {
@@ -2703,6 +3022,8 @@
       if (L) startLevel(CHALLENGE_BY_ID[L.id], L.mode);
     }
     else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
+    else if ((e.key === 'm' || e.key === 'M') && isHardcore()) { e.preventDefault(); findGap(); }
+    else if ((e.key === 'g' || e.key === 'G') && isHardcore()) { e.preventDefault(); giveUp(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
     else {
       const key = jumpKeyFor(e);
@@ -2730,6 +3051,7 @@
     zoomToCodes, zoomToZone, animateView, fitCodes, mapToScreen, bake,
     worldView, frameAt, safeScale, maxFitScale, viewAspect,
     CODES_BY_REGION, SUB_CODES,
+    startLevel, CHALLENGE_BY_ID, selectCountry,
   };
 
   loadPrefs();

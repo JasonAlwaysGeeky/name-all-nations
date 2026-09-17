@@ -12,12 +12,17 @@
   --selected-stroke: #b9821a;
   --named: #7fd08c;
   --named-stroke: #3f8f4e;
-  --revealed: #f2b95c;
-  --revealed-stroke: #c98f2e;
+  /* "Shown to you" and "missed" used to be a gold one shade off
+     --selected, so a revealed country and the country under your cursor
+     looked like the same thing. Clay is nowhere near the selection gold,
+     the named green or the placed blue, and still reads as a mark
+     against you without shouting like red. */
+  --revealed: #eda58c;
+  --revealed-stroke: #bc6046;
   --placed: #8cc1ec;
   --placed-stroke: #3b78b8;
-  --missed: #f2b95c;
-  --missed-stroke: #c98f2e;
+  --missed: #eda58c;
+  --missed-stroke: #bc6046;
 
   --heat-x: #f5edd6;
   --heat-0: #f08a7e;
@@ -228,16 +233,23 @@ svg.world path.country {
   cursor: pointer;
 }
 
-svg.world path.country:hover { fill: var(--hover); }
+/* The highlight follows the country a click would actually select, which
+   is not the same as the shape the cursor is literally over: every
+   country carries a fat invisible stroke of click padding, so the sea
+   just off a coast belongs to it too. `:hover` only knows about the
+   visible path, and the gap between "this click will select Malta" and
+   "Malta looks armed" is exactly where a misclick comes from. `.hot` is
+   set from the same lookup that decides the click. */
+svg.world path.country.hot { fill: var(--hover); }
 svg.world path.country.selected { fill: var(--selected); stroke: var(--selected-stroke); stroke-width: 1.6; }
 svg.world path.country.named { fill: var(--named); stroke: var(--named-stroke); }
-svg.world path.country.named:hover { fill: #9fdca8; }
+svg.world path.country.named.hot { fill: #9fdca8; }
 svg.world path.country.revealed { fill: var(--revealed); stroke: var(--revealed-stroke); }
-svg.world path.country.revealed:hover { fill: #f7cd87; }
+svg.world path.country.revealed.hot { fill: #f6c3b1; }
 svg.world path.country.placed { fill: var(--placed); stroke: var(--placed-stroke); }
-svg.world path.country.placed:hover { fill: #a9d2f2; }
+svg.world path.country.placed.hot { fill: #a9d2f2; }
 svg.world path.country.missed { fill: var(--missed); stroke: var(--missed-stroke); }
-svg.world path.country.missed:hover { fill: #f7cd87; }
+svg.world path.country.missed.hot { fill: #f6c3b1; }
 
 /* invisible click padding around every country — hidden paths are never
    painted, but pointer-events: stroke still hit-tests their fat stroke */
@@ -257,18 +269,29 @@ svg.world path.hit {
    islands still read as islands; clickable as a big target */
 svg.world g.ov-box { cursor: pointer; }
 
+/* Tinted, not empty. Drawn as bare dots over open water, an outline
+   reads as a chart annotation — something the map is telling you — and
+   not as a country still owing you its name. Filling it with the land
+   colour puts it in the same visual family as every other unguessed
+   country, and the status tints below then work the way they do on a
+   mainland. */
 svg.world g.ov-box rect,
 svg.world g.ov-box ellipse {
-  fill: rgba(255, 255, 255, 0.001);
-  stroke: rgba(70, 58, 40, 0.55);
+  fill: rgba(245, 237, 214, 0.42);
+  stroke: rgba(70, 58, 40, 0.6);
   stroke-width: 1.2;
   stroke-dasharray: 2 3;
   vector-effect: non-scaling-stroke;
   pointer-events: all;
 }
 
-svg.world g.ov-box:hover rect,
-svg.world g.ov-box:hover ellipse { stroke: #3b3020; stroke-dasharray: none; }
+svg.world g.ov-box.hot rect,
+svg.world g.ov-box.hot ellipse { fill: rgba(255, 225, 160, 0.62); stroke: #3b3020; stroke-dasharray: none; }
+svg.world g.ov-box.selected rect, svg.world g.ov-box.selected ellipse { fill: rgba(255, 202, 87, 0.58); }
+svg.world g.ov-box.named rect, svg.world g.ov-box.named ellipse { fill: rgba(127, 208, 140, 0.52); }
+svg.world g.ov-box.revealed rect, svg.world g.ov-box.revealed ellipse { fill: rgba(237, 165, 140, 0.52); }
+svg.world g.ov-box.placed rect, svg.world g.ov-box.placed ellipse { fill: rgba(140, 193, 236, 0.52); }
+svg.world g.ov-box.missed rect, svg.world g.ov-box.missed ellipse { fill: rgba(237, 165, 140, 0.52); }
 svg.world g.ov-box.selected rect,
 svg.world g.ov-box.selected ellipse { stroke: var(--selected-stroke); stroke-width: 2; stroke-dasharray: none; }
 svg.world g.ov-box.named rect,
@@ -294,8 +317,8 @@ svg.world g.btn .face { stroke-width: 2.5; }
 svg.world g.btn .tail { stroke-width: 1.5; stroke-linejoin: round; pointer-events: all; }
 svg.world g.btn .pad { fill: transparent; stroke: none; pointer-events: all; }
 
-svg.world g.btn:hover .face,
-svg.world g.btn:hover .tail { fill: rgba(255, 255, 255, 0.96); stroke: #2f2616; }
+svg.world g.btn.hot .face,
+svg.world g.btn.hot .tail { fill: rgba(255, 255, 255, 0.96); stroke: #2f2616; }
 svg.world g.btn.selected .face,
 svg.world g.btn.selected .tail { fill: var(--selected); stroke: var(--selected-stroke); }
 svg.world g.btn.named .face,
@@ -559,6 +582,11 @@ body.no-flags .flag { display: none; }
   width: min(440px, calc(100% - 24px));
 }
 
+/* Hardcore's bar docks where the card already is, so the card steps up
+   over it — they are both in play at once, unlike the word bank, which
+   only ever appears in a mode the card is not used in. */
+body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var(--safe-b)); }
+
 #card-prompt { font-weight: 650; margin-bottom: 12px; padding-right: 22px; }
 
 #guess-form { display: flex; gap: 8px; }
@@ -641,6 +669,7 @@ body.no-flags .flag { display: none; }
 }
 
 #card-actions { display: flex; gap: 8px; margin-top: 12px; }
+#card-actions[hidden] { display: none; }
 
 .btn-soft,
 #card-actions button,
@@ -812,6 +841,12 @@ body.no-flags .flag { display: none; }
 #level-restart { font-size: 0.95rem; }
 
 /* ————— pause veil: no scouting while the clock is stopped ————— */
+/* Auto-pause fires whenever the tab loses focus, so this is what an
+   alt-tab away and back looks like. It stays opaque — the map really is
+   hidden, which is the whole job, and a blur you can still read colours
+   through is not the same promise — but it fades in and out instead of
+   appearing whole between one frame and the next, which is what read as
+   a camera flash. */
 #pause-veil {
   position: absolute;
   inset: 0;
@@ -821,9 +856,25 @@ body.no-flags .flag { display: none; }
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.26s ease, visibility 0s linear 0.26s;
+}
+
+#pause-veil.on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.26s ease, visibility 0s;
 }
 
 #pause-veil[hidden] { display: none; }
+
+.pause-box { transform: scale(0.96); transition: transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1); }
+#pause-veil.on .pause-box { transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #pause-veil, .pause-box { transition-duration: 0.01s; }
+}
 
 .pause-box { text-align: center; color: #fff; }
 .pause-icon { font-size: 3.4rem; line-height: 1; margin-bottom: 10px; }
@@ -864,6 +915,48 @@ body.no-flags .flag { display: none; }
 }
 
 #word-bank[hidden] { display: none; }
+
+/* ————— hardcore mode's bar —————
+
+   Same dock as the word bank, deliberately slimmer: there is nothing to
+   read here, only the two things the mode gives you. */
+#hardcore-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + var(--keys-h) + var(--safe-b));
+  width: min(640px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--panel-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 10px 14px;
+  z-index: 25;
+}
+
+#hardcore-bar[hidden] { display: none; }
+
+#hc-title { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em; }
+#hc-note { font-size: 0.8rem; color: var(--ink-soft); }
+.hc-buttons { margin-left: auto; display: flex; gap: 6px; }
+.hc-buttons button { padding: 6px 11px; font-size: 0.82rem; }
+.hc-buttons kbd { margin-left: 5px; font-size: 0.72em; }
+
+/* The second click is the one that ends the run, so it has to look like
+   a different button from the one that only asked. */
+#hc-giveup.arming {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  #hc-note { display: none; }
+  .hc-buttons kbd { display: none; }
+}
 
 #bank-target {
   display: flex;
