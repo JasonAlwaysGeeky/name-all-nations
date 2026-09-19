@@ -1250,6 +1250,17 @@
     SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
   }
 
+  // A zone dive lands clear of the spot the quiz card is about to open
+  // in, since the tap that follows opens it over whatever is there. That
+  // only means anything while a card can still appear: once it is up it
+  // is already measured into SAFE.bottom, and a place run never shows
+  // one. Reserving it on top of those framed a dive into the top half of
+  // a phone, above a band of map nothing was ever going to cover.
+  function cardClear(z) {
+    if (state.level?.mode === 'place' || !el.card.hidden) return 0;
+    return z.clear ?? 140;
+  }
+
   // `extraBottom` reserves additional space above the bottom edge — the
   // quiz card lives bottom-centre, and a dense zone's south member
   // (Malta) must not end up underneath it.
@@ -1311,7 +1322,7 @@
   // own `pad`/`clear` loosen the frame further.
   function zoomToZone(z, ms = 240) {
     if (!z) return;
-    const clear = z.clear ?? 140;
+    const clear = cardClear(z);
     if (VIEW_BOXES[z.name]) { zoomToView(z.name, ms, z.minScale * 1.1, clear); return; }
     const f = fitCodes(z.codes);
     if (!f) return;
@@ -2364,7 +2375,11 @@
 
   function setBankHint(msg, cls) {
     el.bankHint.textContent = msg;
-    el.bankHint.className = cls;
+    // On a phone the hit/miss line is a pill that fades out above the bar;
+    // two misses in a row carry the same class, so drop it for a beat or
+    // the second one never replays the fade and never shows.
+    el.bankHint.className = '';
+    if (cls) { void el.bankHint.offsetWidth; el.bankHint.className = cls; }
   }
 
   function armChip(code) {
@@ -3028,7 +3043,7 @@
     state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod,
     scale: () => scaleFor(vb), fullVB: () => fullVB, size: () => ({ W, H }), SAFE,
     zoomToCodes, zoomToZone, zoomToView, animateView, fitCodes, mapToScreen, clientToMap, bake,
-    worldView, frameAt, safeScale, maxFitScale, viewAspect,
+    worldView, frameAt, safeScale, maxFitScale, viewAspect, cardClear,
     CODES_BY_REGION, SUB_CODES,
     startLevel, CHALLENGE_BY_ID, selectCountry,
   };

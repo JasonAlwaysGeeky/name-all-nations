@@ -5,7 +5,10 @@
  *   · tap a name (on the map or in the list) to select that box and jump
  *     to it exactly as its key would
  *   · drag the selected box's edges and corners; drag its name to move it
- *   · the dashed frame is this screen's safe area — where a box lands
+ *   · Done (or Esc, or its row again) lets go of it
+ *   · the dashed green frame is this screen's safe area — where a box
+ *     lands; the hatched blue band is what a zone dive also keeps clear
+ *     for the quiz card, when one can still open
  *   · Copy hands back the table to paste over VIEW_BOXES
  *
  * Edits live in this browser's storage (and only apply in ?guides), so a
@@ -17,7 +20,7 @@
   const ORIGINAL = JSON.parse(JSON.stringify(VIEW_BOXES));
   const ZONES = Object.fromEntries(BUTTON_ZONES.map(z => [z.name, z]));
   const names = Object.keys(VIEW_BOXES);
-  let D = null, selected = null, open = true;
+  let D = null, selected = null, open = true, lastSig = '';
 
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || '{}');
@@ -49,6 +52,10 @@
     .gd-h[data-h=nw], .gd-h[data-h=se] { cursor: nwse-resize; } .gd-h[data-h=ne], .gd-h[data-h=sw] { cursor: nesw-resize; }
     #gd-safe { position: absolute; border: 2px dashed rgba(0, 170, 90, 0.9); box-sizing: border-box; }
     #gd-safe::before { content: "safe area"; position: absolute; right: 4px; top: 2px; font: 600 10px system-ui, sans-serif; color: rgb(0, 130, 70); }
+    #gd-card { position: absolute; box-sizing: border-box; border-top: 2px dashed rgba(0, 110, 200, 0.9);
+      background: repeating-linear-gradient(135deg, rgba(0, 110, 200, 0.13) 0 6px, transparent 6px 12px); }
+    #gd-card::before { content: "kept clear — the quiz card opens here"; position: absolute; left: 4px; top: 2px; font: 600 10px system-ui, sans-serif; color: rgb(0, 90, 170); }
+    #gd-card[hidden], #gd-done[hidden] { display: none; }
     #gd-panel { position: absolute; left: 8px; top: 64px; z-index: 40; max-width: min(330px, calc(100% - 16px));
       font: 12px/1.3 system-ui, sans-serif; color: #122236; background: rgba(255, 255, 255, 0.94);
       border-radius: 10px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); padding: 6px; }
@@ -70,15 +77,17 @@
   const wrap = document.getElementById('map-wrap');
   const layer = Object.assign(document.createElement('div'), { id: 'gd-layer' });
   const safe = Object.assign(document.createElement('div'), { id: 'gd-safe' });
-  layer.appendChild(safe);
+  const card = Object.assign(document.createElement('div'), { id: 'gd-card', hidden: true });
+  layer.append(safe, card);
   const panel = Object.assign(document.createElement('div'), { id: 'gd-panel' });
-  panel.innerHTML = `<header><b id="gd-title"></b><button id="gd-copy">Copy</button><button id="gd-reset">Reset</button></header>
+  panel.innerHTML = `<header><b id="gd-title"></b><button id="gd-done" hidden>Done</button><button id="gd-copy">Copy</button><button id="gd-reset">Reset</button></header>
     <div id="gd-rows"></div><textarea id="gd-out" hidden readonly></textarea>`;
   wrap.append(layer, panel);
-  const rowsEl = panel.querySelector('#gd-rows'), outEl = panel.querySelector('#gd-out'), titleEl = panel.querySelector('#gd-title');
+  const rowsEl = panel.querySelector('#gd-rows'), outEl = panel.querySelector('#gd-out'), titleEl = panel.querySelector('#gd-title'), doneEl = panel.querySelector('#gd-done');
 
-  // What a zone dive keeps free above the quiz card, same as zoomToZone.
-  const clearOf = (n) => (ZONES[n] ? ZONES[n].clear ?? 140 : 0);
+  // What a zone dive keeps free for the quiz card right now — nothing in a
+  // place run, or once the card is already up and measured.
+  const clearOf = (n) => (ZONES[n] ? D.cardClear(ZONES[n]) : 0);
   const floorOf = (n) => (ZONES[n] ? ZONES[n].minScale * 1.1 : 0);
   const asBox = (b) => ({ x1: b[0], y1: b[1], x2: b[2], y2: b[3] });
 
@@ -86,11 +95,13 @@
     if (ZONES[n]) D.zoomToZone(ZONES[n], 200); else D.zoomToView(n, 200);
   }
 
+  // null puts every box back to an outline: nothing to grab by accident.
   function select(n, andJump) {
     selected = n;
+    doneEl.hidden = !n;
     for (const b of layer.querySelectorAll('.gd-box')) b.classList.toggle('sel', b.dataset.name === n);
     renderRows();
-    if (andJump) jump(n);
+    if (n && andJump) jump(n);
   }
 
   const boxEls = {};
@@ -154,7 +165,11 @@
       row.innerHTML = `<span>${n}</span><span class="n">${VIEW_BOXES[n].join(' ')}</span>` +
         `<span class="n" title="zoom this screen lands at, px per map unit">${over ? `needs ${floorOf(n).toFixed(1)} · fits ${fit.toFixed(1)}` : `×${Math.min(fit, D.maxFitScale()).toFixed(1)}`}</span>`;
       // On a phone the list is most of the map; picking from it folds it.
-      row.addEventListener('click', () => { if (D.size().W <= 900) open = false; select(n, true); });
+      row.addEventListener('click', () => {
+        if (n === selected) { select(null); return; }          // a second tap lets go of it
+        if (D.size().W <= 900) open = false;
+        select(n, true);
+      });
       rowsEl.appendChild(row);
     }
   }
@@ -165,6 +180,8 @@
   }
 
   titleEl.addEventListener('click', () => { open = !open; outEl.hidden = true; renderRows(); });
+  doneEl.addEventListener('click', () => select(null));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') select(null); });
   panel.querySelector('#gd-copy').addEventListener('click', () => {
     outEl.value = tableText();
     outEl.hidden = false;
@@ -178,12 +195,24 @@
   });
 
   function frame() {
+    // The green frame is only ever the safe area. What a zone dive also
+    // holds back for the quiz card is its own band inside it, so a frame
+    // that stops short of the bottom says why.
     const { W, H } = D.size(), S = D.SAFE;
     const extra = selected ? clearOf(selected) : 0;
     Object.assign(safe.style, {
       left: `${S.left}px`, top: `${S.top}px`,
-      width: `${W - S.left - S.right}px`, height: `${H - S.top - S.bottom - extra}px`,
+      width: `${W - S.left - S.right}px`, height: `${H - S.top - S.bottom}px`,
     });
+    card.hidden = !extra;
+    Object.assign(card.style, {
+      left: `${S.left}px`, top: `${H - S.bottom - extra}px`,
+      width: `${W - S.left - S.right}px`, height: `${extra}px`,
+    });
+    // The bank opening, the card closing, a mode switch: all move the
+    // numbers in the list without anything here having been touched.
+    const sig = `${W},${H},${S.top},${S.bottom},${S.left},${S.right},${extra}`;
+    if (sig !== lastSig) { lastSig = sig; renderRows(); }
     for (const n of names) {
       const [x1, y1, x2, y2] = VIEW_BOXES[n];
       const a = D.mapToScreen(x1, y1), b = D.mapToScreen(x2, y2);

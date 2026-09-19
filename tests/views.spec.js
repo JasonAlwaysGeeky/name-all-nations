@@ -12,6 +12,30 @@ const SCREENS = {
   'an ultrawide': { width: 2560, height: 1080 },
 };
 
+test.describe('what the bottom of a phone costs the map', () => {
+  test.use({ viewport: SCREENS['a portrait phone'] });
+
+  test('the find bar is one row, and a place run reserves no quiz card on top of it', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#hello-close').click();
+    await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
+    await page.evaluate(() => window.NAN_DEBUG.startLevel(window.NAN_DEBUG.CHALLENGE_BY_ID.world, 'place'));
+    await expect(page.locator('#word-bank')).toBeVisible();
+
+    const bar = await page.locator('#word-bank').boundingBox();
+    expect(bar.height).toBeLessThan(60);
+
+    // The bar is measured into the safe area; the card it would have made
+    // room for never opens in this mode.
+    const r = await page.evaluate(() => {
+      const D = window.NAN_DEBUG;
+      return { bottom: D.SAFE.bottom, clear: D.cardClear(BUTTON_ZONES.find(z => z.name === 'European microstates')) };
+    });
+    expect(r.clear).toBe(0);
+    expect(r.bottom).toBeLessThan(200);
+  });
+});
+
 for (const [label, viewport] of Object.entries(SCREENS)) {
   test.describe(label, () => {
     test.use({ viewport });
@@ -30,7 +54,7 @@ for (const [label, viewport] of Object.entries(SCREENS)) {
           if (z) D.zoomToZone(z, 0); else D.zoomToView(name, 0);
           const [x1, y1, x2, y2] = VIEW_BOXES[name];
           const a = D.mapToScreen(x1, y1), b = D.mapToScreen(x2, y2);
-          const { W, H } = D.size(), S = D.SAFE, clear = z ? z.clear ?? 140 : 0;
+          const { W, H } = D.size(), S = D.SAFE, clear = z ? D.cardClear(z) : 0;
           out[name] = {
             inside: a.x >= S.left - 1 && a.y >= S.top - 1 && b.x <= W - S.right + 1 && b.y <= H - S.bottom - clear + 1,
             // A zone dive may overflow only because it is pinned at the

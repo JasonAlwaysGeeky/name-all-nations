@@ -987,6 +987,11 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   to   { opacity: 1; transform: none; }
 }
 
+@keyframes hintPill {
+  0%, 75% { opacity: 1; }
+  100%    { opacity: 0; }
+}
+
 #bank-strikes { color: var(--danger); font-weight: 800; letter-spacing: 0.1em; min-width: 2.2em; }
 
 .bank-buttons { margin-left: auto; display: flex; gap: 6px; }
@@ -1538,9 +1543,41 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   #level-banner { top: calc(8px + var(--safe-t)); left: 12px; transform: none; max-width: calc(100% - 190px); }
   #level-title { max-width: 34vw; font-size: 0.78rem; }
   #level-timer { font-size: 0.95rem; }
-  #word-bank { bottom: calc(10px + var(--keys-h) + var(--safe-b)); }
+  /* The find bar is one row on a phone. It was three — the target, the
+     buttons wrapped under it, a line of instructions — 128px of a map
+     that has the jump pad under it already, and every fit frames above
+     whatever this measures. The buttons keep their glyphs and lose their
+     words; "FIND" goes (the mode says so); the instructions go, and the
+     hit/miss line floats above the bar instead of holding a row open for
+     the moments it has something to say. */
+  #word-bank { bottom: calc(6px + var(--keys-h) + var(--safe-b)); padding: 6px 8px 6px 12px; }
+  #bank-target { flex-wrap: nowrap; gap: 7px; margin: 0; padding: 0; }
+  #bank-find { display: none; }
+  #bank-name { font-size: 1.05rem; line-height: 1.15; min-width: 0; }
+  #bank-strikes { min-width: 0; }
+  .bank-buttons { flex: none; gap: 5px; }
+  .bank-buttons .lbl { display: none; }
+  .bank-buttons button, #bank-collapse { width: 40px; height: 36px; padding: 0; font-size: 1rem; }
+  #bank-hint { display: none; }
+  #bank-hint.good, #bank-hint.bad {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 5px 12px;
+    max-width: 100%;
+    border-radius: 999px;
+    background: var(--panel-bg);
+    box-shadow: var(--shadow-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    animation: hintPill 2.6s ease-out forwards;
+  }
   #bank-chips { max-height: 14vh; }
-  #bank-name { font-size: 1.1rem; }
   .stat-tiles { grid-template-columns: repeat(2, 1fr); }
 }
 
