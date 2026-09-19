@@ -1216,6 +1216,7 @@
   // offset buttons and tails get breathing room too).
   const SAFE = { top: 60, bottom: 64, left: 40, right: 64 };
   const SAFE_BASE = { ...SAFE };
+  const PHONE_MQ = matchMedia('(max-width: 900px), (max-height: 560px) and (pointer: coarse)');
 
   // On a phone the jump keys are docked along the bottom of the map
   // rather than tucked in a corner, so whatever they take is map a fit
@@ -1229,8 +1230,12 @@
     // The left inset exists for the jump bar, which on a phone is docked
     // along the bottom instead — and 40px of a 412px screen is a tenth
     // of the map given away for nothing.
-    const phone = W <= 900;
+    // The right one is the zoom column's, and that docks in the bottom
+    // corner beside the pad. Same query the stylesheet docks them on, so
+    // a big phone held sideways (wider than 900) counts here too.
+    const phone = PHONE_MQ.matches;
     SAFE.left = phone ? 10 : SAFE_BASE.left;
+    SAFE.right = phone ? 10 : SAFE_BASE.right;
     // Whatever is docked along the bottom right now. The mode bars and
     // the quiz card are there on any screen; the jump pad only on a
     // phone, where it moves out of the corner. A fit that does not know

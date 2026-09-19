@@ -1326,6 +1326,8 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   font-weight: 600;
   color: var(--ink-soft);
 }
+/* a label's abbreviation, for the phone's 62px caps */
+#jump-bar .jump-sub .narrow { display: none; }
 
 /* ▸ marks the floor the next tap takes you to */
 #jump-bar .jump-name::before,
@@ -1479,6 +1481,31 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
     border-radius: 11px;
   }
   body.keys-off #jump-toggle { opacity: 0.85; }
+
+  /* "Central America" is wider than the cap it is printed on. */
+  #jump-bar .jump-sub .wide { display: none; }
+  #jump-bar .jump-sub .narrow { display: inline; }
+
+  /* The zoom column stood on the right edge, and every fit had to keep
+     64px clear of it — a sixth of a phone's width, down the whole height
+     of the map, for three buttons. It docks in the corner beside the pad
+     instead, inside the band the pad already costs, and the map gets its
+     right edge back (updateSafe). With the pad up, the 0 key is the reset
+     button; with it folded there is room for all three in a row. */
+  #zoom-controls {
+    top: auto;
+    right: calc(10px + var(--safe-r));
+    bottom: calc(10px + var(--safe-b));
+    gap: 6px;
+  }
+  body:not(.keys-off) #zoom-reset { display: none; }
+  body.keys-off #zoom-controls { flex-direction: row; }
+}
+
+/* too narrow for the pad and the zoom column side by side — a pinch does
+   the same job */
+@media (max-width: 349px) {
+  body:not(.keys-off) #zoom-controls { display: none; }
 }
 
 /* phone landscape: height is the scarce axis, so the caps go to one row
@@ -1491,6 +1518,8 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   #jump-bar button[data-key]::after,
   #jump-bar .jump-sub { display: none; }
   #jump-bar #jump-toggle { height: 40px; }
+  #zoom-controls { flex-direction: row; }
+  #zoom-controls button { width: 40px; height: 40px; }
 
   #card { padding: 11px 14px; }
   #card-prompt { margin-bottom: 8px; font-size: 0.92rem; }
@@ -1504,11 +1533,6 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 @media (max-width: 640px) {
   #card { bottom: calc(10px + var(--keys-h) + var(--safe-b)); }
   #tools { right: calc(10px + var(--safe-r)); top: calc(9px + var(--safe-t)); }
-  #zoom-controls { top: auto; bottom: calc(132px + var(--keys-h) + var(--safe-b)); right: calc(14px + var(--safe-r)); }
-  /* the quiz card is nearly the width of the screen and twice the height
-     of the word bank — there is no room beside it for the zoom column,
-     and a pinch does the same job, so it steps aside while the card is up */
-  body:has(#card:not([hidden])) #zoom-controls { display: none; }
   /* the HUD shares the top edge with the tools, so it gives up the
      challenge name and keeps the clock */
   #level-banner { top: calc(8px + var(--safe-t)); left: 12px; transform: none; max-width: calc(100% - 190px); }
