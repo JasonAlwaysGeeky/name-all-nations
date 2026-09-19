@@ -30,6 +30,10 @@ server, so the Browser pane can start it directly.
 - `js/targets.js` — generated: how big a target each country really is, as the
   radius of the largest circle that fits inside its borders. One rule decides
   every button's life from it, so there are no per-country exceptions
+- `js/views.js` — where each jump key lands: twelve hand-set boxes, each the
+  area that must be on screen. One rule fits them (tightest zoom that holds
+  the box in the safe area), so a wrong view is a box to drag, not code.
+  `?guides` loads `js/guides.js`, the on-map editor that sets them by eye
 - `map/` — the simplified amCharts world map, plus the 1.4MB full-detail
   version fetched lazily for deep zoom
 - `sw.js` — offline play. **Network-first for app code on purpose**, so a

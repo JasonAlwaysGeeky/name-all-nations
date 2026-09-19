@@ -23,17 +23,29 @@ const view = (page) => page.evaluate(() => {
 // where it lands, not where it passes through.
 const settles = (page, ok) => expect.poll(async () => ok(await view(page)), { timeout: 5000 }).toBe(true);
 
+// For a landing with no number to aim at: wherever the view stops moving.
+async function landed(page) {
+  let last = null;
+  await expect.poll(async () => {
+    const v = await view(page), still = last && v.x === last.x && v.y === last.y && v.s === last.s;
+    last = v;
+    return still;
+  }, { intervals: [150], timeout: 5000 }).toBe(true);
+  return last;
+}
+
 const near = (v, [x, y], slack) => Math.abs(v.x - x) <= slack && Math.abs(v.y - y) <= slack;
 
 test('Shift lands on a key\'s second floor in one jump, and the plain key steps back out', async ({ page }) => {
   await boot(page);
 
-  // W alone is the continent. The West African coast sits at [450, 470]
-  // and its layer starts at 3x, so neither number can be mistaken for
-  // the Africa view's.
+  // W alone is the continent. Both floors are hand-set boxes (js/views.js)
+  // that get retuned by eye, so the zooms are compared with each other
+  // rather than with a number: the coast's layer starts at 3.3x and sits
+  // around [455, 440], which the continent's view is never mistaken for.
   await page.keyboard.press('w');
   await expect(page.locator('#jump-flash')).toHaveText(/Africa/);
-  await settles(page, v => v.s < 3);
+  const africa = (await landed(page)).s;
 
   await page.keyboard.press('0');
   await settles(page, v => v.s < 2);
@@ -41,12 +53,12 @@ test('Shift lands on a key\'s second floor in one jump, and the plain key steps 
   // Shift+W: straight there, no stop at the continent on the way.
   await page.keyboard.press('Shift+W');
   await expect(page.locator('#jump-flash')).toHaveText(/West African coast/);
-  await settles(page, v => v.s >= 3 && near(v, [450, 470], 60));
+  await settles(page, v => v.s >= 3.3 && v.s > africa * 1.05 && near(v, [450, 470], 60));
 
   // …and the same key without Shift is still the way back out.
   await page.keyboard.press('w');
   await expect(page.locator('#jump-flash')).toHaveText('WAfrica');
-  await settles(page, v => v.s < 3);
+  await settles(page, v => Math.abs(v.s - africa) < 0.01);
 });
 
 test('Shift works on the number keys, whatever the shifted digit arrives as', async ({ page }) => {

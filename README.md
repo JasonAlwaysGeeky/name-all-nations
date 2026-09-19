@@ -55,6 +55,18 @@ map, **you click a country and name it**.
 - Every country also has 12px of invisible click padding, so coastal
   waters and archipelago gaps still hit the right country.
 
+### Where the jump keys land
+
+Each of the twelve jump views is a hand-set box in `js/views.js`: the area
+that must be on screen. The camera takes the tightest zoom that holds the
+whole box inside the safe area (the window minus the HUD, jump pad and
+word bank), so a phone and an ultrawide show the same required area and
+only differ in the slack around it. To retune them, open the game with
+`?guides` on the address — on the device you care about — drag the boxes,
+tap the jump keys to check the landing, then **Copy** and paste the table
+back over `VIEW_BOXES`. A row in red is a zone dive too wide for that
+screen at the zoom where its buttons unfold.
+
 ## Challenges
 
 The 🎯 button lists the whole world, each continent, and 21 bite-size

@@ -1115,7 +1115,10 @@
         h: from.h + (to.h - from.h) * e,
       });
       if (k < 1) animId = requestAnimationFrame(step);
-      else { animId = null; bake(); }
+      // The last frame's setView may have spent the dirty flag on a
+      // mid-flight bake — one that skips the overlay, because animId was
+      // still set. The landing always redraws it at the final scale.
+      else { animId = null; dirty = true; bake(); }
     };
     step();
   }
@@ -1188,24 +1191,20 @@
     return x1 === Infinity ? null : { x1, y1, x2, y2, tx1, ty1, tx2, ty2 };
   }
 
-  // Hand-picked centres for the big area views: the fit still chooses
-  // the zoom, but the frame centres on this country instead of the
-  // region's bounding box ("put Germany in the middle"). `dy` then
-  // shifts the frame as a fraction of its height — negative slides the
-  // camera north, so the land sits lower on the screen. `yband` goes
-  // further and dictates the vertical span outright (map units): North
-  // America plays from the US–Canada border down to Panama, so that band
-  // fills the safe area regardless of window size.
-  const REGION_VIEW = {
-    Europe: { center: 'DE' },
-    Asia: { center: 'NP', dy: -0.05 },
-    'North America': { center: 'US', yband: [290, 452] },
-  };
+  // The big area views are framed by hand (js/views.js), not from the
+  // countries' bounding boxes: a box there is the area that has to be on
+  // screen, whatever shape the screen is. A challenge over a whole region
+  // opens on the same frame its jump key lands on.
+  function viewBox(name) {
+    const b = VIEW_BOXES[name];
+    return b ? { x1: b[0], y1: b[1], x2: b[2], y2: b[3] } : null;
+  }
 
   function regionView(codes) {
-    for (const region of Object.keys(REGION_VIEW)) {
+    for (const region of Object.keys(CODES_BY_REGION)) {
+      if (!VIEW_BOXES[region]) continue;
       const rc = CODES_BY_REGION[region];
-      if (rc && codes.length === rc.length && rc.every(c => codes.includes(c))) return REGION_VIEW[region];
+      if (codes.length === rc.length && rc.every(c => codes.includes(c))) return region;
     }
     return null;
   }
@@ -1277,24 +1276,29 @@
   // overflow evenly between the frame's edges.
   function zoomToCodes(codes, ms = 260, padFactor = 1.05) {
     if (codes.length === WORLD_CODES.length) { animateView(worldView(), ms); return; }
+    const rv = regionView(codes);
+    if (rv) { zoomToView(rv, ms); return; }
     const f = fitCodes(codes);
     if (!f) return;
     const tf = { x1: f.tx1, y1: f.ty1, x2: f.tx2, y2: f.ty2 };
     let s = Math.max(safeScale(tf, padFactor), safeScale(f, padFactor) * 0.8);
     s = Math.min(s, maxFitScale());
     if (!(s > 0)) return;
-    const rv = regionView(codes);
-    let t;
-    if (rv) {
-      if (rv.yband) s = Math.min((H - SAFE.top - SAFE.bottom) / (rv.yband[1] - rv.yband[0]), maxFitScale());
-      const a = geom[rv.center].anchor;
-      const cy = rv.yband ? (rv.yband[0] + rv.yband[1]) / 2 : a.y;
-      t = frameAt({ x1: a.x, x2: a.x, y1: cy, y2: cy }, s);
-      if (rv.dy) t.y += rv.dy * t.h;
-    } else {
-      t = frameAt(tf, s);
-    }
-    animateView(t, ms);
+    animateView(frameAt(tf, s), ms);
+  }
+
+  // A hand-set view: the tightest zoom that holds the whole box inside
+  // the safe area, centred in it. `floor` is the one thing allowed to
+  // overrule the box — a zone dive that stopped short of the zoom where
+  // its buttons unfold would land on the numbered button it came from.
+  function zoomToView(name, ms = 220, floor = 0, extraBottom = 0) {
+    const b = viewBox(name);
+    if (!b) return;
+    // The floor also beats the fit cap, which is a fraction of the window's
+    // width: on a 375px phone it sits below the Caribbean's unfold zoom.
+    const s = Math.max(Math.min(safeScale(b, 1, extraBottom), maxFitScale()), floor);
+    if (!(s > 0)) return;
+    animateView(frameAt(b, s, extraBottom), ms);
   }
 
   // Zoom to a layer where the zone's buttons are clickable. Every zone
@@ -1302,9 +1306,10 @@
   // own `pad`/`clear` loosen the frame further.
   function zoomToZone(z, ms = 240) {
     if (!z) return;
+    const clear = z.clear ?? 140;
+    if (VIEW_BOXES[z.name]) { zoomToView(z.name, ms, z.minScale * 1.1, clear); return; }
     const f = fitCodes(z.codes);
     if (!f) return;
-    const clear = z.clear ?? 140;
     let s = Math.max(safeScale(f, z.pad ?? 1.05, clear), z.minScale * 1.1);  // at least clickable-layer zoom
     s = Math.min(s, maxFitScale());
     if (!(s > 0)) return;
@@ -2865,51 +2870,20 @@
   // Europe, Asia), Q W E across the south (S. America, Africa, India to
   // New Zealand). Tapping the same key again dives into that area's
   // dense pocket; tapping once more comes back out.
-  const PACIFIC_ISLES = ['PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'];
-  // The 'e' area (India to New Zealand) gets a hand-framed window: a
-  // computed fit reaches Iran in the west and empty Pacific in the east,
-  // since Afghanistan and Pakistan drag the frame while the window's
-  // wide aspect adds slack. This one starts at India and trims the ocean.
-  const E_VIEW = { x1: 662, y1: 368, x2: 1042, y2: 618 };
-
-  // India → New Zealand is framed by hand rather than by a code list: the
-  // list's bounding box drags in the whole Pacific. It still goes through
-  // the same fit, so it fills whatever shape the window is.
-  function zoomToBox(box, ms) {
-    const s = Math.min(safeScale(box, 1.02), maxFitScale());
-    if (!(s > 0)) return;
-    animateView(frameAt(box, s), ms);
-  }
+  //
+  // Every landing is a hand-set box in js/views.js — the same rule for all
+  // twelve, so a view that looks wrong is a box to drag, not code to read.
+  // The four that dive into a button zone go through zoomToZone, which
+  // also holds them at the zoom where that zone's buttons unfold.
+  const view = (name) => () => zoomToView(name, 220);
+  const zone = (name) => () => zoomToZone(ZONE_BY_NAME[name], 220);
   const JUMP_KEYS = {
-    1: {
-      name: 'North America', subName: 'Central America',
-      go: () => zoomToCodes(CODES_BY_REGION['North America'], 220), sub: () => zoomToCodes(SUB_CODES['Central America'], 220),
-    },
-    2: {
-      name: 'Europe', subName: 'The micro-states',
-      go: () => zoomToCodes(CODES_BY_REGION['Europe'], 220), sub: () => zoomToZone(ZONE_BY_NAME['European microstates'], 220),
-    },
-    3: {
-      name: 'Asia', subName: 'The Middle East',
-      go: () => zoomToCodes(CODES_BY_REGION['Asia'], 220), sub: () => zoomToZone(ZONE_BY_NAME['Middle East'], 220),
-    },
-    // The 'q' view frames the Caribbean arc along with the continent —
-    // its buttons live at the top of this view, and fitting them keeps
-    // them out from under the HUD.
-    q: {
-      name: 'South America', subName: 'The Caribbean',
-      go: () => zoomToCodes([...CODES_BY_REGION['South America'], ...ZONE_BY_NAME['Caribbean'].codes], 220),
-      sub: () => zoomToZone(ZONE_BY_NAME['Caribbean'], 220),
-    },
-    w: {
-      name: 'Africa', subName: 'The West African coast',
-      go: () => zoomToCodes(CODES_BY_REGION['Africa'], 220), sub: () => zoomToZone(ZONE_BY_NAME['West African coast'], 220),
-    },
-    e: {
-      name: 'India → New Zealand', subName: 'The Pacific islands',
-      go: () => zoomToBox(E_VIEW, 220),
-      sub: () => zoomToCodes(PACIFIC_ISLES, 220),
-    },
+    1: { name: 'North America', subName: 'Central America', go: view('North America'), sub: view('Central America') },
+    2: { name: 'Europe', subName: 'The micro-states', go: view('Europe'), sub: zone('European microstates') },
+    3: { name: 'Asia', subName: 'The Middle East', go: view('Asia'), sub: zone('Middle East') },
+    q: { name: 'South America', subName: 'The Caribbean', go: view('South America'), sub: zone('Caribbean') },
+    w: { name: 'Africa', subName: 'The West African coast', go: view('Africa'), sub: zone('West African coast') },
+    e: { name: 'India → New Zealand', subName: 'The Pacific islands', go: view('India → New Zealand'), sub: view('Pacific islands') },
   };
   const jumpState = { key: null, stage: 0, t: 0 };
 
@@ -3048,11 +3022,20 @@
   window.NAN_DEBUG = {
     state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod,
     scale: () => scaleFor(vb), fullVB: () => fullVB, size: () => ({ W, H }), SAFE,
-    zoomToCodes, zoomToZone, animateView, fitCodes, mapToScreen, bake,
+    zoomToCodes, zoomToZone, zoomToView, animateView, fitCodes, mapToScreen, clientToMap, bake,
     worldView, frameAt, safeScale, maxFitScale, viewAspect,
     CODES_BY_REGION, SUB_CODES,
     startLevel, CHALLENGE_BY_ID, selectCountry,
   };
+
+  // ?guides draws js/views.js over the map as boxes you can drag. It is a
+  // tuning tool, so none of it ships in the game proper: the editor is a
+  // separate file that only this flag ever fetches.
+  if (new URLSearchParams(location.search).has('guides')) {
+    const s = document.createElement('script');
+    s.src = 'js/guides.js';
+    document.body.appendChild(s);
+  }
 
   loadPrefs();
   loadStats();
