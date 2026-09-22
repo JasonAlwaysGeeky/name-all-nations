@@ -22,7 +22,7 @@
  * the row ⚠ when that is so.
  */
 const VIEW_BOXES = {
-  'North America':          [165, 290, 322, 452],
+  'North America':          [123, 243, 315, 452],
   'Central America':        [215, 406, 262, 446],
   'Europe':                 [408, 207, 590, 360],
   'European microstates':   [476, 296, 543, 360],
@@ -30,7 +30,7 @@ const VIEW_BOXES = {
   'Middle East':            [560, 345, 637, 403],
   'South America':          [247, 405, 380, 645],
   'Caribbean':              [287, 406, 312, 440],
-  'Africa':                 [398, 344, 643, 572],
+  'Africa':                 [401, 344, 645, 572],
   'West African coast':     [401, 410, 515, 478],
   'India → New Zealand':    [727, 321, 1017, 618],
   'Pacific islands':        [840, 424, 1014, 531],

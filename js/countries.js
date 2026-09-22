@@ -390,8 +390,10 @@ const BUTTON_MIN_SCALE = { LI: 2.2, ME: 5, MK: 5 };
 // per map unit). Luxembourg is a hundred times the Vatican and sits on
 // its own patch of open border — folding it away with the micro-states
 // until you dive into them costs a whole extra keystroke for a country
-// you can see perfectly well from the Europe view.
-const ZONE_SOLO = { LU: 2.2 };
+// you can see perfectly well from the Europe view. Jamaica is the same
+// case for the Caribbean: 40 map units west of the arc's numbered
+// button, and there on any North America view.
+const ZONE_SOLO = { LU: 2.2, JM: 1.5 };
 
 // Zoom layers: below `minScale` a dense area's buttons collapse into one
 // numbered button at `at` (map units) that zooms to the layer where the

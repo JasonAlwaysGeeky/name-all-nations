@@ -83,11 +83,10 @@ test('the results tell "needed a hint" apart from "never got it"', async ({ page
     const D = window.NAN_DEBUG;
     D.startLevel(D.CHALLENGE_BY_ID['sub:Central America'], 'name');
   });
-  await expect.poll(async () => {
-    const a = await page.evaluate(() => window.NAN_DEBUG.view().x);
-    await page.waitForTimeout(60);
-    return a === await page.evaluate(() => window.NAN_DEBUG.view().x);
-  }, { timeout: 5000 }).toBe(true);
+  // The level opens with a zoom, and a loaded runner can stall frames
+  // long enough for "the view stopped moving" to be true mid-flight; ask
+  // the game whether it has landed instead.
+  await expect.poll(() => page.evaluate(() => window.NAN_DEBUG.settled()), { timeout: 5000 }).toBe(true);
 
   const names = {
     BZ: 'belize', CR: 'costa rica', SV: 'el salvador',

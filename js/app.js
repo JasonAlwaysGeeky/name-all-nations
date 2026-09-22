@@ -3070,6 +3070,7 @@
   window.NAN_DEBUG = {
     state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod,
     scale: () => scaleFor(vb), fullVB: () => fullVB, size: () => ({ W, H }), SAFE,
+    settled: () => animId == null && !zoomAnim.active && !interacting(),
     zoomToCodes, zoomToZone, zoomToView, animateView, fitCodes, mapToScreen, clientToMap, bake,
     worldView, frameAt, safeScale, maxFitScale, viewAspect, viewScale, zoneOpenScale,
     CODES_BY_REGION, SUB_CODES,
