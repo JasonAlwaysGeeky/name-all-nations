@@ -577,7 +577,7 @@
   for (const id of [
     'map-wrap', 'map', 'tooltip', 'toast', 'progress-text', 'progress-fill', 'progress-wrap',
     'mic-toggle', 'voice-meter', 'mic-status-text', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'fs-btn',
-    'jump-bar', 'jump-toggle', 'jump-flash',
+    'jump-bar', 'jump-keys', 'jump-toggle', 'jump-flash',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
     'card-actions', 'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
@@ -597,6 +597,7 @@
   // ————— map setup —————
 
   let svg = null;
+  let osvg = null;                // the overlay's own <svg>, laid over the map's
   let fullVB = null;              // { x, y, w, h } of the whole map
   const shapes = {};              // code -> country path
   const allPaths = {};            // id -> every map path (countries + territories)
@@ -671,7 +672,18 @@
     buildHitLayer();
     overlayLayer = document.createElementNS(SVG_NS, 'g');
     overlayLayer.id = 'overlay-layer';
-    svg.appendChild(overlayLayer);
+    // The overlay gets an <svg> of its own, over the map's and moved in
+    // step with it. A style change inside an svg repaints the whole svg,
+    // and the map's is 250 paths of borders that the transform-only
+    // pan/zoom exists to leave alone; here a button can hide for a zoom
+    // or flash for an answer at the cost of repainting a few dozen
+    // circles. Nothing in it catches the pointer but the targets
+    // themselves, so a tap between them still lands on the map.
+    osvg = document.createElementNS(SVG_NS, 'svg');
+    osvg.id = 'overlay';
+    osvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    osvg.appendChild(overlayLayer);
+    el.map.appendChild(osvg);
 
     // Start on the coarse coastlines; bake() swaps levels as you zoom.
     for (const id of Object.keys(allPaths)) allPaths[id].setAttribute('d', dLo[id]);
@@ -824,12 +836,23 @@
     return (TARGET_R[code] || 0) * s >= BTN_R;
   }
 
+  // The zoom a zone unfolds at: its minScale — where its member buttons
+  // were spaced to stop merging — or, when its own dive lands wider than
+  // that on this screen, the landing itself. A dive always arrives on
+  // open buttons; a narrow phone pays with buttons a little closer, not
+  // with a view cropped around the numbered button it just tapped. (The
+  // 0.98 keeps the landing clear of its own threshold.)
+  function zoneOpenScale(z) {
+    const b = viewBox(z.name);
+    return b ? Math.min(z.minScale, viewScale(b) * 0.98) : z.minScale;
+  }
+
   // Zoom needed before this country's own button shows (zone layers and
   // the boxed-in micro-states).
   function minScaleFor(code) {
     let m = BUTTON_MIN_SCALE[code] || 0;
     const z = ZONE_BY_CODE[code];
-    if (z) m = Math.max(m, ZONE_SOLO[code] ?? z.minScale);
+    if (z) m = Math.max(m, ZONE_SOLO[code] ?? zoneOpenScale(z));
     return m;
   }
 
@@ -972,7 +995,7 @@
     const ox = (W - base.w * sb) / 2, oy = (H - base.h * sb) / 2;
     const tx = ox * (1 - k) + k * sb * (base.x - vb.x);
     const ty = oy * (1 - k) + k * sb * (base.y - vb.y);
-    svg.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+    svg.style.transform = osvg.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
     dirty = true;
     // Panned past the pre-rendered margin (bare edges would show) or
     // zoomed far from the baked raster (mush) — re-render right away.
@@ -995,7 +1018,8 @@
   function bake() {
     clearTimeout(bakeTimer);
     bakeTimer = null;
-    if (!dirty && base) return;
+    const settled = animId == null && !zoomAnim.active && !interacting();
+    if (!dirty && base) { if (settled) landOverlay(); return; }
     dirty = false;
     base = { ...vb };
     lastBakeAt = performance.now();
@@ -1015,11 +1039,22 @@
       for (const id of Object.keys(allPaths)) allPaths[id].setAttribute('d', src[id]);
     }
     const m = VIEW_MARGIN;
-    svg.setAttribute('viewBox', `${vb.x - m * vb.w} ${vb.y - m * vb.h} ${vb.w * (1 + 2 * m)} ${vb.h * (1 + 2 * m)}`);
-    svg.style.transform = '';
+    const box = `${vb.x - m * vb.w} ${vb.y - m * vb.h} ${vb.w * (1 + 2 * m)} ${vb.h * (1 + 2 * m)}`;
+    svg.setAttribute('viewBox', box);
+    osvg.setAttribute('viewBox', box);
+    svg.style.transform = osvg.style.transform = '';
     // Rebuilding the overlay mid-animation would just add to the frame's
     // work; the landing bake redraws it at the final scale anyway.
-    if (animId == null && !zoomAnim.active && !interacting()) updateOverlay();
+    if (settled) { updateOverlay(); landOverlay(); }
+  }
+
+  // Mid-zoom the buttons would scale with the map — a button the size of
+  // Spain for a moment, then a snap back at the landing — so they step
+  // aside for the flight (the `zooming` class) and come back at their
+  // size once it settles: the frame after they are rebuilt, so the
+  // fade-in has something to fade from.
+  function landOverlay() {
+    requestAnimationFrame(() => osvg.classList.remove('zooming'));
   }
 
   // The untouched amCharts map (full border detail, 1.4MB) is fetched in
@@ -1104,6 +1139,7 @@
     const from = { ...vb };
     const to = clampView(target);
     if (ms <= 0) { setView(to); bake(); return; }
+    if (Math.abs(to.w - from.w) > from.w * 0.002) osvg.classList.add('zooming');
     const t0 = performance.now();
     const step = () => {
       const k = Math.min(1, (performance.now() - t0) / ms);
@@ -1135,6 +1171,7 @@
       if (animId) cancelAnimationFrame(animId);
       animId = null;
       zoomAnim.active = true;
+      osvg.classList.add('zooming');
       zoomAnim.last = performance.now();
       requestAnimationFrame(zoomStep);
     }
@@ -1227,14 +1264,19 @@
   // does not know the word bank is 130px tall frames the country it is
   // asking you to find underneath it.
   function updateSafe() {
-    // The left inset exists for the jump bar, which on a phone is docked
-    // along the bottom instead — and 40px of a 412px screen is a tenth
-    // of the map given away for nothing.
-    // The right one is the zoom column's, and that docks in the bottom
-    // corner beside the pad. Same query the stylesheet docks them on, so
-    // a big phone held sideways (wider than 900) counts here too.
+    // On a desktop the jump keys run down the left edge, and the map's
+    // own area starts to their right — measured, like the phone's bottom
+    // is. On a phone they are docked along the bottom instead, and 40px
+    // of a 412px screen is a tenth of the map given away for nothing.
+    // The right inset is the zoom column's, and on a phone that docks in
+    // the bottom corner beside the pad. Same query the stylesheet docks
+    // them on, so a big phone held sideways (wider than 900) counts too.
     const phone = PHONE_MQ.matches;
-    SAFE.left = phone ? 10 : SAFE_BASE.left;
+    let left = phone ? 10 : SAFE_BASE.left;
+    if (!phone && el.jumpBar.offsetParent) {
+      left = Math.max(left, Math.round(el.jumpBar.getBoundingClientRect().right - rectLeft) + 10);
+    }
+    SAFE.left = Math.min(left, W * 0.2);
     SAFE.right = phone ? 10 : SAFE_BASE.right;
     // Whatever is docked along the bottom right now. The mode bars and
     // the quiz card are there on any screen; the jump pad only on a
@@ -1250,24 +1292,10 @@
     SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
   }
 
-  // A zone dive lands clear of the spot the quiz card is about to open
-  // in, since the tap that follows opens it over whatever is there. That
-  // only means anything while a card can still appear: once it is up it
-  // is already measured into SAFE.bottom, and a place run never shows
-  // one. Reserving it on top of those framed a dive into the top half of
-  // a phone, above a band of map nothing was ever going to cover.
-  function cardClear(z) {
-    if (state.level?.mode === 'place' || !el.card.hidden) return 0;
-    return z.clear ?? 140;
-  }
-
-  // `extraBottom` reserves additional space above the bottom edge — the
-  // quiz card lives bottom-centre, and a dense zone's south member
-  // (Malta) must not end up underneath it.
-  function safeScale(f, pad, extraBottom = 0) {
+  function safeScale(f, pad) {
     return Math.min(
       (W - SAFE.left - SAFE.right) / ((f.x2 - f.x1) * pad),
-      (H - SAFE.top - SAFE.bottom - extraBottom) / ((f.y2 - f.y1) * pad));
+      (H - SAFE.top - SAFE.bottom) / ((f.y2 - f.y1) * pad));
   }
 
   // The widest allowed fit is half of MAX_ZOOM, so a "zoom to this tiny
@@ -1277,10 +1305,10 @@
   }
 
   // View rect that shows `f` at scale s, centred in the safe area.
-  function frameAt(f, s, extraBottom = 0) {
+  function frameAt(f, s) {
     return {
       x: (f.x1 + f.x2) / 2 - (SAFE.left + (W - SAFE.left - SAFE.right) / 2) / s,
-      y: (f.y1 + f.y2) / 2 - (SAFE.top + (H - SAFE.top - SAFE.bottom - extraBottom) / 2) / s,
+      y: (f.y1 + f.y2) / 2 - (SAFE.top + (H - SAFE.top - SAFE.bottom) / 2) / s,
       w: W / s, h: H / s,
     };
   }
@@ -1304,32 +1332,31 @@
   }
 
   // A hand-set view: the tightest zoom that holds the whole box inside
-  // the safe area, centred in it. `floor` is the one thing allowed to
-  // overrule the box — a zone dive that stopped short of the zoom where
-  // its buttons unfold would land on the numbered button it came from.
-  function zoomToView(name, ms = 220, floor = 0, extraBottom = 0) {
+  // the safe area, centred in it. Nothing overrules the box.
+  function viewScale(b) { return Math.min(safeScale(b, 1), maxFitScale()); }
+
+  function zoomToView(name, ms = 220) {
     const b = viewBox(name);
     if (!b) return;
-    // The floor also beats the fit cap, which is a fraction of the window's
-    // width: on a 375px phone it sits below the Caribbean's unfold zoom.
-    const s = Math.max(Math.min(safeScale(b, 1, extraBottom), maxFitScale()), floor);
+    const s = viewScale(b);
     if (!(s > 0)) return;
-    animateView(frameAt(b, s, extraBottom), ms);
+    animateView(frameAt(b, s), ms);
   }
 
-  // Zoom to a layer where the zone's buttons are clickable. Every zone
-  // keeps clearance above the quiz card's home (bottom centre); a zone's
-  // own `pad`/`clear` loosen the frame further.
+  // Zoom to the layer where the zone's buttons are clickable. A zone with
+  // a box lands on it like any other view, and unfolds wherever that is
+  // (zoneOpenScale). One without a box (Oceania, reached only by its
+  // numbered button) fits its members, and at least at the zoom its
+  // buttons unfold at.
   function zoomToZone(z, ms = 240) {
     if (!z) return;
-    const clear = cardClear(z);
-    if (VIEW_BOXES[z.name]) { zoomToView(z.name, ms, z.minScale * 1.1, clear); return; }
+    if (VIEW_BOXES[z.name]) { zoomToView(z.name, ms); return; }
     const f = fitCodes(z.codes);
     if (!f) return;
-    let s = Math.max(safeScale(f, z.pad ?? 1.05, clear), z.minScale * 1.1);  // at least clickable-layer zoom
+    let s = Math.max(safeScale(f, 1.05), z.minScale * 1.1);
     s = Math.min(s, maxFitScale());
     if (!(s > 0)) return;
-    animateView(frameAt(f, s, clear), ms);
+    animateView(frameAt(f, s), ms);
   }
 
   // Pan (and zoom in if needed) so a country is comfortably on screen.
@@ -1538,13 +1565,13 @@
       overlayLayer.appendChild(grp);
     }
 
-    // Zoom layers: below a zone's minScale its buttons collapse into one
-    // numbered button that zooms to where they're clickable.
+    // Zoom layers: below the zoom a zone opens at, its buttons collapse
+    // into one numbered button that zooms to where they're clickable.
     const grouped = new Set();
     for (const z of BUTTON_ZONES) {
       const members = z.codes.filter(c => codes.includes(c) && BUTTON_OFFSETS[c] && geom[c] &&
         !buttonRedundant(c, s) && inZoneFold(c, s));
-      if (s >= z.minScale || members.length < 2) continue;
+      if (s >= zoneOpenScale(z) || members.length < 2) continue;
       for (const c of members) grouped.add(c);
       const g = document.createElementNS(SVG_NS, 'g');
       g.setAttribute('class', 'btn zone');
@@ -1832,6 +1859,7 @@
         gest.noTap = true;
         dragging = true;
         el.map.classList.add('panning');
+        osvg.classList.add('zooming');   // a pinch scales the buttons with the map too
         el.tooltip.hidden = true;
         clearHot();
       }
@@ -3043,7 +3071,7 @@
     state, geom, view: () => vb, base: () => base, stats: () => stats, lod: () => lod,
     scale: () => scaleFor(vb), fullVB: () => fullVB, size: () => ({ W, H }), SAFE,
     zoomToCodes, zoomToZone, zoomToView, animateView, fitCodes, mapToScreen, clientToMap, bake,
-    worldView, frameAt, safeScale, maxFitScale, viewAspect, cardClear,
+    worldView, frameAt, safeScale, maxFitScale, viewAspect, viewScale, zoneOpenScale,
     CODES_BY_REGION, SUB_CODES,
     startLevel, CHALLENGE_BY_ID, selectCountry,
   };

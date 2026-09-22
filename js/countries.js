@@ -342,9 +342,15 @@ const BUTTON_OFFSETS = {
   // Albania drops south into the Ionian: its own sea, the Adriatic, is
   // where the micro-state zone button stands until Europe opens up.
   VA: [0, 0], SM: [0, 0], MC: [0, 0], AD: [-6, 34], LI: [0, -30], LU: [-30, 14], MT: [12, 22],
-  ME: [0, 0], MK: [0, 0], AL: [0, 36], CY: [-14, 2], LB: [-31, 20], IL: [-26, 40], PS: [-54, 34],
-  // Gulf
-  KW: [20, 20], BH: [10, -22], QA: [40, -12],
+  ME: [0, 0], MK: [0, 0], AL: [0, 36],
+  // The Middle East zone's seven, placed by search rather than by hand:
+  // every pair stays 44px apart from the zone's minScale up through the
+  // desktop dive, each sits in open water (or on its own country) clear
+  // of every small neighbour, and the tails are as short as that allows.
+  // Israel and Palestine share an anchor, so one of the two has to reach
+  // further out; the old pair sat 29px apart on a phone.
+  CY: [12, -20], LB: [0, 4], IL: [-20, 4], PS: [-40, -32],
+  KW: [8, 8], BH: [12, -16], QA: [48, -16],
   // Caribbean & Central America (the Bahamas' dotted outline is its
   // button). The Lesser Antilles never render individual buttons — their
   // zone folds them into one numbered button right up to the zoom where
@@ -389,7 +395,9 @@ const ZONE_SOLO = { LU: 2.2 };
 
 // Zoom layers: below `minScale` a dense area's buttons collapse into one
 // numbered button at `at` (map units) that zooms to the layer where the
-// individual buttons are clickable. The keyed ones are also hotkeys.
+// individual buttons are clickable. A zone with a box in js/views.js
+// dives onto that box; where the box lands wider than minScale (a narrow
+// phone), the zone unfolds there instead, its buttons a little closer.
 // The dense areas. Each is reached by tapping its parent area's hotkey
 // a second time (1 2 3 / Q W E lay the world out on the keyboard), or
 // by clicking its numbered button on the map.
@@ -407,16 +415,15 @@ const BUTTON_ZONES = [
   // square for each of them simply will not go any further out.
   { name: 'Caribbean', at: [299, 422], minScale: 12, squareScale: 12, codes: ['AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD', 'TT', 'JM'] },
   { name: 'West African coast', at: [450, 470], minScale: 3.0, codes: ['CV', 'GM', 'GW', 'SL', 'TG', 'GQ', 'ST'] },
-  // pad/clear: this dive runs Luxembourg to Malta top-to-bottom, so it
-  // frames looser and keeps Malta well above the quiz card's spot.
   // minScale sits where Vatican and San Marino's buttons (7.7 map units
   // apart, both offset [0,0]) no longer merge.
-  { name: 'European microstates', at: [504, 332], minScale: 4.5, pad: 1.15, clear: 200, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
-  // Folded through the Asia view — below 6, Israel and Palestine's
-  // buttons sat close enough to merge.
+  { name: 'European microstates', at: [504, 332], minScale: 4.5, codes: ['VA', 'SM', 'MC', 'MT', 'AD', 'LU', 'LI'] },
+  // minScale is where the closest pair of member buttons (Kuwait and
+  // Bahrain, in the Gulf) would start to merge; a 360px phone's dive
+  // lands at about 4.4. Still folded through the Asia view.
   // Out in the Persian Gulf: the members are spread from Cyprus to the
   // UAE, but the Gulf four are the dense half, and the old centre-of-mass
   // spot sat right on Saudi Arabia's own click target.
-  { name: 'Middle East', at: [621, 385], minScale: 6, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA', 'AE'] },
+  { name: 'Middle East', at: [621, 385], minScale: 4.2, codes: ['CY', 'LB', 'IL', 'PS', 'KW', 'BH', 'QA', 'AE'] },
   { name: 'Oceania', at: [949, 479], minScale: 2.6, squareScale: 2.8, codes: ['AU', 'NZ', 'PG', 'PW', 'FM', 'MH', 'NR', 'KI', 'TV', 'SB', 'VU', 'FJ', 'WS', 'TO'] },
 ];

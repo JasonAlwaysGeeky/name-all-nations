@@ -10,7 +10,7 @@ const { test, expect } = require('@playwright/test');
 async function boot(page) {
   await page.goto('/');
   await page.locator('#hello-close').click();
-  await expect(page.locator('#map svg')).toBeAttached();
+  await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
   // Somewhere the padding is a meaningful share of the target.
   await page.evaluate(() => window.NAN_DEBUG.zoomToCodes(window.NAN_DEBUG.SUB_CODES['Southern Europe'], 0));

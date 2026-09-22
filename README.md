@@ -59,13 +59,17 @@ map, **you click a country and name it**.
 
 Each of the twelve jump views is a hand-set box in `js/views.js`: the area
 that must be on screen. The camera takes the tightest zoom that holds the
-whole box inside the safe area (the window minus the HUD, jump pad and
-word bank), so a phone and an ultrawide show the same required area and
-only differ in the slack around it. To retune them, open the game with
-`?guides` on the address — on the device you care about — drag the boxes,
-tap the jump keys to check the landing, then **Copy** and paste the table
-back over `VIEW_BOXES`. A row in red is a zone dive too wide for that
-screen at the zoom where its buttons unfold.
+whole box inside the safe area (the window minus the HUD, the jump keys
+and whatever is docked along the bottom) and centres it there, so a phone
+and an ultrawide show the same required area and only differ in the slack
+around it. To retune them, open the game with `?guides` on the address —
+on the device you care about — drag the boxes, tap the jump keys to check
+the landing, then **Copy** and paste the table back over `VIEW_BOXES`. A
+dive into a dense zone unfolds that zone wherever it lands; a row marked
+⚠ lands below the zoom the zone's buttons were spaced for, so a pair of
+them may merge there. The jump keys are the same 62px caps on every
+screen — a column down the left edge on a desktop, a row along the bottom
+on a phone — and sit outside the safe area either way.
 
 ## Challenges
 

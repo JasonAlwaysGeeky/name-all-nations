@@ -265,9 +265,18 @@ svg.world path.hit {
 
 /* ————— overlay: island outlines & buttons ————— */
 
+/* The overlay's own svg (see initMap): nothing in it catches the pointer
+   but the targets themselves, so the map underneath gets the rest. */
+#overlay { pointer-events: none; }
+#overlay g.btn { transition: opacity 0.12s ease; }
+/* Mid-zoom the buttons would scale with the map — a button the size of
+   Spain for a moment, then a snap back at the landing. They step aside
+   for the flight and come back at their size once it settles. */
+#overlay.zooming g.btn { opacity: 0; }
+
 /* dotted outline around an island nation's islands — quiet, so the
    islands still read as islands; clickable as a big target */
-svg.world g.ov-box { cursor: pointer; }
+#overlay g.ov-box { cursor: pointer; }
 
 /* Tinted, not empty. Drawn as bare dots over open water, an outline
    reads as a chart annotation — something the map is telling you — and
@@ -275,8 +284,8 @@ svg.world g.ov-box { cursor: pointer; }
    colour puts it in the same visual family as every other unguessed
    country, and the status tints below then work the way they do on a
    mainland. */
-svg.world g.ov-box rect,
-svg.world g.ov-box ellipse {
+#overlay g.ov-box rect,
+#overlay g.ov-box ellipse {
   fill: rgba(245, 237, 214, 0.42);
   stroke: rgba(70, 58, 40, 0.6);
   stroke-width: 1.2;
@@ -285,76 +294,76 @@ svg.world g.ov-box ellipse {
   pointer-events: all;
 }
 
-svg.world g.ov-box.hot rect,
-svg.world g.ov-box.hot ellipse { fill: rgba(255, 225, 160, 0.62); stroke: #3b3020; stroke-dasharray: none; }
-svg.world g.ov-box.selected rect, svg.world g.ov-box.selected ellipse { fill: rgba(255, 202, 87, 0.58); }
-svg.world g.ov-box.named rect, svg.world g.ov-box.named ellipse { fill: rgba(127, 208, 140, 0.52); }
-svg.world g.ov-box.revealed rect, svg.world g.ov-box.revealed ellipse { fill: rgba(237, 165, 140, 0.52); }
-svg.world g.ov-box.placed rect, svg.world g.ov-box.placed ellipse { fill: rgba(140, 193, 236, 0.52); }
-svg.world g.ov-box.missed rect, svg.world g.ov-box.missed ellipse { fill: rgba(237, 165, 140, 0.52); }
-svg.world g.ov-box.selected rect,
-svg.world g.ov-box.selected ellipse { stroke: var(--selected-stroke); stroke-width: 2; stroke-dasharray: none; }
-svg.world g.ov-box.named rect,
-svg.world g.ov-box.named ellipse { stroke: var(--named-stroke); stroke-dasharray: none; }
-svg.world g.ov-box.revealed rect,
-svg.world g.ov-box.revealed ellipse { stroke: var(--revealed-stroke); stroke-dasharray: none; }
-svg.world g.ov-box.placed rect,
-svg.world g.ov-box.placed ellipse { stroke: var(--placed-stroke); stroke-dasharray: none; }
-svg.world g.ov-box.missed rect,
-svg.world g.ov-box.missed ellipse { stroke: var(--missed-stroke); stroke-dasharray: none; }
+#overlay g.ov-box.hot rect,
+#overlay g.ov-box.hot ellipse { fill: rgba(255, 225, 160, 0.62); stroke: #3b3020; stroke-dasharray: none; }
+#overlay g.ov-box.selected rect, #overlay g.ov-box.selected ellipse { fill: rgba(255, 202, 87, 0.58); }
+#overlay g.ov-box.named rect, #overlay g.ov-box.named ellipse { fill: rgba(127, 208, 140, 0.52); }
+#overlay g.ov-box.revealed rect, #overlay g.ov-box.revealed ellipse { fill: rgba(237, 165, 140, 0.52); }
+#overlay g.ov-box.placed rect, #overlay g.ov-box.placed ellipse { fill: rgba(140, 193, 236, 0.52); }
+#overlay g.ov-box.missed rect, #overlay g.ov-box.missed ellipse { fill: rgba(237, 165, 140, 0.52); }
+#overlay g.ov-box.selected rect,
+#overlay g.ov-box.selected ellipse { stroke: var(--selected-stroke); stroke-width: 2; stroke-dasharray: none; }
+#overlay g.ov-box.named rect,
+#overlay g.ov-box.named ellipse { stroke: var(--named-stroke); stroke-dasharray: none; }
+#overlay g.ov-box.revealed rect,
+#overlay g.ov-box.revealed ellipse { stroke: var(--revealed-stroke); stroke-dasharray: none; }
+#overlay g.ov-box.placed rect,
+#overlay g.ov-box.placed ellipse { stroke: var(--placed-stroke); stroke-dasharray: none; }
+#overlay g.ov-box.missed rect,
+#overlay g.ov-box.missed ellipse { stroke: var(--missed-stroke); stroke-dasharray: none; }
 
 /* round button with a pointer wedge to the country it stands for */
-svg.world g.btn { cursor: pointer; }
+#overlay g.btn { cursor: pointer; }
 
-svg.world g.btn .face,
-svg.world g.btn .tail {
+#overlay g.btn .face,
+#overlay g.btn .tail {
   fill: rgba(255, 255, 255, 0.62);
   stroke: #4a3c26;
   vector-effect: non-scaling-stroke;
 }
 
-svg.world g.btn .face { stroke-width: 2.5; }
-svg.world g.btn .tail { stroke-width: 1.5; stroke-linejoin: round; pointer-events: all; }
-svg.world g.btn .pad { fill: transparent; stroke: none; pointer-events: all; }
+#overlay g.btn .face { stroke-width: 2.5; }
+#overlay g.btn .tail { stroke-width: 1.5; stroke-linejoin: round; pointer-events: all; }
+#overlay g.btn .pad { fill: transparent; stroke: none; pointer-events: all; }
 
-svg.world g.btn.hot .face,
-svg.world g.btn.hot .tail { fill: rgba(255, 255, 255, 0.96); stroke: #2f2616; }
-svg.world g.btn.selected .face,
-svg.world g.btn.selected .tail { fill: var(--selected); stroke: var(--selected-stroke); }
-svg.world g.btn.named .face,
-svg.world g.btn.named .tail { fill: var(--named); stroke: var(--named-stroke); }
-svg.world g.btn.revealed .face,
-svg.world g.btn.revealed .tail { fill: var(--revealed); stroke: var(--revealed-stroke); }
-svg.world g.btn.placed .face,
-svg.world g.btn.placed .tail { fill: var(--placed-stroke); stroke: #ffffff; }
-svg.world g.btn.missed .face,
-svg.world g.btn.missed .tail { fill: var(--missed-stroke); stroke: #ffffff; }
+#overlay g.btn.hot .face,
+#overlay g.btn.hot .tail { fill: rgba(255, 255, 255, 0.96); stroke: #2f2616; }
+#overlay g.btn.selected .face,
+#overlay g.btn.selected .tail { fill: var(--selected); stroke: var(--selected-stroke); }
+#overlay g.btn.named .face,
+#overlay g.btn.named .tail { fill: var(--named); stroke: var(--named-stroke); }
+#overlay g.btn.revealed .face,
+#overlay g.btn.revealed .tail { fill: var(--revealed); stroke: var(--revealed-stroke); }
+#overlay g.btn.placed .face,
+#overlay g.btn.placed .tail { fill: var(--placed-stroke); stroke: #ffffff; }
+#overlay g.btn.missed .face,
+#overlay g.btn.missed .tail { fill: var(--missed-stroke); stroke: #ffffff; }
 
 /* two buttons that would overlap at this zoom: one numbered button */
-svg.world g.btn.group .face { fill: rgba(255, 255, 255, 0.96); stroke-width: 3; }
-svg.world g.btn.group:hover .face { stroke: #2f2616; }
+#overlay g.btn.group .face { fill: rgba(255, 255, 255, 0.96); stroke-width: 3; }
+#overlay g.btn.group:hover .face { stroke: #2f2616; }
 
-svg.world g.btn.group text,
-svg.world g.btn.zone text {
+#overlay g.btn.group text,
+#overlay g.btn.zone text {
   fill: #3f3623;
   font-weight: 700;
   pointer-events: none;
 }
 
 /* a whole dense area folded into one button — click to zoom to its layer */
-svg.world g.btn.zone .face {
+#overlay g.btn.zone .face {
   fill: rgba(255, 255, 255, 0.9);
   stroke-width: 2.5;
   stroke-dasharray: 5 3;
 }
 
-svg.world g.btn.zone:hover .face { fill: #ffffff; stroke: #2f2616; stroke-dasharray: none; }
+#overlay g.btn.zone:hover .face { fill: #ffffff; stroke: #2f2616; stroke-dasharray: none; }
 
 /* ————— feedback flashes ————— */
 svg.world path.country.flash-good,
-svg.world g.ov-box.flash-good rect,
-svg.world g.ov-box.flash-good ellipse { animation: goodPulse 0.9s ease-out; }
-svg.world g.btn.flash-good .face { animation: goodBtn 0.9s ease-out; }
+#overlay g.ov-box.flash-good rect,
+#overlay g.ov-box.flash-good ellipse { animation: goodPulse 0.9s ease-out; }
+#overlay g.btn.flash-good .face { animation: goodBtn 0.9s ease-out; }
 
 @keyframes goodPulse {
   0%   { fill: #2ee86a; }
@@ -368,16 +377,16 @@ svg.world g.btn.flash-good .face { animation: goodBtn 0.9s ease-out; }
 }
 
 svg.world path.country.flash-bad,
-svg.world g.ov-box.flash-bad rect,
-svg.world g.ov-box.flash-bad ellipse { fill: #e98980 !important; }
-svg.world g.btn.flash-bad .face,
-svg.world g.btn.flash-bad .tail { fill: #e98980 !important; stroke: #c0392b !important; }
+#overlay g.ov-box.flash-bad rect,
+#overlay g.ov-box.flash-bad ellipse { fill: #e98980 !important; }
+#overlay g.btn.flash-bad .face,
+#overlay g.btn.flash-bad .tail { fill: #e98980 !important; stroke: #c0392b !important; }
 
 /* "here it is" after three misses or Show me: three bright pulses */
 svg.world path.country.flash-show,
-svg.world g.ov-box.flash-show rect,
-svg.world g.ov-box.flash-show ellipse { animation: showPulse 0.6s ease-in-out 3; }
-svg.world g.btn.flash-show .face { animation: showBtn 0.6s ease-in-out 3; }
+#overlay g.ov-box.flash-show rect,
+#overlay g.ov-box.flash-show ellipse { animation: showPulse 0.6s ease-in-out 3; }
+#overlay g.btn.flash-show .face { animation: showBtn 0.6s ease-in-out 3; }
 
 @keyframes showPulse {
   0%, 100% { fill: var(--missed); }
@@ -1280,25 +1289,43 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
    Each key is two floors of the same building, printed on the button:
    the area on top, its dense pocket underneath. Whichever floor you're
    standing on lights up; the other one is marked ▸ — that's the next tap. */
+/* The keys are caps, 62px wide, on every screen: on a desktop a column
+   down the left edge, on a phone a row docked along the bottom. Each cap
+   says the same two things stacked — the key, the area, then the pocket
+   the next tap dives into. A desktop used to get a 456x140 slab of
+   labelled chips in the top-left corner, sitting on a sixth of the map's
+   height; the column costs it 44px of width, which a height-bound fit
+   never misses (updateSafe measures it in). */
 #jump-bar {
   position: absolute;
   left: 12px;
-  top: calc(12px + var(--safe-t));
+  top: calc(60px + var(--safe-t));
   z-index: 10;
-  width: 456px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
-#jump-bar button { white-space: nowrap; }
+#jump-keys { display: flex; flex-direction: column; gap: 4px; }
+body.keys-off #jump-keys { display: none; }
 
 #jump-bar button {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 7px;
-  font-size: 0.74rem;
+  gap: 1px;
+  width: 62px;
+  height: 58px;
+  padding: 3px;
+  font-size: 0.64rem;
+  line-height: 1.15;
   font-weight: 600;
-  padding: 4px 9px 4px 5px;
+  text-align: center;
+  white-space: nowrap;
   border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
+  border-radius: 11px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--ink);
   cursor: pointer;
@@ -1308,31 +1335,22 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 
 #jump-bar button:hover { background: #fff; }
 
-#jump-bar .jump-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-}
+#jump-bar .jump-grid { display: flex; flex-direction: column; gap: 4px; }
+#jump-bar .jump-world { height: 40px; }
 
-#jump-bar .jump-grid button { justify-content: flex-start; border-radius: 9px; }
-#jump-bar .jump-world { margin-top: 5px; width: 100%; justify-content: center; border-radius: 9px; }
-
-#jump-bar .jump-lines {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  min-width: 0;
-  line-height: 1.15;
-}
+#jump-bar .jump-lines { display: contents; }
+#jump-bar .jump-name { display: none; }
+#jump-bar kbd { order: 0; font-size: 0.78rem; padding: 0 4px; }
+#jump-bar button[data-key]::after { content: attr(data-short); order: 1; }
 
 #jump-bar .jump-sub {
-  font-size: 0.63rem;
+  order: 2;
+  font-size: 0.58rem;
   font-weight: 600;
   color: var(--ink-soft);
 }
-/* a label's abbreviation, for the phone's 62px caps */
-#jump-bar .jump-sub .narrow { display: none; }
+/* "Central America" is wider than the cap it is printed on */
+#jump-bar .jump-sub .wide { display: none; }
 
 /* ▸ marks the floor the next tap takes you to */
 #jump-bar .jump-name::before,
@@ -1343,28 +1361,9 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   color: #b07d12;
 }
 
-#jump-bar .jump-hint {
-  margin-top: 4px;
-  text-align: center;
-  font-size: 0.62rem;
-  line-height: 1.5;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 1px 2px rgba(10, 30, 55, 0.5);
-}
+/* the two-floors hint lives in the help panel; a cap has no room for it */
+#jump-bar .jump-hint { display: none; }
 #jump-bar button:active { transform: translateY(1px); }
-#jump-bar kbd { font-size: 0.68rem; padding: 0 5px; }
-/* the hint sits on the dark bar, not on a card — a full keycap there
-   reads as a button you could press */
-#jump-bar .jump-hint kbd {
-  font-size: 0.95em;
-  padding: 0 4px;
-  border-width: 1px;
-  background: rgba(12, 35, 60, 0.55);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: #fff;
-  text-shadow: none;
-}
 
 /* the key you're standing on, and which floor of it */
 #jump-bar button.armed,
@@ -1376,7 +1375,7 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 #jump-bar button.deep .jump-name { color: #a8874a; }
 
 #jump-bar button.armed .jump-sub::before,
-#jump-bar button.deep .jump-name::before { content: "▸"; width: 9px; }
+#jump-bar button.deep .jump-name::before { content: "▸"; width: 7px; }
 
 #jump-bar button.deep { background: #ffe1a0; border-color: #d99b28; }
 
@@ -1410,8 +1409,14 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   100% { opacity: 0; }
 }
 
-/* only the touch layout offers the show/hide chip */
-#jump-bar #jump-toggle { display: none; }
+/* the show/hide chip, under the column */
+#jump-bar #jump-toggle {
+  height: 28px;
+  padding: 0;
+  font-size: 0.95rem;
+  border-radius: 9px;
+}
+body.keys-off #jump-toggle { opacity: 0.85; }
 
 /* place mode: the target row pulses whenever the name changes */
 #bank-target { border-radius: 10px; padding: 3px 8px; margin: -3px -8px; }
@@ -1441,55 +1446,15 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
     top: auto;
     left: calc(10px + var(--safe-l));
     bottom: calc(10px + var(--safe-b));
-    width: auto;
-    display: flex;
+    flex-direction: row;
     align-items: flex-end;
-    gap: 6px;
   }
 
-  #jump-keys { display: flex; align-items: stretch; gap: 4px; }
-  body.keys-off #jump-keys { display: none; }
-
-  #jump-bar .jump-grid { gap: 4px; }
-  #jump-bar .jump-grid button,
-  #jump-bar .jump-world {
-    flex-direction: column;
-    justify-content: center;
-    gap: 1px;
-    width: 62px;
-    height: 58px;
-    padding: 3px;
-    border-radius: 11px;
-    font-size: 0.64rem;
-    line-height: 1.15;
-    text-align: center;
-  }
-  #jump-bar .jump-world { margin: 0; width: 46px; height: auto; }
-  /* the cap says the same two things the desktop chip does, stacked:
-     the area, then the pocket the next tap dives into */
-  #jump-bar .jump-lines { display: contents; }
-  #jump-bar .jump-name { display: none; }
-  #jump-bar kbd { order: 0; font-size: 0.78rem; padding: 0 4px; }
-  #jump-bar button[data-key]::after { content: attr(data-short); order: 1; }
-  #jump-bar .jump-sub { order: 2; font-size: 0.58rem; }
-  #jump-bar button.armed .jump-sub::before,
-  #jump-bar button.deep .jump-name::before { width: 7px; }
-  #jump-bar .jump-hint { display: none; }
-
-  #jump-bar #jump-toggle {
-    display: flex;
-    justify-content: center;
-    width: 42px;
-    height: 40px;
-    padding: 0;
-    font-size: 1.05rem;
-    border-radius: 11px;
-  }
-  body.keys-off #jump-toggle { opacity: 0.85; }
-
-  /* "Central America" is wider than the cap it is printed on. */
-  #jump-bar .jump-sub .wide { display: none; }
-  #jump-bar .jump-sub .narrow { display: inline; }
+  #jump-keys { flex-direction: row; align-items: stretch; }
+  /* the six keys keep the keyboard's shape here: 1 2 3 over Q W E */
+  #jump-bar .jump-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+  #jump-bar .jump-world { width: 46px; height: auto; }
+  #jump-bar #jump-toggle { width: 42px; height: 40px; font-size: 1.05rem; border-radius: 11px; }
 
   /* The zoom column stood on the right edge, and every fit had to keep
      64px clear of it — a sixth of a phone's width, down the whole height

@@ -6,9 +6,9 @@
  *     to it exactly as its key would
  *   · drag the selected box's edges and corners; drag its name to move it
  *   · Done (or Esc, or its row again) lets go of it
- *   · the dashed green frame is this screen's safe area — where a box
- *     lands; the hatched blue band is what a zone dive also keeps clear
- *     for the quiz card, when one can still open
+ *   · the dashed green frame is this screen's safe area — every box lands
+ *     centred in it. A row marked ⚠ lands below the zoom that zone's
+ *     buttons were spaced for, so some of them may pair up there
  *   · Copy hands back the table to paste over VIEW_BOXES
  *
  * Edits live in this browser's storage (and only apply in ?guides), so a
@@ -52,10 +52,7 @@
     .gd-h[data-h=nw], .gd-h[data-h=se] { cursor: nwse-resize; } .gd-h[data-h=ne], .gd-h[data-h=sw] { cursor: nesw-resize; }
     #gd-safe { position: absolute; border: 2px dashed rgba(0, 170, 90, 0.9); box-sizing: border-box; }
     #gd-safe::before { content: "safe area"; position: absolute; right: 4px; top: 2px; font: 600 10px system-ui, sans-serif; color: rgb(0, 130, 70); }
-    #gd-card { position: absolute; box-sizing: border-box; border-top: 2px dashed rgba(0, 110, 200, 0.9);
-      background: repeating-linear-gradient(135deg, rgba(0, 110, 200, 0.13) 0 6px, transparent 6px 12px); }
-    #gd-card::before { content: "kept clear — the quiz card opens here"; position: absolute; left: 4px; top: 2px; font: 600 10px system-ui, sans-serif; color: rgb(0, 90, 170); }
-    #gd-card[hidden], #gd-done[hidden] { display: none; }
+    #gd-done[hidden] { display: none; }
     #gd-panel { position: absolute; left: 8px; top: 64px; z-index: 40; max-width: min(330px, calc(100% - 16px));
       font: 12px/1.3 system-ui, sans-serif; color: #122236; background: rgba(255, 255, 255, 0.94);
       border-radius: 10px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); padding: 6px; }
@@ -77,18 +74,15 @@
   const wrap = document.getElementById('map-wrap');
   const layer = Object.assign(document.createElement('div'), { id: 'gd-layer' });
   const safe = Object.assign(document.createElement('div'), { id: 'gd-safe' });
-  const card = Object.assign(document.createElement('div'), { id: 'gd-card', hidden: true });
-  layer.append(safe, card);
+  layer.appendChild(safe);
   const panel = Object.assign(document.createElement('div'), { id: 'gd-panel' });
   panel.innerHTML = `<header><b id="gd-title"></b><button id="gd-done" hidden>Done</button><button id="gd-copy">Copy</button><button id="gd-reset">Reset</button></header>
     <div id="gd-rows"></div><textarea id="gd-out" hidden readonly></textarea>`;
   wrap.append(layer, panel);
   const rowsEl = panel.querySelector('#gd-rows'), outEl = panel.querySelector('#gd-out'), titleEl = panel.querySelector('#gd-title'), doneEl = panel.querySelector('#gd-done');
 
-  // What a zone dive keeps free for the quiz card right now — nothing in a
-  // place run, or once the card is already up and measured.
-  const clearOf = (n) => (ZONES[n] ? D.cardClear(ZONES[n]) : 0);
-  const floorOf = (n) => (ZONES[n] ? ZONES[n].minScale * 1.1 : 0);
+  // Below this a zone's buttons were not spaced to stay apart.
+  const tunedFor = (n) => (ZONES[n] ? ZONES[n].minScale : 0);
   const asBox = (b) => ({ x1: b[0], y1: b[1], x2: b[2], y2: b[3] });
 
   function jump(n) {
@@ -158,12 +152,15 @@
     rowsEl.innerHTML = '';
     for (const n of names) {
       const box = asBox(VIEW_BOXES[n]);
-      const fit = D.safeScale(box, 1, clearOf(n));
-      const over = floorOf(n) > fit * 1.001;
+      const lands = D.viewScale(box);
+      const over = lands < tunedFor(n);
       const row = document.createElement('div');
       row.className = `gd-row${n === selected ? ' sel' : ''}${over ? ' over' : ''}`;
+      const why = over
+        ? `lands below ×${tunedFor(n)}, where this zone's buttons were spaced to stay apart — some may pair up`
+        : 'zoom this screen lands at, px per map unit';
       row.innerHTML = `<span>${n}</span><span class="n">${VIEW_BOXES[n].join(' ')}</span>` +
-        `<span class="n" title="zoom this screen lands at, px per map unit">${over ? `needs ${floorOf(n).toFixed(1)} · fits ${fit.toFixed(1)}` : `×${Math.min(fit, D.maxFitScale()).toFixed(1)}`}</span>`;
+        `<span class="n" title="${why}">×${lands.toFixed(1)}${over ? ' ⚠' : ''}</span>`;
       // On a phone the list is most of the map; picking from it folds it.
       row.addEventListener('click', () => {
         if (n === selected) { select(null); return; }          // a second tap lets go of it
@@ -195,23 +192,14 @@
   });
 
   function frame() {
-    // The green frame is only ever the safe area. What a zone dive also
-    // holds back for the quiz card is its own band inside it, so a frame
-    // that stops short of the bottom says why.
     const { W, H } = D.size(), S = D.SAFE;
-    const extra = selected ? clearOf(selected) : 0;
     Object.assign(safe.style, {
       left: `${S.left}px`, top: `${S.top}px`,
       width: `${W - S.left - S.right}px`, height: `${H - S.top - S.bottom}px`,
     });
-    card.hidden = !extra;
-    Object.assign(card.style, {
-      left: `${S.left}px`, top: `${H - S.bottom - extra}px`,
-      width: `${W - S.left - S.right}px`, height: `${extra}px`,
-    });
-    // The bank opening, the card closing, a mode switch: all move the
+    // The bank opening, the card closing, the keys folding: all move the
     // numbers in the list without anything here having been touched.
-    const sig = `${W},${H},${S.top},${S.bottom},${S.left},${S.right},${extra}`;
+    const sig = `${W},${H},${S.top},${S.bottom},${S.left},${S.right}`;
     if (sig !== lastSig) { lastSig = sig; renderRows(); }
     for (const n of names) {
       const [x1, y1, x2, y2] = VIEW_BOXES[n];

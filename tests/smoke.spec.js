@@ -16,7 +16,7 @@ async function boot(page) {
   await page.goto('/');
   await page.locator('#hello-close').click();
   // The map SVG is fetched at runtime; the hit layer is built after it lands.
-  await expect(page.locator('#map svg')).toBeAttached();
+  await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 }
 
