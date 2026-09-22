@@ -25,41 +25,14 @@
     <!-- the challenge's progress, as a hairline along the very top edge -->
     <div id="progress-bar"><span id="progress-fill"></span></div>
 
+    <!-- one row, one label each: where the next tap goes (see markJumpKeys) -->
     <nav id="jump-bar" aria-label="Jump around the map">
-      <div id="jump-keys">
-        <div class="jump-grid">
-          <button data-key="1" data-short="N. America" data-sub="Central America">
-            <kbd>1</kbd>
-            <span class="jump-lines"><span class="jump-name">North&nbsp;America</span><span class="jump-sub"><span class="wide">Central&nbsp;America</span><span class="narrow">C.&nbsp;America</span></span></span>
-          </button>
-          <button data-key="2" data-short="Europe" data-sub="Micro-states">
-            <kbd>2</kbd>
-            <span class="jump-lines"><span class="jump-name">Europe</span><span class="jump-sub">Micro-states</span></span>
-          </button>
-          <button data-key="3" data-short="Asia" data-sub="Middle East">
-            <kbd>3</kbd>
-            <span class="jump-lines"><span class="jump-name">Asia</span><span class="jump-sub">Middle&nbsp;East</span></span>
-          </button>
-          <button data-key="q" data-short="S. America" data-sub="Caribbean">
-            <kbd>Q</kbd>
-            <span class="jump-lines"><span class="jump-name">South&nbsp;America</span><span class="jump-sub">Caribbean</span></span>
-          </button>
-          <button data-key="w" data-short="Africa" data-sub="West coast">
-            <kbd>W</kbd>
-            <span class="jump-lines"><span class="jump-name">Africa</span><span class="jump-sub">West&nbsp;coast</span></span>
-          </button>
-          <button data-key="e" data-short="India–NZ" data-sub="Pacific isles">
-            <kbd>E</kbd>
-            <span class="jump-lines"><span class="jump-name">India–New&nbsp;Zealand</span><span class="jump-sub">Pacific&nbsp;isles</span></span>
-          </button>
-        </div>
-        <button data-key="0" class="jump-world" data-short="World">
-          <kbd>0</kbd>
-          <span class="jump-lines"><span class="jump-name">Whole&nbsp;world</span></span>
-        </button>
-        <div class="jump-hint">top line = the area · bottom line = its dense pocket<br>tap the key again to dive · <kbd>Shift</kbd> to land straight on it</div>
-      </div>
-      <button id="jump-toggle" aria-expanded="true" aria-controls="jump-keys" title="Hide the jump keys" aria-label="Hide the jump keys">⌨</button>
+      <button data-key="1" data-area="N. America" data-pocket="Central America"><kbd>1</kbd><span class="jump-to">N. America</span></button>
+      <button data-key="2" data-area="Europe" data-pocket="Micro-states"><kbd>2</kbd><span class="jump-to">Europe</span></button>
+      <button data-key="3" data-area="Asia" data-pocket="Middle East"><kbd>3</kbd><span class="jump-to">Asia</span></button>
+      <button data-key="q" data-area="S. America" data-pocket="Caribbean"><kbd>Q</kbd><span class="jump-to">S. America</span></button>
+      <button data-key="w" data-area="Africa" data-pocket="West coast"><kbd>W</kbd><span class="jump-to">Africa</span></button>
+      <button data-key="e" data-area="India–NZ" data-pocket="Pacific isles"><kbd>E</kbd><span class="jump-to">India–NZ</span></button>
     </nav>
 
     <div id="tools">
@@ -69,11 +42,6 @@
       <button id="mic-toggle" title="Voice input on/off" aria-label="Toggle voice input">🎤</button>
     </div>
 
-    <div id="zoom-controls">
-      <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
-      <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
-      <button id="zoom-reset" title="Reset view (0)" aria-label="Reset view">⛶</button>
-    </div>
 
     <div id="tooltip" hidden></div>
     <div id="toast" hidden></div>
@@ -85,8 +53,8 @@
          Turn on the 🎤 to just say the names out loud.
          Pick a continent or region from the pill at the top for a smaller, timed challenge.</p>
       <p class="hello-keys">Keys: <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> over <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd>
-         lay the world out on your keyboard — or on the pad in the corner if you're on a touch screen.
-         Every key has two floors: the area, and the dense pocket printed under it ·
+         lay the world out on your keyboard — or tap the row along the bottom.
+         Every key has two floors, the area and its dense pocket, and the button says where the next tap goes ·
          <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>R</kbd> restart ·
          <kbd>Space</kbd> skip (place mode)</p>
       <button id="hello-close">Let's go</button>
@@ -234,18 +202,17 @@
       <button id="help-close" aria-label="Close">×</button>
       <h2>Shortcuts</h2>
       <dl class="keys">
-        <dt><kbd>0</kbd></dt><dd>Whole-world view</dd>
+        <dt><kbd>0</kbd></dt><dd>Whole-world view (on a touch screen, pinch all the way out)</dd>
         <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd></dt>
         <dd>The map on your keyboard — top row north: N. America · Europe · Asia;
           bottom row south: S. America · Africa · India-to-NZ.
-          Every key has a second floor, printed on the second line of its button: tap the same key
-          again for that area's dense pocket — Central America · micro-states · Middle East ·
-          Caribbean · West coast · Pacific islands — and once more to come back out.
+          Every key has a second floor: tap the same key again for that area's dense pocket —
+          Central America · micro-states · Middle East · Caribbean · West coast · Pacific islands —
+          and once more to come back out. The row of buttons along the bottom is the same six
+          keys, and each one says where its next tap goes.
           Hold <kbd>Shift</kbd> (or shift-click the button) to drop straight onto that second floor
           in one move, with no stop at the area view on the way — the same key without Shift
-          steps back out of it.
-          On a touch screen the same six keys sit in a pad at the bottom-left corner;
-          the ⌨ chip beside it folds the pad away when you want the whole map.</dd>
+          steps back out of it.</dd>
         <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
         <dt><kbd>R</kbd></dt><dd>Restart this challenge</dd>
         <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>

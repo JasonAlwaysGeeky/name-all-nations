@@ -87,7 +87,7 @@
     micOn: false,
     seenIntro: false,
     seenFs: false,       // the full-screen chip has drawn attention to itself once
-    prefs: { flags: true, keys: true },
+    prefs: { flags: true },
     heat: false,
   };
   let stats = { games: 0, byCode: {}, bests: {}, history: [] };
@@ -219,7 +219,7 @@
 
   function savePrefs() {
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ seenIntro: state.seenIntro, flags: state.prefs.flags, keys: state.prefs.keys, seenFs: state.seenFs }));
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ seenIntro: state.seenIntro, flags: state.prefs.flags, seenFs: state.seenFs }));
     } catch { /* private mode etc. */ }
   }
 
@@ -229,7 +229,6 @@
       state.seenIntro = !!d.seenIntro;
       state.seenFs = !!d.seenFs;
       if (typeof d.flags === 'boolean') state.prefs.flags = d.flags;
-      if (typeof d.keys === 'boolean') state.prefs.keys = d.keys;
     } catch { /* corrupted — defaults */ }
   }
 
@@ -576,8 +575,8 @@
   const el = {};
   for (const id of [
     'map-wrap', 'map', 'tooltip', 'toast', 'progress-text', 'progress-fill', 'progress-wrap',
-    'mic-toggle', 'voice-meter', 'mic-status-text', 'zoom-in', 'zoom-out', 'zoom-reset', 'stats-btn', 'help-btn', 'fs-btn',
-    'jump-bar', 'jump-keys', 'jump-toggle', 'jump-flash',
+    'mic-toggle', 'voice-meter', 'mic-status-text', 'stats-btn', 'help-btn', 'fs-btn',
+    'jump-bar', 'jump-flash',
     'hello', 'hello-close', 'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
     'card-actions', 'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
@@ -954,8 +953,8 @@
   const mapBox = () => ({ x1: fullVB.x, y1: fullVB.y, x2: fullVB.x + fullVB.w, y2: fullVB.y + fullVB.h });
 
   // Zoomed all the way out is "the whole map is somewhere I can see it",
-  // and on a phone that is not the same as "on screen": the jump pad and
-  // the word bank own a third of the glass between them, so a world view
+  // and on a phone that is not the same as "on screen": the jump keys and
+  // the word bank own a slice of the glass between them, so a world view
   // centred in the *window* hands them the bottom half of the map. It
   // goes through the same safe-area fit every other view does.
   function worldView() {
@@ -1246,45 +1245,23 @@
     return null;
   }
 
-  // The floating UI overlays the map's edges — the level banner across
-  // the top, the jump bar top-left, the zoom column top-right, the card
-  // and word bank along the bottom. Fits aim for the window minus this
-  // border, so a framed area never starts life under the chrome (and
-  // offset buttons and tails get breathing room too).
-  const SAFE = { top: 60, bottom: 64, left: 40, right: 64 };
+  // The floating UI overlays the map's edges — the HUD and the tools
+  // across the top, and along the bottom the jump keys plus whatever the
+  // mode docks there. Fits aim for the window minus this border, so a
+  // framed area never starts life under the chrome (and offset buttons
+  // and tails get breathing room too). The sides are bare on every
+  // screen: 40px of a 412px phone was a tenth of the map given away.
+  const SAFE = { top: 60, bottom: 64, left: 12, right: 12 };
   const SAFE_BASE = { ...SAFE };
-  const PHONE_MQ = matchMedia('(max-width: 900px), (max-height: 560px) and (pointer: coarse)');
 
-  // On a phone the jump keys are docked along the bottom of the map
-  // rather than tucked in a corner, so whatever they take is map a fit
-  // must not frame anything into. Re-read on every measure().
-  // On a phone everything docks along the bottom edge — the jump pad, and
-  // whichever of the word bank or the quiz card is open — so what the map
-  // actually has to itself is measured rather than guessed at. A fit that
-  // does not know the word bank is 130px tall frames the country it is
-  // asking you to find underneath it.
+  // What is docked along the bottom right now — the jump keys always,
+  // and whichever of the word bank, hardcore's bar or the quiz card is
+  // open — is measured rather than guessed at, on every measure(). A fit
+  // that does not know the word bank is 50px tall frames the country it
+  // is asking you to find underneath it.
   function updateSafe() {
-    // On a desktop the jump keys run down the left edge, and the map's
-    // own area starts to their right — measured, like the phone's bottom
-    // is. On a phone they are docked along the bottom instead, and 40px
-    // of a 412px screen is a tenth of the map given away for nothing.
-    // The right inset is the zoom column's, and on a phone that docks in
-    // the bottom corner beside the pad. Same query the stylesheet docks
-    // them on, so a big phone held sideways (wider than 900) counts too.
-    const phone = PHONE_MQ.matches;
-    let left = phone ? 10 : SAFE_BASE.left;
-    if (!phone && el.jumpBar.offsetParent) {
-      left = Math.max(left, Math.round(el.jumpBar.getBoundingClientRect().right - rectLeft) + 10);
-    }
-    SAFE.left = Math.min(left, W * 0.2);
-    SAFE.right = phone ? 10 : SAFE_BASE.right;
-    // Whatever is docked along the bottom right now. The mode bars and
-    // the quiz card are there on any screen; the jump pad only on a
-    // phone, where it moves out of the corner. A fit that does not know
-    // the word bank is 130px tall frames the country it is asking you to
-    // find underneath it.
     let bottom = SAFE_BASE.bottom;
-    for (const e of [phone && state.prefs.keys ? el.jumpBar : null, el.wordBank, el.hardcoreBar, el.card]) {
+    for (const e of [el.jumpBar, el.wordBank, el.hardcoreBar, el.card]) {
       if (!e || e.hidden || !e.offsetParent) continue;
       const top = e.getBoundingClientRect().top - rectTop;
       if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
@@ -2910,10 +2887,6 @@
     markFullscreen();
   }
 
-  el.zoomIn.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 0.6));
-  el.zoomOut.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + H / 2, 1 / 0.6));
-  el.zoomReset.addEventListener('click', () => animateView(worldView()));
-
   // The keyboard is a little map: 1 2 3 across the north (N. America,
   // Europe, Asia), Q W E across the south (S. America, Africa, India to
   // New Zealand). Tapping the same key again dives into that area's
@@ -2946,16 +2919,23 @@
     return digit && (digit === '0' || JUMP_KEYS[digit]) ? digit : null;
   }
 
-  // Which key you're standing on, and which of its two floors. On the
-  // pad that lights the cap; on either layout it moves the ▸ onto the
-  // line the next tap takes you to, so the second floor stops being a
-  // secret.
+  // Which key you're standing on, and which of its two floors — and, on
+  // every key, where its next tap goes: the area from anywhere else, the
+  // dense pocket while you stand on the area, the area again from inside
+  // the pocket. A key forgets where you stood after 15s (jumpTo), and the
+  // label is told when that happens.
+  let jumpMarkTimer = null;
   function markJumpKeys() {
+    const live = jumpState.key != null && performance.now() - jumpState.t < 15000;
     for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
-      const on = b.dataset.key === jumpState.key;
-      b.classList.toggle('armed', on && jumpState.stage === 0);
-      b.classList.toggle('deep', on && jumpState.stage === 1);
+      const on = live && b.dataset.key === jumpState.key;
+      const deep = on && jumpState.stage === 1;
+      b.classList.toggle('armed', on && !deep);
+      b.classList.toggle('deep', deep);
+      b.querySelector('.jump-to').textContent = on && !deep ? b.dataset.pocket : b.dataset.area;
     }
+    clearTimeout(jumpMarkTimer);
+    if (live) jumpMarkTimer = setTimeout(markJumpKeys, 15020 - (performance.now() - jumpState.t));
   }
 
   // Say out loud where that key just put you. Cheap to ignore, but it
@@ -3001,24 +2981,6 @@
     b.addEventListener('mousedown', (e) => e.preventDefault());
     b.addEventListener('click', (e) => jumpTo(b.dataset.key, e.shiftKey));
   }
-
-  // Fold the pad away when the map matters more than the shortcut — the
-  // chip stays put so it's one tap back.
-  function applyKeysPref() {
-    document.body.classList.toggle('keys-off', !state.prefs.keys);
-    const label = state.prefs.keys ? 'Hide the jump keys' : 'Show the jump keys';
-    el.jumpToggle.setAttribute('aria-expanded', String(state.prefs.keys));
-    el.jumpToggle.setAttribute('aria-label', label);
-    el.jumpToggle.title = label;
-    measure();                                             // the map's safe area just changed
-    if (vb) { dirty = true; setView({ ...vb }); bake(); }
-  }
-  el.jumpToggle.addEventListener('mousedown', (e) => e.preventDefault());
-  el.jumpToggle.addEventListener('click', () => {
-    state.prefs.keys = !state.prefs.keys;
-    savePrefs();
-    applyKeysPref();
-  });
 
   document.addEventListener('keydown', (e) => {
     if (state.level?.pausedAt != null) {
@@ -3089,7 +3051,6 @@
   loadPrefs();
   loadStats();
   document.body.classList.toggle('no-flags', !state.prefs.flags);
-  applyKeysPref();
   updateProgress();
   el.micToggle.classList.add('off');
   el.hello.hidden = true;

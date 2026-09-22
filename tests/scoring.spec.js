@@ -21,16 +21,21 @@ async function boot(page) {
 async function clickCountry(page, code) {
   const pt = await page.evaluate((code) => {
     const r = document.querySelector(`#map svg path#${code}`).getBoundingClientRect();
+    const seen = new Set();
     for (let fy = 0.25; fy <= 0.75; fy += 0.05) {
       for (let fx = 0.25; fx <= 0.75; fx += 0.05) {
         const x = r.x + r.width * fx, y = r.y + r.height * fy;
-        const t = document.elementFromPoint(x, y)?.closest?.('[data-code], path[id]');
+        const hit = document.elementFromPoint(x, y);
+        const t = hit?.closest?.('[data-code], path[id]');
         if ((t?.dataset?.code || t?.id) === code) return { x, y };
+        seen.add(t?.dataset?.code || t?.id || hit?.id || hit?.tagName || 'nothing');
       }
     }
-    return null;
+    // Which country (or what else) was in the way, and how far in the
+    // view was: the two things a failure here needs to say.
+    return { found: [...seen], scale: window.NAN_DEBUG.scale(), rect: [r.x, r.y, r.width, r.height].map(Math.round) };
   }, code);
-  expect(pt, `no clickable point inside ${code}`).not.toBeNull();
+  expect(pt?.x, `no clickable point inside ${code}: ${JSON.stringify(pt)}`).not.toBeUndefined();
   await page.mouse.click(pt.x, pt.y);
   // Under a loaded runner a click can land while the view is still
   // animating, so confirm the game agrees about what got selected before

@@ -44,14 +44,18 @@
   --bar-a: #123a5f;
   --bar-b: #1d5f8c;
 
-  /* the notch / gesture-bar cutouts, and the room the touch key pad
-     reserves along the bottom of the map (0 on desktop, where the jump
-     bar lives up in the corner instead) */
+  /* the notch / gesture-bar cutouts, and the row of jump keys along the
+     bottom of the map (44px + 10) — whatever else docks there stacks
+     above it */
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  --keys-h: 0px;
+  --keys-h: 54px;
+
+  /* light only: with no scheme declared, a phone in dark mode may paint
+     the answer box black on the white card */
+  color-scheme: light;
 
   --shadow-sm: 0 2px 8px rgba(20, 45, 75, 0.16);
   --shadow-md: 0 6px 20px rgba(15, 40, 70, 0.22);
@@ -478,33 +482,6 @@ body.level-active svg.world path.country:not(.in-level) {
 
 body.no-flags .flag { display: none; }
 
-/* ————— zoom controls ————— */
-#zoom-controls {
-  position: absolute;
-  right: 14px;
-  top: calc(56px + var(--safe-t));
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  z-index: 10;
-}
-
-#zoom-controls button {
-  width: 42px;
-  height: 42px;
-  font-size: 1.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--ink);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-
-#zoom-controls button:hover { background: #fff; }
-#zoom-controls button:active { transform: translateY(1px); }
-
 /* ————— tooltip ————— */
 #tooltip {
   position: absolute;
@@ -603,6 +580,8 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 #guess-input {
   flex: 1;
   font-size: 1rem;
+  background: #fff;
+  color: var(--ink);
   padding: 11px 13px;
   border: 2px solid #d3dde6;
   border-radius: 11px;
@@ -1284,49 +1263,42 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 .keys dd { color: var(--ink-soft); }
 .help-note { margin-top: 14px; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.45; }
 
-/* ————— continent jump bar —————
+/* ————— jump keys —————
 
-   Each key is two floors of the same building, printed on the button:
-   the area on top, its dense pocket underneath. Whichever floor you're
-   standing on lights up; the other one is marked ▸ — that's the next tap. */
-/* The keys are caps, 62px wide, on every screen: on a desktop a column
-   down the left edge, on a phone a row docked along the bottom. Each cap
-   says the same two things stacked — the key, the area, then the pocket
-   the next tap dives into. A desktop used to get a 456x140 slab of
-   labelled chips in the top-left corner, sitting on a sixth of the map's
-   height; the column costs it 44px of width, which a height-bound fit
-   never misses (updateSafe measures it in). */
+   One row along the bottom on every screen, six keys, one label each:
+   where the next tap takes you. From anywhere else that is the area;
+   standing on the area it is the dense pocket inside it; standing in
+   the pocket it is the area again, the way out. The key itself is
+   printed on a desktop, where it is the faster way in; a touch screen
+   has no keys to press and gets the bare label. */
 #jump-bar {
   position: absolute;
-  left: 12px;
-  top: calc(60px + var(--safe-t));
+  left: 50%;
+  bottom: calc(10px + var(--safe-b));
+  transform: translateX(-50%);
   z-index: 10;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
+  width: min(calc(100% - 20px), 620px);
 }
 
-#jump-keys { display: flex; flex-direction: column; gap: 4px; }
-body.keys-off #jump-keys { display: none; }
-
 #jump-bar button {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   gap: 1px;
-  width: 62px;
-  height: 58px;
-  padding: 3px;
+  height: 44px;
+  padding: 2px 3px;
   font-size: 0.64rem;
   line-height: 1.15;
-  font-weight: 600;
+  font-weight: 650;
   text-align: center;
-  white-space: nowrap;
   border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
   color: var(--ink);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -1334,50 +1306,21 @@ body.keys-off #jump-keys { display: none; }
 }
 
 #jump-bar button:hover { background: #fff; }
-
-#jump-bar .jump-grid { display: flex; flex-direction: column; gap: 4px; }
-#jump-bar .jump-world { height: 40px; }
-
-#jump-bar .jump-lines { display: contents; }
-#jump-bar .jump-name { display: none; }
-#jump-bar kbd { order: 0; font-size: 0.78rem; padding: 0 4px; }
-#jump-bar button[data-key]::after { content: attr(data-short); order: 1; }
-
-#jump-bar .jump-sub {
-  order: 2;
-  font-size: 0.58rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-/* "Central America" is wider than the cap it is printed on */
-#jump-bar .jump-sub .wide { display: none; }
-
-/* ▸ marks the floor the next tap takes you to */
-#jump-bar .jump-name::before,
-#jump-bar .jump-sub::before {
-  content: "";
-  display: inline-block;
-  width: 0;
-  color: #b07d12;
-}
-
-/* the two-floors hint lives in the help panel; a cap has no room for it */
-#jump-bar .jump-hint { display: none; }
 #jump-bar button:active { transform: translateY(1px); }
+#jump-bar kbd { font-size: 0.64rem; padding: 0 4px; }
+#jump-bar .jump-to {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (pointer: coarse) { #jump-bar kbd { display: none; } }
 
 /* the key you're standing on, and which floor of it */
-#jump-bar button.armed,
-#jump-bar button.deep { background: #fff3d0; border-color: #e7b95a; }
-
-#jump-bar button.armed .jump-name,
-#jump-bar button.deep .jump-sub { color: #7a5200; font-weight: 800; }
-#jump-bar button.armed .jump-sub,
-#jump-bar button.deep .jump-name { color: #a8874a; }
-
-#jump-bar button.armed .jump-sub::before,
-#jump-bar button.deep .jump-name::before { content: "▸"; width: 7px; }
-
+#jump-bar button.armed { background: #fff3d0; border-color: #e7b95a; }
 #jump-bar button.deep { background: #ffe1a0; border-color: #d99b28; }
+#jump-bar button.armed .jump-to,
+#jump-bar button.deep .jump-to { color: #7a5200; font-weight: 800; }
 
 /* where that key just put you — a beat of confirmation, then gone */
 #jump-flash {
@@ -1409,15 +1352,6 @@ body.keys-off #jump-keys { display: none; }
   100% { opacity: 0; }
 }
 
-/* the show/hide chip, under the column */
-#jump-bar #jump-toggle {
-  height: 28px;
-  padding: 0;
-  font-size: 0.95rem;
-  border-radius: 9px;
-}
-body.keys-off #jump-toggle { opacity: 0.85; }
-
 /* place mode: the target row pulses whenever the name changes */
 #bank-target { border-radius: 10px; padding: 3px 8px; margin: -3px -8px; }
 #bank-target.switch { animation: targetSwitch 0.8s ease-out; }
@@ -1427,77 +1361,18 @@ body.keys-off #jump-toggle { opacity: 0.85; }
   100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
 }
 
-/* ————— touch & small screens —————
-
-   No keyboard, so the same 1 2 3 / Q W E layer becomes a pad of key-caps
-   docked bottom-left, in reach of a thumb; the card, the word bank and
-   the zoom column all sit above whatever it reserves (--keys-h), which
-   drops to just the toggle chip when it's folded away.
-
-   Width alone missed the case that hurt most: a big phone held sideways
-   is ~915px wide, so it was getting the desktop bar — a 456x125 slab of
-   chips over a screen barely 340px tall once the browser's own bars have
-   taken their cut. Short and touched counts as a phone too. */
-@media (max-width: 900px), (max-height: 560px) and (pointer: coarse) {
-  :root { --keys-h: 120px; }
-  body.keys-off { --keys-h: 48px; }
-
-  #jump-bar {
-    top: auto;
-    left: calc(10px + var(--safe-l));
-    bottom: calc(10px + var(--safe-b));
-    flex-direction: row;
-    align-items: flex-end;
-  }
-
-  #jump-keys { flex-direction: row; align-items: stretch; }
-  /* the six keys keep the keyboard's shape here: 1 2 3 over Q W E */
-  #jump-bar .jump-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
-  #jump-bar .jump-world { width: 46px; height: auto; }
-  #jump-bar #jump-toggle { width: 42px; height: 40px; font-size: 1.05rem; border-radius: 11px; }
-
-  /* The zoom column stood on the right edge, and every fit had to keep
-     64px clear of it — a sixth of a phone's width, down the whole height
-     of the map, for three buttons. It docks in the corner beside the pad
-     instead, inside the band the pad already costs, and the map gets its
-     right edge back (updateSafe). With the pad up, the 0 key is the reset
-     button; with it folded there is room for all three in a row. */
-  #zoom-controls {
-    top: auto;
-    right: calc(10px + var(--safe-r));
-    bottom: calc(10px + var(--safe-b));
-    gap: 6px;
-  }
-  body:not(.keys-off) #zoom-reset { display: none; }
-  body.keys-off #zoom-controls { flex-direction: row; }
-}
-
-/* too narrow for the pad and the zoom column side by side — a pinch does
-   the same job */
-@media (max-width: 349px) {
-  body:not(.keys-off) #zoom-controls { display: none; }
-}
-
-/* phone landscape: height is the scarce axis, so the caps go to one row
-   of bare glyphs and the card gives back the padding it can spare */
+/* phone landscape: height is the scarce axis, so the jump row drops to
+   one line per label and the card gives back the padding it can spare */
 @media (max-width: 900px) and (max-height: 560px), (max-height: 560px) and (pointer: coarse) {
-  :root { --keys-h: 56px; }
-  #jump-bar .jump-grid { grid-template-columns: repeat(6, 1fr); }
-  #jump-bar .jump-grid button,
-  #jump-bar .jump-world { width: 40px; height: 40px; }
-  #jump-bar button[data-key]::after,
-  #jump-bar .jump-sub { display: none; }
-  #jump-bar #jump-toggle { height: 40px; }
-  #zoom-controls { flex-direction: row; }
-  #zoom-controls button { width: 40px; height: 40px; }
+  :root { --keys-h: 46px; }
+  #jump-bar button { height: 36px; font-size: 0.6rem; }
+  #jump-bar .jump-to { -webkit-line-clamp: 1; }
 
   #card { padding: 11px 14px; }
   #card-prompt { margin-bottom: 8px; font-size: 0.92rem; }
   #guess-input, #guess-btn { padding: 8px 12px; }
   #card-actions { margin-top: 8px; }
   #bank-chips { max-height: 22vh; }
-  /* leave the zoom column its corner */
-  #word-bank { width: min(720px, calc(100% - 120px)); }
 }
 
 @media (max-width: 640px) {
@@ -1510,7 +1385,7 @@ body.keys-off #jump-toggle { opacity: 0.85; }
   #level-timer { font-size: 0.95rem; }
   /* The find bar is one row on a phone. It was three — the target, the
      buttons wrapped under it, a line of instructions — 128px of a map
-     that has the jump pad under it already, and every fit frames above
+     that has the jump keys under it already, and every fit frames above
      whatever this measures. The buttons keep their glyphs and lose their
      words; "FIND" goes (the mode says so); the instructions go, and the
      hit/miss line floats above the bar instead of holding a row open for

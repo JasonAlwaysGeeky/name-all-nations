@@ -25,32 +25,44 @@ test.describe('what the bottom of a phone costs the map', () => {
     const bar = await page.locator('#word-bank').boundingBox();
     expect(bar.height).toBeLessThan(60);
 
-    // …and, with the pad under it, that is all the bottom costs the map.
-    expect(await page.evaluate(() => window.NAN_DEBUG.SAFE.bottom)).toBeLessThan(200);
+    // …and, with the jump keys under it, that is all the bottom costs the
+    // map. The safe area is re-read a frame after anything docked there
+    // changes size, so give it that frame; and if it is still wrong, say
+    // what was measured.
+    const bottom = () => page.evaluate(() => {
+      const D = window.NAN_DEBUG, map = document.getElementById('map').getBoundingClientRect();
+      const rect = id => { const e = document.getElementById(id); return e.hidden ? 'hidden' : [Math.round(e.getBoundingClientRect().top - map.top), Math.round(e.getBoundingClientRect().height)]; };
+      return { bottom: D.SAFE.bottom, size: D.size(), map: Math.round(map.height), bank: rect('word-bank'), keys: rect('jump-bar'), card: rect('card'), hc: rect('hardcore-bar') };
+    });
+    await expect.poll(async () => (await bottom()).bottom, { timeout: 2000, message: JSON.stringify(await bottom()) }).toBeLessThan(200);
   });
 });
 
-test.describe('the desktop jump keys', () => {
-  test.use({ viewport: SCREENS['a laptop'] });
+for (const [label, viewport] of Object.entries({ 'a laptop': SCREENS['a laptop'], 'a portrait phone': SCREENS['a portrait phone'] })) {
+  test.describe(label, () => {
+    test.use({ viewport });
 
-  test('run down the left edge, outside the safe area, and cost it no height', async ({ page }) => {
-    await page.goto('/');
-    await page.locator('#hello-close').click();
-    await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
+    test('the jump keys are one short row along the bottom, outside the safe area', async ({ page }) => {
+      await page.goto('/');
+      await page.locator('#hello-close').click();
+      await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 
-    const r = await page.evaluate(() => ({
-      left: window.NAN_DEBUG.SAFE.left,
-      top: window.NAN_DEBUG.SAFE.top,
-      keys: document.getElementById('jump-bar').getBoundingClientRect().right - document.getElementById('map').getBoundingClientRect().left,
-    }));
-    expect(r.left).toBeGreaterThanOrEqual(r.keys);
-    expect(r.left).toBeLessThan(100);
-    expect(r.top).toBe(60);
-
-    await page.locator('#jump-toggle').click();
-    await expect(page.locator('#jump-keys')).toBeHidden();
+      const r = await page.evaluate(() => {
+        const bar = document.getElementById('jump-bar').getBoundingClientRect();
+        const map = document.getElementById('map').getBoundingClientRect();
+        return {
+          keys: document.querySelectorAll('#jump-bar button').length,
+          barH: bar.height,
+          below: map.bottom - bar.top,
+          bottom: window.NAN_DEBUG.SAFE.bottom,
+        };
+      });
+      expect(r.keys).toBe(6);
+      expect(r.barH).toBeLessThan(50);
+      expect(r.bottom).toBeGreaterThanOrEqual(r.below);
+    });
   });
-});
+}
 
 // The Middle East's buttons were spaced by search so that none pair up
 // from the zone's minScale on — which is what lets a phone's dive land on

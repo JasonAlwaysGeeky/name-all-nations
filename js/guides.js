@@ -65,7 +65,7 @@
     .gd-row span:first-child { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
     .gd-row .n { font-variant-numeric: tabular-nums; color: #4a5b70; }
     .gd-row.over .n:last-child { color: #d00000; font-weight: 700; }
-    @media (min-width: 901px) { #gd-panel { left: auto; right: 72px; } }
+    @media (min-width: 901px) { #gd-panel { left: auto; right: 12px; } }
     #gd-out[hidden] { display: none; }
     #gd-out { display: block; width: 100%; height: 150px; margin-top: 6px; box-sizing: border-box; font: 11px/1.35 ui-monospace, monospace; }
   `;

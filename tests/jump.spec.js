@@ -76,6 +76,23 @@ test('Shift works on the number keys, whatever the shifted digit arrives as', as
   await expect(page.locator('#jump-flash')).toHaveText(/Middle East/);
 });
 
+test('each key says where its next tap goes', async ({ page }) => {
+  await boot(page);
+  const key = page.locator('#jump-bar button[data-key="2"]');
+  const label = key.locator('.jump-to');
+
+  await expect(label).toHaveText('Europe');
+  await page.keyboard.press('2');                 // standing on the area: the next tap dives
+  await expect(label).toHaveText('Micro-states');
+  await expect(key).toHaveClass(/armed/);
+  await page.keyboard.press('2');                 // standing in the pocket: the next tap climbs out
+  await expect(label).toHaveText('Europe');
+  await expect(key).toHaveClass(/deep/);
+  await page.keyboard.press('0');                 // the world: nowhere in particular
+  await expect(key).not.toHaveClass(/armed|deep/);
+  await expect(label).toHaveText('Europe');
+});
+
 test('shift-clicking a jump button does the same as the Shift key', async ({ page }) => {
   await boot(page);
 

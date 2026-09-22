@@ -67,9 +67,9 @@ on the device you care about — drag the boxes, tap the jump keys to check
 the landing, then **Copy** and paste the table back over `VIEW_BOXES`. A
 dive into a dense zone unfolds that zone wherever it lands; a row marked
 ⚠ lands below the zoom the zone's buttons were spaced for, so a pair of
-them may merge there. The jump keys are the same 62px caps on every
-screen — a column down the left edge on a desktop, a row along the bottom
-on a phone — and sit outside the safe area either way.
+them may merge there. The jump keys are one row along the bottom on every
+screen, each saying where its next tap goes, and sit outside the safe
+area; the sides are bare.
 
 ## Challenges
 
