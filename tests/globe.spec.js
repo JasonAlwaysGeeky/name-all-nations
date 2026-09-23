@@ -9,7 +9,7 @@ const dlon = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
 
 test('a drag keeps the grabbed point under the pointer', async ({ page }) => {
   await page.goto('/globe.html');
-  await expect(page.locator('#hud')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!window.GLOBE)).toBe(true);
 
   const box = await page.locator('#globe').boundingBox();
   const r = await page.evaluate(() => window.GLOBE_DEBUG.view.r);

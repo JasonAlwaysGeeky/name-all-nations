@@ -72,6 +72,17 @@ them may merge there. The jump keys are one row along the bottom on every
 screen, each saying where its next tap goes, and sit outside the safe
 area; the sides are bare.
 
+### The globe
+
+`globe.html` draws the same borders as a turning globe (canvas; every
+frame re-projects) and runs enough of the game on it to judge the feel:
+name and place modes over the world or a region, the small countries'
+buttons and the zones they fold into, and the jump keys landing on the
+same boxes as the map, at the same zoom read at the middle of the view.
+Dragging holds the point under your finger, as the map does; past the
+rim it turns by rate. It is an experiment, not a mode: no clock, no
+stats, nothing saved.
+
 ## Challenges
 
 The 🎯 button lists the whole world, each continent, and 21 bite-size

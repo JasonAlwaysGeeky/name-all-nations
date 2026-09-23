@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1c4b7a">
-  <title>Globe experiment — Name All Nations</title>
+  <title>Globe — Name All Nations</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* The experiment's own chrome. Everything that decides how the globe
-       looks lives in css/style.css with the flat map's, so the two are
-       being judged on the same palette. */
+    /* The globe's own chrome. Everything the game puts on screen — the
+       jump row, the card, the find bar, the pops — is the flat map's
+       markup under the flat map's stylesheet, so the two are judged on
+       the same furniture. */
     body { display: flex; flex-direction: column; }
     #globe-wrap {
       position: relative;
@@ -24,37 +25,16 @@
     #globe.turning { cursor: grabbing; }
     #pick { display: none; }
 
-    #hud {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      width: min(760px, calc(100% - 24px));
-      background: var(--panel-bg);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-lg);
-      padding: 11px 14px;
-      z-index: 5;
-    }
-    #hud[hidden] { display: none; }
-    #readout { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
-    #fps {
-      margin-top: 4px;
-      font: 600 0.74rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      color: var(--ink-soft);
-    }
-    .hud-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
-    .hud-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--ink-soft); }
     #back {
       position: absolute;
-      left: 14px;
+      left: 12px;
       top: calc(12px + env(safe-area-inset-top, 0px));
-      z-index: 6;
+      z-index: 16;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 7px 12px;
-      font-size: 0.82rem;
+      padding: 7px 11px;
+      font-size: 0.8rem;
       font-weight: 650;
       text-decoration: none;
       color: var(--ink);
@@ -63,21 +43,29 @@
       background: rgba(255, 255, 255, 0.85);
       box-shadow: var(--shadow-sm);
     }
-    #note {
+    /* what each frame costs, for the experiment's sake */
+    #fps {
       position: absolute;
-      right: 14px;
+      right: 12px;
       top: calc(12px + env(safe-area-inset-top, 0px));
       z-index: 6;
-      max-width: 240px;
-      font-size: 0.72rem;
-      line-height: 1.5;
+      max-width: 38vw;
+      font: 600 0.64rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       color: #16324c;
-      background: rgba(255, 255, 255, 0.82);
-      border-radius: 10px;
-      padding: 8px 11px;
-      box-shadow: var(--shadow-sm);
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: 8px;
+      padding: 5px 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    @media (max-width: 640px) { #note { display: none; } }
+    @media (max-width: 640px) { #fps { display: none; } }
+
+    /* the banner is the game's; here the title is the level picker */
+    #level-banner { left: 50%; transform: translateX(-50%); max-width: calc(100% - 200px); }
+    @media (max-width: 640px) {
+      #level-banner { left: 50%; transform: translateX(-50%); max-width: calc(100% - 180px); }
+    }
   </style>
 </head>
 <body>
@@ -86,26 +74,69 @@
     <canvas id="globe"></canvas>
     <canvas id="pick"></canvas>
 
-    <a id="back" href="index.html">‹ back to the game</a>
+    <a id="back" href="index.html">‹ flat map</a>
+    <div id="fps"></div>
 
-    <p id="note">
-      Experiment, not a mode yet: this draws the real borders as a globe and
-      shows what each frame costs. Drag to turn it, scroll or pinch to zoom,
-      click a country to name it. Nothing here is scored.
-    </p>
-
-    <div id="hud" hidden>
-      <div id="readout">loading the map…</div>
-      <div id="fps"></div>
-      <div class="hud-row">
-        <label><input type="checkbox" id="detail"> fine borders (normally automatic, on settle)</label>
-        <label><input type="checkbox" id="grid" checked> graticule</label>
-        <label><input type="checkbox" id="spin-toggle"> spin (a steady worst case for the frame counter)</label>
-      </div>
+    <div id="level-banner">
+      <button id="progress-wrap" title="Next challenge">
+        <span id="level-title">The whole world</span>
+        <span id="progress-text">0 / 195</span>
+      </button>
+      <button id="level-mode" title="Switch mode">Place</button>
     </div>
+
+    <!-- one row, one label each: where the next tap goes (globe-play.js) -->
+    <nav id="jump-bar" aria-label="Jump around the globe">
+      <button data-key="1" data-area="N. America" data-pocket="Central America"><kbd>1</kbd><span class="jump-to">N. America</span></button>
+      <button data-key="q" data-area="S. America" data-pocket="Caribbean"><kbd>Q</kbd><span class="jump-to">S. America</span></button>
+      <button data-key="2" data-area="Europe" data-pocket="Micro-states"><kbd>2</kbd><span class="jump-to">Europe</span></button>
+      <button data-key="w" data-area="Africa" data-pocket="West coast"><kbd>W</kbd><span class="jump-to">Africa</span></button>
+      <button data-key="3" data-area="Asia" data-pocket="Middle East"><kbd>3</kbd><span class="jump-to">Asia</span></button>
+      <button data-key="e" data-area="South Asia" data-pocket="Pacific isles"><kbd>E</kbd><span class="jump-to">South Asia</span></button>
+    </nav>
+
+    <section id="card" class="panel" hidden>
+      <button id="card-close" aria-label="Close">×</button>
+      <div id="card-question">
+        <p id="card-prompt">What country is this?</p>
+        <form id="guess-form" autocomplete="off">
+          <input id="guess-input" type="text" autocomplete="off" autocapitalize="words"
+                 spellcheck="false" placeholder="Type its name…" aria-label="Country name guess">
+          <button type="submit" id="guess-btn">Guess</button>
+        </form>
+        <p id="feedback" role="status"></p>
+        <div id="card-actions">
+          <button id="reveal-btn">Reveal</button>
+        </div>
+      </div>
+      <div id="card-answer" hidden>
+        <p id="answer-result"></p>
+        <h2 id="answer-name"></h2>
+      </div>
+    </section>
+
+    <section id="word-bank" hidden>
+      <div id="bank-target">
+        <span id="bank-find">Find</span>
+        <span id="bank-flag"></span>
+        <strong id="bank-name"></strong>
+        <span id="bank-strikes" aria-label="Wrong tries"></span>
+        <span class="bank-buttons">
+          <button id="bank-skip" title="Skip for now (Space)" aria-label="Skip">⏭<span class="lbl"> Skip</span></button>
+          <button id="bank-show" title="Show me where it is (counts as a miss)" aria-label="Show me">👁<span class="lbl"> Show me</span></button>
+          <button id="bank-collapse" title="Show / hide the list" aria-label="Toggle list">▾</button>
+        </span>
+      </div>
+      <p id="bank-hint"></p>
+      <div id="bank-chips"></div>
+    </section>
   </div>
 
   <script src="js/countries.js"></script>
+  <script src="js/targets.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/names.js"></script>
   <script src="js/globe.js"></script>
+  <script src="js/globe-play.js"></script>
 </body>
 </html>

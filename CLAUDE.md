@@ -34,6 +34,15 @@ server, so the Browser pane can start it directly.
   area that must be on screen. One rule fits them (tightest zoom that holds
   the box in the safe area), so a wrong view is a box to drag, not code.
   `?guides` loads `js/guides.js`, the on-map editor that sets them by eye
+- `js/names.js` — does a guess name this country: normalise, typo budget,
+  the phonetic pass for the mic. Shared by the flat map and the globe
+- `js/globe.js` + `js/globe-play.js` + `globe.html` — the globe: a canvas
+  renderer over the same borders (every frame re-projects; nothing is
+  transformed) with the flat map's gesture on a sphere, and a cut-down copy
+  of the game loop on top — name and place, the buttons and zones, the jump
+  keys on the same boxes — enough to judge how it plays. Not a mode of the
+  game yet; nothing there is scored or saved
+- `flags/` — the 195 flags, SVG, from flag-icons (MIT). Cache-first like `map/`
 - `map/` — the simplified amCharts world map, plus the 1.4MB full-detail
   version fetched lazily for deep zoom
 - `sw.js` — offline play. **Network-first for app code on purpose**, so a

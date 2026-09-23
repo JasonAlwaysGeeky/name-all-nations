@@ -26,6 +26,7 @@ const CORE = [
   './js/countries.js',
   './js/targets.js',
   './js/views.js',
+  './js/names.js',
   './map/world.svg',
   './map/world-lo.json',
   './manifest.webmanifest',

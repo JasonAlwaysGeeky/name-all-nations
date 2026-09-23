@@ -67,6 +67,11 @@
   const FLING_MAX = 5;         // px/ms cap on the launch speed
   const FLING_WINDOW = 90;     // ms of recent movement the launch speed is measured over
   const TAP_SLOP = { mouse: 5, pen: 8, touch: 10 };   // px of movement still counted as a tap
+  // Past this share of the radius the grabbed point has no honest place
+  // to be (a finger off the disc is off the planet), so a drag out there
+  // turns the globe by rate instead, and takes the point back up when the
+  // finger comes back over it.
+  const RATE_EDGE = 0.95;
   const HIT_PAD = 11;          // px of click padding around a country
   const LOD_HI_R = 900;        // above this radius, the fine borders are worth it
   const RING_MIN_PX = 0.6;     // rings smaller than this on screen are skipped
@@ -87,8 +92,21 @@
   let needsDraw = true;
   let settleTimer = null;
 
+  // ————— what the game paints —————
+  //
+  // The renderer knows nothing about the game; the game (globe-play.js)
+  // sets these and draws its own things over the top.
+  const status = {};           // code -> named | placed | missed | revealed
+  const flashes = new Map();   // code -> a fill to show for a moment
+  let dimTo = null;            // the codes in play; everything else fades back
+  let drawHook = null;         // called over the finished globe every frame
+  let tapHook = null;          // first look at a tap, before the countries
+  let countryHook = null;      // a tap that reached a country (or the ocean)
+  let anim = null;             // a camera flight in progress
+  let centre = null;           // where the disc is centred, when not the canvas middle
+
   const el = {};
-  for (const id of ['globe', 'pick', 'hud', 'readout', 'fps', 'detail', 'grid', 'spin-toggle']) {
+  for (const id of ['globe', 'pick', 'fps', 'readout']) {
     el[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id);
   }
   const ctx = el.globe.getContext('2d');
@@ -241,13 +259,42 @@
   const FILL = {
     land: colour('--land', '#f5edd6'),
     territory: colour('--territory', '#cdc7b9'),
+    dim: '#e6e0d2',
     selected: colour('--selected', '#ffca57'),
     hover: colour('--hover', '#ffe1a0'),
+    named: colour('--named', '#7fd08c'),
+    placed: colour('--placed', '#8cc1ec'),
+    missed: colour('--missed', '#f2b95c'),
+    revealed: colour('--revealed', '#f2b95c'),
+    'flash-good': '#2ee86a',
+    'flash-bad': '#e98980',
+    'flash-show': '#fff176',
   };
   const STROKE = {
     land: colour('--land-stroke', '#8a7d5f'),
     territory: colour('--territory-stroke', '#a59e8c'),
+    dim: '#b9b2a3',
+    selected: colour('--selected-stroke', '#b9821a'),
+    named: colour('--named-stroke', '#3f8f4e'),
+    placed: colour('--placed-stroke', '#3b78b8'),
+    missed: colour('--missed-stroke', '#c98f2e'),
+    revealed: colour('--revealed-stroke', '#c98f2e'),
   };
+
+  // The same order of precedence as the flat map's classes: a flash on
+  // top of everything, then the selection, the hover, what the game has
+  // decided about the country, and last what it is.
+  function paint(code) {
+    const playable = isCountry.has(code);
+    const st = status[code];
+    if (flashes.has(code)) return { fill: FILL[flashes.get(code)], stroke: STROKE[st] || STROKE.land };
+    if (code === selected) return { fill: FILL.selected, stroke: STROKE.selected };
+    if (code === hovered && playable && (!dimTo || dimTo.has(code))) return { fill: FILL.hover, stroke: STROKE[st] || STROKE.land };
+    if (st) return { fill: FILL[st], stroke: STROKE[st] };
+    if (!playable) return { fill: FILL.territory, stroke: STROKE.territory };
+    if (dimTo && !dimTo.has(code)) return { fill: FILL.dim, stroke: STROKE.dim };
+    return { fill: FILL.land, stroke: STROKE.land };
+  }
 
   function draw() {
     const cam = camera();
@@ -290,12 +337,10 @@
         any = true;
       }
       if (any) {
-        const playable = isCountry.has(code);
-        ctx.fillStyle = code === selected ? FILL.selected
-          : code === hovered && playable ? FILL.hover
-            : playable ? FILL.land : FILL.territory;
+        const p = paint(code);
+        ctx.fillStyle = p.fill;
         ctx.fill();
-        ctx.strokeStyle = playable ? STROKE.land : STROKE.territory;
+        ctx.strokeStyle = p.stroke;
         ctx.stroke();
       }
       i = j;
@@ -307,6 +352,8 @@
     ctx.strokeStyle = 'rgba(20, 55, 90, 0.35)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    if (drawHook) drawHook(ctx, cam);
   }
 
   // Meridians and parallels every 30°, so the globe reads as a turning
@@ -419,6 +466,16 @@
 
     if (autoSpin && !moving) { view.lam += 0.0022; needsDraw = true; }
 
+    // a flight: the same ease the flat map's animateView uses
+    if (anim) {
+      const k = Math.min(1, (now - anim.t0) / anim.ms), e = 1 - Math.pow(1 - k, 3);
+      view.lam = anim.from.lam + anim.dlam * e;
+      view.phi = clampPhi(anim.from.phi + (anim.to.phi - anim.from.phi) * e);
+      view.r = anim.from.r + (anim.to.r - anim.from.r) * e;
+      needsDraw = true;
+      if (k >= 1) { anim = null; scheduleSettle(); }
+    }
+
     // momentum, decaying by e every FLING_TAU
     if (!moving && (spin.vlam || spin.vphi)) {
       const dt = Math.min(50, now - spin.at);
@@ -447,7 +504,7 @@
     // frame of a gesture has to land whatever the throttle says —
     // otherwise the numbers on screen are the second-to-last frame's,
     // which is exactly when someone is reading them.
-    const busy = autoSpin || spin.vlam || spin.vphi || needsDraw;
+    const busy = autoSpin || spin.vlam || spin.vphi || needsDraw || anim;
     hud(!busy);
     if (busy) request();
   }
@@ -459,6 +516,7 @@
 
   let hudAt = 0;
   function hud(force) {
+    if (!el.fps) return;
     const now = performance.now();
     if (!force && now - hudAt < 200) return;
     hudAt = now;
@@ -514,8 +572,9 @@
       const c = centroidOf(pts);
       const l = local(c);
       gest = {
-        a: unproject(l.x, l.y), cx: c.x, cy: c.y,
+        a: unproject(l.x, l.y), cx: c.x, cy: c.y, lx: c.x, ly: c.y,
         spread: spreadOf(pts, c), r: view.r,
+        rate: Math.hypot(l.x - view.cx, l.y - view.cy) > RATE_EDGE * view.r,
         moved: gest ? gest.moved : false,
         type: gest ? gest.type : 'touch',
         noTap: gest ? gest.noTap : false,
@@ -553,6 +612,7 @@
       // tap on whatever happened to turn under the finger.
       const caught = spin.vlam !== 0 || spin.vphi !== 0;
       spin.vlam = spin.vphi = 0;
+      anim = null;
       try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic / stale pointer */ }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
@@ -597,7 +657,19 @@
       }
       setRadius(r);
       const l = local(c);
-      aim(gest.a, l.x, l.y);
+      if (Math.hypot(l.x - view.cx, l.y - view.cy) > RATE_EDGE * view.r) {
+        // Out past the rim: turn by the finger's travel, a radian per
+        // radius, which is what holding on would mean near the centre.
+        gest.rate = true;
+        view.lam -= (c.x - gest.lx) / view.r;
+        view.phi = clampPhi(view.phi + (c.y - gest.ly) / view.r);
+      } else {
+        // Back over the planet: take hold of what is under the finger
+        // now, so nothing jumps, and hold it from here.
+        if (gest.rate) anchorGesture();
+        aim(gest.a, l.x, l.y);
+      }
+      gest.lx = c.x; gest.ly = c.y;
       if (pts.length === 1) sample();
       else trail.length = 0;      // don't fling out of a pinch
       invalidate();
@@ -624,7 +696,7 @@
         if (v) startSpin(v.vlam, v.vphi);
       }
       trail.length = 0;
-      if (wasTap && tap) pick(tap.x, tap.y);
+      if (wasTap && tap && !(tapHook && tapHook(tap.x, tap.y))) pick(tap.x, tap.y);
       spin.at = performance.now();
       scheduleSettle();
       request();
@@ -634,6 +706,7 @@
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      anim = null;
       const rect = canvas.getBoundingClientRect();
       zoomAt(e.clientX - rect.left, e.clientY - rect.top,
         Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)));
@@ -641,14 +714,6 @@
       scheduleSettle();
       invalidate();
     }, { passive: false });
-
-    el.detail.addEventListener('change', () => {
-      lod = el.detail.checked ? 'hi' : 'lo';
-      geom = built[lod] || geom;
-      invalidate();
-    });
-    el.grid.addEventListener('change', () => { showGrid = el.grid.checked; invalidate(); });
-    el.spinToggle.addEventListener('change', () => { autoSpin = el.spinToggle.checked; request(); });
 
     addEventListener('resize', measure);
   }
@@ -774,9 +839,64 @@
 
   function pick(x, y) {
     const code = codeAt(x, y);
+    if (countryHook) { countryHook(code, x, y); return; }
     selected = code;
-    el.readout.textContent = code ? (nameOf[code] || code) : 'ocean';
+    if (el.readout) el.readout.textContent = code ? (nameOf[code] || code) : 'ocean';
     invalidate();
+  }
+
+  // ————— what the game is given —————
+
+  // A point on the globe, on screen: canvas coordinates, and whether it
+  // faces the camera at all.
+  function project(lon, lat) {
+    const cam = camera();
+    const la = lat * D2R, lo = lon * D2R;
+    const ca = Math.cos(la), sa = Math.sin(la);
+    const cd = Math.cos(lo) * cam.cl + Math.sin(lo) * cam.sl, sd = Math.sin(lo) * cam.cl - Math.cos(lo) * cam.sl;
+    return {
+      x: cam.cx + cam.r * ca * sd,
+      y: cam.cy - cam.r * (cam.cp * sa - cam.sp * ca * cd),
+      front: cam.sp * sa + cam.cp * ca * cd >= 0,
+    };
+  }
+
+  // Where to look for a country: the middle of its biggest ring, which
+  // is its biggest landmass — the flat map's focusPoint, on a sphere.
+  const focusOf = {};
+  function focus(code) {
+    if (focusOf[code]) return focusOf[code];
+    const g = built.hi || geom;
+    let best = -1, at = null;
+    for (let i = 0; i < g.rings; i++) {
+      if (g.ringCode[i] !== code || g.capSin[i] <= best) continue;
+      best = g.capSin[i];
+      at = { lon: Math.atan2(g.capY[i], g.capX[i]) * R2D, lat: Math.asin(Math.max(-1, Math.min(1, g.capZ[i]))) * R2D };
+    }
+    return (focusOf[code] = at);
+  }
+
+  // The flat map's zoom, px per map unit, for this radius: a map unit is
+  // 1/PXK of a degree of longitude, and at the equator a degree is
+  // r·π/180 px across. Every rule the game states in that unit — when a
+  // button retires, when a zone unfolds — reads the same here.
+  const scaleOf = (r) => r * (Math.PI / 180) / PXK;
+  const radiusOf = (s) => s * PXK / (Math.PI / 180);
+
+  function animateTo(to, ms = 260) {
+    spin.vlam = spin.vphi = 0;
+    const target = { lam: to.lon * D2R, phi: clampPhi(to.lat * D2R), r: Math.max(MIN_R, Math.min(MAX_R, to.r)) };
+    if (ms <= 0) { view.lam = target.lam; view.phi = target.phi; view.r = target.r; anim = null; invalidate(); scheduleSettle(); return; }
+    const dl = target.lam - view.lam;
+    anim = { from: { lam: view.lam, phi: view.phi, r: view.r }, to: target, dlam: Math.atan2(Math.sin(dl), Math.cos(dl)), t0: performance.now(), ms };
+    useCoarseWhileMoving();
+    request();
+  }
+
+  function flash(code, kind, ms) {
+    flashes.set(code, kind);
+    invalidate();
+    setTimeout(() => { if (flashes.get(code) === kind) { flashes.delete(code); invalidate(); } }, ms);
   }
 
   // ————— boot —————
@@ -787,7 +907,8 @@
     W = Math.round(rect.width); H = Math.round(rect.height);
     el.globe.width = Math.round(W * dpr); el.globe.height = Math.round(H * dpr);
     el.globe.style.width = `${W}px`; el.globe.style.height = `${H}px`;
-    view.cx = W / 2; view.cy = H / 2;
+    view.cx = centre ? centre.x : W / 2;
+    view.cy = centre ? centre.y : H / 2;
     if (!view.r) view.r = Math.min(W, H) * 0.42;
     pickDirty = true;
     invalidate();
@@ -833,14 +954,32 @@
       settled: () => !moving && !spin.vlam && !spin.vphi,
       unproject, aim, invalidate,
     };
+    // What the game layer (globe-play.js) gets to work with.
+    window.GLOBE = {
+      view, status, project, focus, unproject, codeAt, animateTo, flash, invalidate, scaleOf, radiusOf,
+      size: () => ({ W, H }),
+      scale: () => scaleOf(view.r),
+      lonLat: (x, y) => ({ lon: lonAt(x), lat: latAt(y) }),     // map units → degrees
+      mapXY: (lon, lat) => ({ x: PX0 + PXK * lon, y: PY0 - PYK * Math.log(Math.tan(Math.PI / 4 + lat * D2R / 2)) }),
+      lonLatOf: (p) => ({ lon: Math.atan2(p.y, p.x) * R2D, lat: Math.asin(Math.max(-1, Math.min(1, p.z))) * R2D }),
+      isCountry: (code) => isCountry.has(code),
+      select: (code) => { selected = code; invalidate(); },
+      dim: (codes) => { dimTo = codes ? new Set(codes) : null; invalidate(); },
+      centreAt: (x, y) => { centre = x == null ? null : { x, y }; measure(); },
+      onDraw: (fn) => { drawHook = fn; invalidate(); },
+      onTap: (fn) => { tapHook = fn; },
+      onCountry: (fn) => { countryHook = fn; },
+      settled: () => !moving && !spin.vlam && !spin.vphi && !anim,
+    };
     measure();
     bind();
-    el.hud.hidden = false;
-    el.readout.textContent = `ready — ${built.lo.verts.toLocaleString()} coarse / ${built.hi.verts.toLocaleString()} fine points, prepared in ${buildMs.toFixed(0)}ms`;
+    if (el.readout) el.readout.textContent = `ready — ${built.lo.verts.toLocaleString()} coarse / ${built.hi.verts.toLocaleString()} fine points, prepared in ${buildMs.toFixed(0)}ms`;
     request();
+    dispatchEvent(new Event('globe-ready'));
   }
 
   boot().catch((err) => {
-    el.readout.textContent = `could not load the map (${err.message})`;
+    if (el.readout) el.readout.textContent = `could not load the map (${err.message})`;
+    console.error(err);
   });
 })();
