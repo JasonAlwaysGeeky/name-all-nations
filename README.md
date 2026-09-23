@@ -25,8 +25,9 @@ map, **you click a country and name it**.
   level one (learn the region), Name mode is the real test.
 - Scroll/pinch to zoom, drag to pan. The hotkeys lay the world out on
   your keyboard: `1` `2` `3` across the north (N. America · Europe ·
-  Asia), `Q` `W` `E` across the south (S. America · Africa · India-to-
-  New-Zealand), `0` the whole world. Tap the same key again to dive into
+  Asia), `Q` `W` `E` across the south (S. America · Africa · South Asia,
+  India across to New Zealand), `0` the whole world; the row of buttons
+  along the bottom runs west to east, 1 Q 2 W 3 E. Tap the same key again to dive into
   that area's dense pocket — Central America, the micro-states, the
   Middle East, the Caribbean, the West African coast, the Pacific
   islands — and again to come back out. `[` / `]` step through

@@ -25,14 +25,15 @@
     <!-- the challenge's progress, as a hairline along the very top edge -->
     <div id="progress-bar"><span id="progress-fill"></span></div>
 
-    <!-- one row, one label each: where the next tap goes (see markJumpKeys) -->
+    <!-- one row, one label each: where the next tap goes (see markJumpKeys).
+         West to east, each keyboard column in turn: 1 over Q, 2 over W, 3 over E. -->
     <nav id="jump-bar" aria-label="Jump around the map">
       <button data-key="1" data-area="N. America" data-pocket="Central America"><kbd>1</kbd><span class="jump-to">N. America</span></button>
-      <button data-key="2" data-area="Europe" data-pocket="Micro-states"><kbd>2</kbd><span class="jump-to">Europe</span></button>
-      <button data-key="3" data-area="Asia" data-pocket="Middle East"><kbd>3</kbd><span class="jump-to">Asia</span></button>
       <button data-key="q" data-area="S. America" data-pocket="Caribbean"><kbd>Q</kbd><span class="jump-to">S. America</span></button>
+      <button data-key="2" data-area="Europe" data-pocket="Micro-states"><kbd>2</kbd><span class="jump-to">Europe</span></button>
       <button data-key="w" data-area="Africa" data-pocket="West coast"><kbd>W</kbd><span class="jump-to">Africa</span></button>
-      <button data-key="e" data-area="India–NZ" data-pocket="Pacific isles"><kbd>E</kbd><span class="jump-to">India–NZ</span></button>
+      <button data-key="3" data-area="Asia" data-pocket="Middle East"><kbd>3</kbd><span class="jump-to">Asia</span></button>
+      <button data-key="e" data-area="South Asia" data-pocket="Pacific isles"><kbd>E</kbd><span class="jump-to">South Asia</span></button>
     </nav>
 
     <div id="tools">
@@ -205,7 +206,7 @@
         <dt><kbd>0</kbd></dt><dd>Whole-world view (on a touch screen, pinch all the way out)</dd>
         <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd></dt>
         <dd>The map on your keyboard — top row north: N. America · Europe · Asia;
-          bottom row south: S. America · Africa · India-to-NZ.
+          bottom row south: S. America · Africa · South Asia (India across to New Zealand).
           Every key has a second floor: tap the same key again for that area's dense pocket —
           Central America · micro-states · Middle East · Caribbean · West coast · Pacific islands —
           and once more to come back out. The row of buttons along the bottom is the same six

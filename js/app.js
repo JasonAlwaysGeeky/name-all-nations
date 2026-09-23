@@ -2888,9 +2888,11 @@
   }
 
   // The keyboard is a little map: 1 2 3 across the north (N. America,
-  // Europe, Asia), Q W E across the south (S. America, Africa, India to
-  // New Zealand). Tapping the same key again dives into that area's
-  // dense pocket; tapping once more comes back out.
+  // Europe, Asia), Q W E across the south (S. America, Africa, South
+  // Asia — India across to New Zealand). Tapping the same key again
+  // dives into that area's dense pocket; tapping once more comes back
+  // out. The row on screen runs west to east, one keyboard column at a
+  // time: 1 Q 2 W 3 E.
   //
   // Every landing is a hand-set box in js/views.js — the same rule for all
   // twelve, so a view that looks wrong is a box to drag, not code to read.
@@ -2904,7 +2906,7 @@
     3: { name: 'Asia', subName: 'The Middle East', go: view('Asia'), sub: zone('Middle East') },
     q: { name: 'South America', subName: 'The Caribbean', go: view('South America'), sub: zone('Caribbean') },
     w: { name: 'Africa', subName: 'The West African coast', go: view('Africa'), sub: zone('West African coast') },
-    e: { name: 'India → New Zealand', subName: 'The Pacific islands', go: view('India → New Zealand'), sub: view('Pacific islands') },
+    e: { name: 'South Asia', subName: 'The Pacific islands', go: view('South Asia'), sub: view('Pacific islands') },
   };
   const jumpState = { key: null, stage: 0, t: 0 };
 

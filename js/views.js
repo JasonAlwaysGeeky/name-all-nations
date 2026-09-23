@@ -32,6 +32,6 @@ const VIEW_BOXES = {
   'Caribbean':              [287, 406, 312, 440],
   'Africa':                 [401, 344, 645, 572],
   'West African coast':     [401, 410, 515, 478],
-  'India → New Zealand':    [727, 321, 1017, 618],
+  'South Asia':             [727, 321, 1017, 618],   // India across to New Zealand
   'Pacific islands':        [840, 424, 1014, 531],
 };
