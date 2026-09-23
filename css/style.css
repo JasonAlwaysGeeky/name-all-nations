@@ -439,7 +439,7 @@ body.level-active svg.world path.country:not(.in-level) {
 
 .pop.good { background: #1f9d47; color: #fff; }
 .pop.show { background: #ffd54a; color: #4a3a00; }
-.pop .flag { height: 14px; border-radius: 2px; }
+.pop .flag { height: 18px; border-radius: 2px; }
 
 @keyframes popUp {
   0%   { opacity: 0; transform: translate(-50%, -60%) scale(0.8); }
@@ -473,9 +473,9 @@ body.level-active svg.world path.country:not(.in-level) {
 }
 
 .flag {
-  height: 16px;
+  height: 18px;
   width: auto;
-  vertical-align: -3px;
+  vertical-align: -4px;
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
@@ -690,7 +690,7 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 #answer-result.good { color: var(--ok); }
 #answer-result.meh { color: var(--revealed-stroke); }
 #answer-name { font-size: 1.6rem; margin-bottom: 2px; letter-spacing: -0.01em; display: flex; align-items: center; justify-content: center; gap: 10px; }
-#answer-name .flag { height: 22px; }
+#answer-name .flag { height: 30px; border-radius: 3px; }
 #answer-meta { color: var(--ink-soft); font-size: 0.88rem; margin-bottom: 14px; }
 
 #speak-btn {
@@ -968,7 +968,9 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   animation: targetIn 0.25s ease-out;
 }
 
-#bank-flag .flag { height: 20px; }
+/* the flag is the thing to learn here, so it is the biggest thing in
+   the row on every screen */
+#bank-flag .flag { height: 32px; border-radius: 3px; }
 
 @keyframes targetIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -1022,7 +1024,7 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   transition: background 0.15s ease;
 }
 
-.chip .flag { height: 13px; }
+.chip .flag { height: 16px; }
 .chip:hover { background: #e9eef4; }
 
 .chip.armed {
@@ -1423,16 +1425,14 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 
 /* ————— bigger flags where there is room —————
 
-   On a desktop there is room to actually learn the flag, not just tell
+   On a desktop there is room to actually study the flag, not just tell
    two of them apart — and place mode spends its whole run looking at
-   one. A phone keeps the small sizes: the word bank is already docked
-   along the bottom edge there, and a 40px flag in it costs a row of
-   chips. This is the only breakpoint where flags differ, so it reads as
+   one. This is the only breakpoint where flags differ, so it reads as
    one rule rather than five. */
 @media (min-width: 901px) and (min-height: 561px) {
-  .flag { height: 19px; vertical-align: -4px; }
-  .pop .flag { height: 17px; }
-  .chip .flag { height: 15px; }
-  #answer-name .flag { height: 34px; }
-  #bank-flag .flag { height: 40px; border-radius: 3px; }
+  .flag { height: 22px; vertical-align: -5px; }
+  .pop .flag { height: 20px; }
+  .chip .flag { height: 18px; }
+  #answer-name .flag { height: 44px; }
+  #bank-flag .flag { height: 52px; border-radius: 4px; }
 }

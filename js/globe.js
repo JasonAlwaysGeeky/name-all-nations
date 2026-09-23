@@ -60,9 +60,13 @@
 
   const MIN_R = 120;           // globe radius, px
   const MAX_R = 9700;         // the flat map's own 60x, as a radius
-  const FLING_TAU = 190;       // matches the flat map's momentum
-  const FLING_MIN = 0.00002;   // radians/ms below which a spin stops
-  const TAP_SLOP = 6;          // px of movement still counted as a tap
+  // The flat map's own numbers (app.js), read at the surface in px/ms, so
+  // a flick feels the same on either.
+  const FLING_TAU = 190;       // ms; momentum decay time constant
+  const FLING_MIN = 0.02;      // px/ms below which a spin stops
+  const FLING_MAX = 5;         // px/ms cap on the launch speed
+  const FLING_WINDOW = 90;     // ms of recent movement the launch speed is measured over
+  const TAP_SLOP = { mouse: 5, pen: 8, touch: 10 };   // px of movement still counted as a tap
   const HIT_PAD = 11;          // px of click padding around a country
   const LOD_HI_R = 900;        // above this radius, the fine borders are worth it
   const RING_MIN_PX = 0.6;     // rings smaller than this on screen are skipped
@@ -423,7 +427,7 @@
       view.lam += spin.vlam * dt;
       view.phi = clampPhi(view.phi + spin.vphi * dt);
       spin.vlam *= decay; spin.vphi *= decay;
-      if (Math.abs(spin.vlam) < FLING_MIN && Math.abs(spin.vphi) < FLING_MIN) {
+      if (Math.hypot(spin.vlam * Math.cos(view.phi), spin.vphi) * view.r < FLING_MIN) {
         spin.vlam = spin.vphi = 0;
         scheduleSettle();
       }
@@ -480,22 +484,89 @@
   }
 
   // ————— input —————
+  //
+  // The gesture the flat map runs (bindMapEvents there), on a sphere.
+  // Every pointer in play contributes to a centroid and a spread; the
+  // gesture keeps one anchor — the point on the globe that sat under the
+  // centroid when the anchor was taken — and each move re-solves the
+  // camera so that point is back under the centroid, at a radius scaled
+  // by how far the fingers have spread. One finger and two run through
+  // the same path, and the anchor is retaken whenever the set of
+  // pointers changes, so lifting one finger out of a pinch does not
+  // teleport the globe. A press that never moves past TAP_SLOP is a tap.
+  //
+  // "Back under the centroid" is a rotation here, with north kept up,
+  // and both angles of it fall out in closed form (aim) — so the grabbed
+  // point stays under the finger exactly, the way a grabbed map point
+  // does, instead of the globe turning by some rate per pixel.
 
   function bind() {
     const canvas = el.globe;
     const pointers = new Map();
-    let last = null, tapAt = null, movedBy = 0;
+    let gest = null;
+    const trail = [];   // recent camera attitudes, for the release spin
 
-    canvas.addEventListener('pointerdown', (e) => {
-      canvas.setPointerCapture(e.pointerId);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      last = { x: e.clientX, y: e.clientY, t: performance.now(), spread: spreadOf(pointers) };
-      tapAt = { x: e.clientX, y: e.clientY };
-      movedBy = 0;
-      spin.vlam = spin.vphi = 0;
+    const local = (p) => { const rect = canvas.getBoundingClientRect(); return { x: p.x - rect.left, y: p.y - rect.top }; };
+
+    function anchorGesture() {
+      const pts = [...pointers.values()];
+      if (!pts.length) { gest = null; return; }
+      const c = centroidOf(pts);
+      const l = local(c);
+      gest = {
+        a: unproject(l.x, l.y), cx: c.x, cy: c.y,
+        spread: spreadOf(pts, c), r: view.r,
+        moved: gest ? gest.moved : false,
+        type: gest ? gest.type : 'touch',
+        noTap: gest ? gest.noTap : false,
+        tap: gest ? gest.tap : null,
+      };
+      trail.length = 0;   // the centroid just jumped; old samples would fling
+    }
+
+    function begin() {
+      if (moving) return;
       moving = true;
       useCoarseWhileMoving();
       canvas.classList.add('turning');
+    }
+
+    function sample() {
+      const now = performance.now();
+      trail.push({ t: now, lam: view.lam, phi: view.phi });
+      while (trail.length > 2 && now - trail[0].t > FLING_WINDOW) trail.shift();
+    }
+
+    function releaseSpin() {
+      if (trail.length < 2) return null;
+      const a = trail[0], b = trail[trail.length - 1];
+      const dt = b.t - a.t;
+      // A finger that stopped before lifting should not fling.
+      if (dt < 8 || performance.now() - b.t > 70) return null;
+      const dl = b.lam - a.lam;
+      return { vlam: Math.atan2(Math.sin(dl), Math.cos(dl)) / dt, vphi: (b.phi - a.phi) / dt };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // A touch that catches a spin should stop it, not also count as a
+      // tap on whatever happened to turn under the finger.
+      const caught = spin.vlam !== 0 || spin.vphi !== 0;
+      spin.vlam = spin.vphi = 0;
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic / stale pointer */ }
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        gest = null;
+        anchorGesture();
+        gest.type = e.pointerType;
+        gest.noTap = caught;
+        gest.tap = local({ x: e.clientX, y: e.clientY });
+      } else {
+        anchorGesture();
+        gest.moved = true;      // a second finger is never a tap
+        gest.noTap = true;
+        begin();
+      }
     });
 
     canvas.addEventListener('pointermove', (e) => {
@@ -504,46 +575,62 @@
         return;
       }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const c = centroid(pointers);
-      const now = performance.now();
-      const dt = Math.max(1, now - last.t);
+      if (!gest) return;
 
-      // Turning: a drag of one radius across the screen turns the globe
-      // by one radian, which is the closest thing to "the point under
-      // your finger stays under it" that survives a pole.
-      const dx = c.x - last.x, dy = c.y - last.y;
-      const dlam = -dx / view.r, dphi = dy / view.r;
-      view.lam += dlam;
-      view.phi = clampPhi(view.phi + dphi);
-      spin.vlam = dlam / dt; spin.vphi = dphi / dt; spin.at = now;
+      const pts = [...pointers.values()];
+      const c = centroidOf(pts);
 
-      const sp = spreadOf(pointers);
-      if (last.spread > 0 && sp > 0) {
-        const rect = canvas.getBoundingClientRect();
-        zoomAt(c.x - rect.left, c.y - rect.top, sp / last.spread);
+      if (!gest.moved) {
+        if (Math.hypot(c.x - gest.cx, c.y - gest.cy) <= (TAP_SLOP[gest.type] || 8)) return;
+        gest.moved = true;
+        begin();
+        // Re-anchor at the point the drag actually broke loose, so the
+        // globe doesn't snap by the slop distance on the first moved frame.
+        anchorGesture();
+        return;
       }
 
-      movedBy += Math.hypot(dx, dy);
-      last = { x: c.x, y: c.y, t: now, spread: sp };
+      let r = gest.r;
+      if (gest.spread > 0) {
+        const sp = spreadOf(pts, c);
+        if (sp > 0) r = gest.r * (sp / gest.spread);
+      }
+      setRadius(r);
+      const l = local(c);
+      aim(gest.a, l.x, l.y);
+      if (pts.length === 1) sample();
+      else trail.length = 0;      // don't fling out of a pinch
       invalidate();
     });
 
-    const up = (e) => {
-      if (!pointers.delete(e.pointerId)) return;
-      if (pointers.size) { const c = centroid(pointers); last = { x: c.x, y: c.y, t: performance.now(), spread: spreadOf(pointers) }; return; }
+    const endPointer = (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      const wasTap = e.type === 'pointerup' && pointers.size === 1 && gest && !gest.moved && !gest.noTap;
+      const tap = gest?.tap;
+      pointers.delete(e.pointerId);
+
+      if (pointers.size > 0) {
+        // Fingers still down (a pinch losing one): re-anchor rather than
+        // carry on from a centroid that no longer means anything.
+        anchorGesture();
+        return;
+      }
+      const moved = gest?.moved, type = gest?.type;
+      gest = null;
       moving = false;
       canvas.classList.remove('turning');
-      if (movedBy <= TAP_SLOP && tapAt) {
-        const rect = canvas.getBoundingClientRect();
-        pick(tapAt.x - rect.left, tapAt.y - rect.top);
-        spin.vlam = spin.vphi = 0;
+      if (moved) {
+        const v = type !== 'mouse' ? releaseSpin() : null;
+        if (v) startSpin(v.vlam, v.vphi);
       }
+      trail.length = 0;
+      if (wasTap && tap) pick(tap.x, tap.y);
       spin.at = performance.now();
       scheduleSettle();
       request();
     };
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -566,21 +653,91 @@
     addEventListener('resize', measure);
   }
 
-  const centroid = (pts) => {
+  const centroidOf = (pts) => {
     let x = 0, y = 0;
-    for (const p of pts.values()) { x += p.x; y += p.y; }
-    return { x: x / pts.size, y: y / pts.size };
+    for (const p of pts) { x += p.x; y += p.y; }
+    return { x: x / pts.length, y: y / pts.length };
   };
-  const spreadOf = (pts) => {
-    if (pts.size < 2) return 0;
-    const c = centroid(pts);
+  // Mean distance from the centroid: for two fingers that is half the
+  // pinch distance, and it keeps working if a third finger lands.
+  const spreadOf = (pts, c) => {
+    if (pts.length < 2) return 0;
     let d = 0;
-    for (const p of pts.values()) d += Math.hypot(p.x - c.x, p.y - c.y);
-    return d / pts.size;
+    for (const p of pts) d += Math.hypot(p.x - c.x, p.y - c.y);
+    return d / pts.length;
   };
 
   function setRadius(r) {
     view.r = Math.max(MIN_R, Math.min(MAX_R, r));
+  }
+
+  // A spin is a fling: the flat map's numbers, read in px/ms at the
+  // surface under the centre of the disc.
+  function startSpin(vlam, vphi) {
+    const px = Math.hypot(vlam * Math.cos(view.phi), vphi) * view.r;
+    if (!(px > FLING_MIN * 4)) return;
+    const c = Math.min(1, FLING_MAX / px);
+    spin.vlam = vlam * c; spin.vphi = vphi * c;
+  }
+
+  // Screen position → the camera-space point on the sphere under it,
+  // (east, north, depth) in radii. Off the disc, the nearest point on
+  // its rim, so a drag that runs out over the ocean still holds on.
+  function discPoint(x, y) {
+    let px = (x - view.cx) / view.r, py = -(y - view.cy) / view.r;
+    const d = Math.hypot(px, py);
+    if (d > 0.999) { px *= 0.999 / d; py *= 0.999 / d; }
+    return { px, py, pz: Math.sqrt(Math.max(0, 1 - px * px - py * py)) };
+  }
+
+  // The point on the globe under a screen position, as a world unit
+  // vector — projectRing run backwards.
+  function unproject(x, y) {
+    const { px, py, pz } = discPoint(x, y);
+    const cam = camera();
+    return {
+      x: px * cam.Ex + py * cam.Nx + pz * cam.ex,
+      y: px * cam.Ey + py * cam.Ny + pz * cam.ey,
+      z: py * cam.Nz + pz * cam.ez,        // east has no z
+    };
+  }
+
+  // Turn the camera so the world point `a` sits under screen (x, y), with
+  // north still up. Two unknowns, and two equations that each involve
+  // one of them: a's east component depends on the longitude alone, and
+  // once that is known its depth fixes the latitude. Each equation has
+  // two answers, so four candidate attitudes; with east and depth both
+  // right, a's north component can only be the one asked for or its
+  // mirror, and that is what tells the true answer from the other three.
+  // Among the true ones (there can be two, on the far side of a pole),
+  // the nearer to where the camera already points is the one the hand
+  // meant.
+  function aim(a, x, y) {
+    const { px: qx, py: qy, pz: qz } = discPoint(x, y);
+    const rho = Math.hypot(a.x, a.y);
+    if (rho < 1e-6) return;                          // holding a pole: nothing to turn
+    const alpha = Math.atan2(a.x, a.y);
+    const base = Math.acos(Math.max(-1, Math.min(1, qx / rho)));
+    let best = null;
+    for (const lam of [base - alpha, -base - alpha]) {
+      const cl = Math.cos(lam), sl = Math.sin(lam);
+      const u = a.x * cl + a.y * sl;
+      const R = Math.hypot(u, a.z);
+      if (R < 1e-6) continue;
+      const beta = Math.atan2(a.z, u);
+      const off = Math.acos(Math.max(-1, Math.min(1, qz / R)));
+      const dl = Math.atan2(Math.sin(lam - view.lam), Math.cos(lam - view.lam));
+      for (const phi of [beta + off, beta - off]) {
+        const p = clampPhi(phi);
+        const north = -Math.sin(p) * u + Math.cos(p) * a.z;                // a · N at this attitude
+        const miss = Math.abs(north - qy);
+        const cost = Math.hypot(dl * Math.cos(view.phi), p - view.phi);   // how far the camera would move
+        if (!best || miss < best.miss - 1e-9 || (Math.abs(miss - best.miss) <= 1e-9 && cost < best.cost)) {
+          best = { lam: view.lam + dl, phi: p, miss, cost };
+        }
+      }
+    }
+    if (best) { view.lam = best.lam; view.phi = best.phi; }
   }
 
   // Zoom towards a point, the way the flat map zooms at the cursor —
@@ -671,6 +828,10 @@
       lod: () => lod,
       stats: () => ({ drawnVerts, drawnRings, rings: geom.rings, verts: geom.verts }),
       go: (lon, lat, r) => { view.lam = lon * D2R; view.phi = clampPhi(lat * D2R); if (r) setRadius(r); invalidate(); },
+      // what is under a canvas position, in degrees — for the tests
+      under: (x, y) => { const p = unproject(x, y); return { lon: Math.atan2(p.y, p.x) * R2D, lat: Math.asin(Math.max(-1, Math.min(1, p.z))) * R2D }; },
+      settled: () => !moving && !spin.vlam && !spin.vphi,
+      unproject, aim, invalidate,
     };
     measure();
     bind();

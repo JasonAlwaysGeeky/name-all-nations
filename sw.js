@@ -34,7 +34,9 @@ const CORE = [
   './icons/icon-maskable-512.png',
 ];
 
-const IMMUTABLE = /\/map\/[^/]+\.(svg|json)$/;
+// The flags too: 195 files that change when a country changes its flag,
+// which is to say when CACHE is bumped for it.
+const IMMUTABLE = /\/(map|flags)\/[^/]+\.(svg|json)$/;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

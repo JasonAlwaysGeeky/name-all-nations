@@ -141,4 +141,6 @@ is the untouched amCharts file; the simplifier never drops an island.
   island outlines), fuzzy matching, speech in/out, timer, stats, results
 - `map/world-lo.json` — coarse coastlines for zoomed-out views
 - `map/world.svg` — world map © [amCharts](https://www.amcharts.com)
+- `flags/` — the 195 flags, from [flag-icons](https://github.com/lipis/flag-icons)
+  (MIT), copied out of the npm package so the game needs no CDN
   (free to use with attribution link, kept in the page footer)

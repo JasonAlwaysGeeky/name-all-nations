@@ -268,15 +268,12 @@
 
   // ————— flags —————
 
-  // `w` is the CDN's width bucket, not a CSS size: the two places a flag
-  // is big enough to actually study — the place-mode target and the
-  // answer card — ask for the next size up so a desktop-sized flag isn't
-  // a 40px thumbnail stretched over 60. Everywhere else (chips, toasts,
-  // map pops) stays on w40, which matters when a whole-world word bank
-  // asks for all 195 at once.
-  function flagHTML(code, cls = 'flag', w = 40) {
-    const cc = code.toLowerCase();
-    return `<img class="${cls}" src="https://flagcdn.com/w${w}/${cc}.png" srcset="https://flagcdn.com/w${w * 2}/${cc}.png 2x" alt="" loading="lazy" onerror="this.remove()">`;
+  // The flags ship with the game (flags/, from flag-icons): they used to
+  // come from a CDN, and any host that will not fetch from it — an
+  // artifact sandbox, a phone offline — showed no flags at all. SVG, so
+  // one file is every size.
+  function flagHTML(code, cls = 'flag') {
+    return `<img class="${cls}" src="flags/${code.toLowerCase()}.svg" alt="" loading="lazy" onerror="this.remove()">`;
   }
 
   // ————— speech (out) —————
@@ -2008,7 +2005,7 @@
     el.cardAnswer.hidden = false;
     el.answerResult.textContent = resultText;
     el.answerResult.className = resultClass;
-    el.answerName.innerHTML = `${flagHTML(c.code, 'flag', 80)}<span></span>`;
+    el.answerName.innerHTML = `${flagHTML(c.code)}<span></span>`;
     el.answerName.querySelector('span').textContent = c.name;
     el.answerMeta.textContent = c.region;
     el.speakBtn.hidden = false;
@@ -2366,7 +2363,7 @@
       b.querySelector('span').textContent = COUNTRY_BY_CODE[code].name;
       b.dataset.code = code;
       b.addEventListener('mousedown', (e) => e.preventDefault());
-      b.addEventListener('click', () => { armChip(code); setBankHint(`Now find ${COUNTRY_BY_CODE[code].name}.`, ''); });
+      b.addEventListener('click', () => { armChip(code); setBankHint('', ''); });
       el.bankChips.appendChild(b);
     }
     if (pending.length) {
@@ -2394,7 +2391,7 @@
     L.strikes = 0;
     el.bankChips.querySelectorAll('.chip').forEach(c => c.classList.toggle('armed', c.dataset.code === code));
     el.bankChips.querySelector('.chip.armed')?.scrollIntoView({ block: 'nearest' });
-    el.bankFlag.innerHTML = flagHTML(code, 'flag', 80);
+    el.bankFlag.innerHTML = flagHTML(code);
     el.bankName.textContent = COUNTRY_BY_CODE[code].name;
     el.bankStrikes.textContent = '';
     // Make the switch unmissable — the whole target row pulses.
@@ -2413,7 +2410,7 @@
     el.bankChips.appendChild(chip);
     const next = el.bankChips.querySelector('.chip').dataset.code;
     armChip(next);
-    setBankHint(`Skipped ${skipped} (it's back at the end of the list) → now find ${COUNTRY_BY_CODE[next].name}.`, '');
+    setBankHint(`Skipped ${skipped} — it's back at the end of the list.`, '');
   }
 
   function placeAttempt(code, pt) {
@@ -2467,13 +2464,18 @@
     advanceTarget(`${name} is flashing — ${auto ? 'three misses' : 'shown'}, so it counts as a miss.`, 'bad');
   }
 
+  // The next name comes up in the target row, which pulses to say so —
+  // the line under it does not repeat it ("✓ Malta → now find Belize"
+  // was three things to read for one thing that happened). A hit says
+  // nothing more: the pop on the map already did. A miss or a reveal
+  // keeps its line, because that is where the cost is explained.
   function advanceTarget(msg, cls) {
     const L = state.level;
     L.armed = null;
     const next = el.bankChips.querySelector('.chip');
     if (next) {
       armChip(next.dataset.code);
-      setBankHint(`${msg} → now find ${COUNTRY_BY_CODE[next.dataset.code].name}.`, cls);
+      setBankHint(cls === 'good' ? '' : msg, cls === 'good' ? '' : cls);
     } else {
       el.bankName.textContent = 'All placed!';
       el.bankFlag.innerHTML = '';

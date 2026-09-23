@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
+    "flag-icons": "^7.5.0",
     "http-server": "^14.1.1"
   }
 }

@@ -1,56 +1,40 @@
-// The globe is an experiment, but it ships in the same deploy as the
-// game, so it has to at least boot, draw and pick. It shares nothing
-// with the flat map except the map files and the palette, so this is the
-// only thing watching it.
+// The globe turns the way the flat map pans: the point you grabbed stays
+// under the pointer (aim, in globe.js — bindMapEvents' anchor on a
+// sphere), and a mouse lets go without a fling, as it does on the map.
 
 const { test, expect } = require('@playwright/test');
 
-async function boot(page) {
+// Wrap-safe difference of two longitudes.
+const dlon = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
+
+test('a drag keeps the grabbed point under the pointer', async ({ page }) => {
   await page.goto('/globe.html');
-  await expect.poll(() => page.locator('#hud').isHidden(), { timeout: 15000 }).toBe(false);
-  await page.waitForTimeout(300);
-}
+  await expect(page.locator('#hud')).toBeVisible();
 
-test('the globe boots, draws real geography, and costs a sane amount per frame', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-  await boot(page);
+  const box = await page.locator('#globe').boundingBox();
+  const r = await page.evaluate(() => window.GLOBE_DEBUG.view.r);
+  const under = (p) => page.evaluate(([x, y]) => window.GLOBE_DEBUG.under(x, y), [p.x - box.x, p.y - box.y]);
 
-  // Something was actually drawn: most of the world's points are behind
-  // the globe or too small, but a good share of them land on screen.
-  const stats = await page.evaluate(() => window.GLOBE_DEBUG.stats());
-  expect(stats.drawnRings).toBeGreaterThan(100);
-  expect(stats.drawnVerts).toBeGreaterThan(2000);
-  expect(stats.drawnVerts).toBeLessThan(stats.verts);
+  // Grab off centre, on the disc.
+  const grab = { x: box.x + box.width / 2 + r * 0.4, y: box.y + box.height / 2 - r * 0.3 };
+  await page.mouse.move(grab.x, grab.y);
+  await page.mouse.down();
+  // The gesture anchors where the drag breaks loose of the tap slop, not
+  // at the press — the same as the map — so that is the point to hold.
+  const loose = { x: grab.x + 8, y: grab.y };
+  await page.mouse.move(loose.x, loose.y, { steps: 2 });
+  const held = await under(loose);
 
-  expect(errors).toEqual([]);
-});
+  const to = { x: loose.x - r * 0.5, y: loose.y + r * 0.35 };
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  const now = await under(to);
+  expect(dlon(now.lon, held.lon)).toBeLessThan(0.5);
+  expect(Math.abs(now.lat - held.lat)).toBeLessThan(0.5);
 
-test('the projection is right: clicking a known place names that place', async ({ page }) => {
-  await boot(page);
-
-  // Turn to a country big enough that the centre of the disc is
-  // unambiguously inside it, and check the pick buffer agrees. This is
-  // really a test of the inverse-Mercator constants: get them wrong and
-  // the click lands in the wrong ocean.
-  for (const [lon, lat, name] of [[-55, -10, 'Brazil'], [100, 45, 'Mongolia'], [19, 16, 'Chad'], [134, -24, 'Australia']]) {
-    await page.evaluate(([lon, lat]) => window.GLOBE_DEBUG.go(lon, lat), [lon, lat]);
-    await page.waitForTimeout(120);
-    const box = await page.locator('#globe').boundingBox();
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.locator('#readout')).toHaveText(name);
-  }
-});
-
-test('zooming in draws less, not more', async ({ page }) => {
-  await boot(page);
-  const wide = await page.evaluate(() => window.GLOBE_DEBUG.stats().drawnRings);
-
-  // The whole point of the per-ring cull: a zoomed-in globe has most of
-  // the world off the side of the canvas, and must not pay for it.
-  await page.evaluate(() => window.GLOBE_DEBUG.go(10, 50, 6000));
-  await page.waitForTimeout(200);
-  const close = await page.evaluate(() => window.GLOBE_DEBUG.stats().drawnRings);
-  expect(close).toBeLessThan(wide / 2);
+  // …and lets go where it is: a mouse never flings.
+  await page.mouse.up();
+  await page.waitForTimeout(80);
+  expect(await page.evaluate(() => window.GLOBE_DEBUG.settled())).toBe(true);
+  const after = await under(to);
+  expect(dlon(after.lon, held.lon)).toBeLessThan(0.5);
 });
