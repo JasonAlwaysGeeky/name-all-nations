@@ -47,7 +47,7 @@ server, so the Browser pane can start it directly.
   the box in the safe area), so a wrong view is a box to drag, not code.
   `?guides` loads `js/guides.js`, the on-map editor that sets them by eye.
   It and the globe live in the Developer panel (menu, or `` ` ``), which every
-  build but the live one shows; on the live one `?dev` switches it on for
+  build but the live Pages site shows, the artifact included; on Pages `?dev` switches it on for
   that browser and `?dev=0` off
 - `js/minimap.js` — the minimap's picture (all land as two paths). Shared by
   the flat map and the globe

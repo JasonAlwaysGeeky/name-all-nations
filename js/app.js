@@ -3030,11 +3030,11 @@
 
   // The developer panel gathers the tools for working on the game — the
   // globe, the view editor — out of the way of the screens a player sees.
-  // A build on this machine or the local network has it in the menu — the
-  // dev server, the preview pane, a phone on the LAN. Anywhere else (Pages,
-  // a shared artifact) a player might be looking, so it waits for ?dev,
-  // which this browser then remembers; ?dev=0 forgets it again.
-  const DEV_HOST = /^(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|.+\.local)$/;
+  // Every build has it in the menu — the dev server, a phone on the LAN,
+  // the published artifact — except the live site on GitHub Pages, which
+  // is what a player sees. There it waits for ?dev, which this browser
+  // then remembers; ?dev=0 forgets it again.
+  const LIVE_HOST = /(^|\.)github\.io$/;
   const DEV_KEY = 'nan.dev';
   const devParam = new URLSearchParams(location.search).get('dev');
   try {
@@ -3043,7 +3043,7 @@
   } catch { /* private window: the flag still counts for this page */ }
   let devSaved = false;
   try { devSaved = localStorage.getItem(DEV_KEY) === '1'; } catch { /* fine */ }
-  const devOn = guidesOn || DEV_HOST.test(location.hostname) || (devParam != null && devParam !== '0') || devSaved;
+  const devOn = guidesOn || !LIVE_HOST.test(location.hostname) || (devParam != null && devParam !== '0') || devSaved;
   const toggleDev = () => { const was = el.dev.hidden; closeMenu(); closePanels(); el.dev.hidden = !was; };
   if (devOn) {
     el.devBtn.hidden = false;
