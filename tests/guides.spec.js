@@ -36,6 +36,13 @@ test('a view box drags by its edge, the jump follows it, and Copy hands the tabl
   const b2 = await grip.boundingBox();
   expect(Math.abs(b2.y + b2.height / 2 - (y - 40))).toBeLessThan(scale + 2);
 
+  // A drag waits for Save, and Save says where it went (a test never
+  // writes the file, so here that is this browser).
+  await expect(page.locator('#gd-status')).toHaveText('Unsaved changes');
+  await page.locator('#gd-save').click();
+  await expect(page.locator('#gd-status')).toHaveText('Saved in this browser');
+  await expect(page.locator('#gd-save')).toBeDisabled();
+
   // The game itself reads the dragged box, and it survives a reload.
   await page.locator('#gd-copy').click();
   await expect(page.locator('#gd-out')).toHaveValue(new RegExp(`'Europe':\\s+\\[${after.join(', ')}\\]`));

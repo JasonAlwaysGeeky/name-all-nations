@@ -1,6 +1,6 @@
 // The local server: the game as static files, never cached, plus the one
 // thing a static server cannot do — let the ?guides editor write the view
-// boxes straight back into js/views.js. Drag a box on the phone and the
+// boxes straight back into js/views.js. Tune a box on the phone, Save, and the
 // file on this machine changes; nothing to copy, nothing to paste.
 //
 //   npm run serve          (http://localhost:5173, and this machine's LAN address)
