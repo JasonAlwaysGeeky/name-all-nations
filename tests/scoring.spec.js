@@ -10,8 +10,7 @@
 const { test, expect } = require('@playwright/test');
 
 async function boot(page) {
-  await page.goto('/');
-  await page.locator('#hello-close').click();
+  await page.goto('/?play=name');
   await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 }
@@ -75,7 +74,7 @@ test('a hint leaves the map green but the run knows it was not first try', async
   await page.locator('#hint-btn').click();
   await answer(page, 'kazakhstan');
 
-  await expect(page.locator('#answer-result')).toHaveText('✓ Correct!');
+  await expect(page.locator('#idle-bar .dock-note')).toContainText('✓');
   expect(await page.evaluate(() => window.NAN_DEBUG.state.status.KZ)).toBe('named');
   expect(await page.evaluate(() => window.NAN_DEBUG.state.level.result.KZ)).toBe(false);
 });

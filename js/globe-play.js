@@ -11,8 +11,7 @@
  * this.
  *
  * Not here: timers, stats, hints, hardcore, voice, the results panel,
- * the island outlines (an archipelago is its button here), and the pair
- * buttons two crowded buttons merge into.
+ * and the pair buttons two crowded buttons merge into.
  */
 (() => {
   'use strict';
@@ -61,7 +60,10 @@
     let bottom = SAFE_BASE.bottom;
     for (const e of [el.jumpBar, el.wordBank, el.card]) {
       if (!e || e.hidden || !e.offsetParent) continue;
-      const top = e.getBoundingClientRect().top - top0;
+      const r = e.getBoundingClientRect();
+      // the minimap counts only where it spans a real share of the width
+      if (e === el.jumpBar && r.width < W * 0.4) continue;
+      const top = r.top - top0;
       if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
     }
     SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
@@ -198,17 +200,123 @@
     return { x: off[0] * grow, y: off[1] * grow, px: mag * grow };
   }
 
-  const buttonRedundant = (code, s) => (TARGET_R[code] || 0) * s >= BTN_R;
+  // An archipelago's target is its dotted outline, not its land, so its
+  // button retires once its biggest island group is a fair size on
+  // screen — the flat map's rule.
+  const buttonRedundant = (code, s) => groups[code]
+    ? Math.max(biggestGroup(code).w, biggestGroup(code).h) * s >= 48
+    : (TARGET_R[code] || 0) * s >= BTN_R;
+
+  // ————— island outlines —————
+  //
+  // js/islands.js lays them out in map units, exactly as on the flat
+  // map; here each rounded rect is walked as a polygon and every point
+  // of it projected onto the sphere, so an outline is the flat map's
+  // shape draped over the globe.
+
+  const groups = {};           // code -> island groups, for the archipelagos
+  const groupsOf = (code) => groups[code];
+  const biggestGroup = (code) => groups[code].reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
+  let outlines = [];           // this frame's outlines, projected, for the tap to look through
+
+  function buildGroups() {
+    for (const code of ARCHIPELAGOS) {
+      const boxes = G.islandBoxes(code);
+      if (boxes.length) groups[code] = groupIslands(boxes);
+    }
+  }
+
+  // Where a country's button points: the middle of the biggest island
+  // group for an archipelago (the flat map's focusPoint), else the globe's.
+  function buttonFocus(code) {
+    if (!groups[code]) return G.focus(code);
+    const b = biggestGroup(code);
+    return G.lonLat(b.x + b.w / 2, b.y + b.h / 2);
+  }
+
+  // A rounded rect, turned about its centre, as points in map units.
+  function rectPoints(b) {
+    const pts = [];
+    const hw = b.w / 2, hh = b.h / 2, r = Math.min(b.rx, hw, hh);
+    const th = b.angle * D2R, c = Math.cos(th), sn = Math.sin(th);
+    const corners = [[hw - r, hh - r, 0], [-(hw - r), hh - r, 90], [-(hw - r), -(hh - r), 180], [hw - r, -(hh - r), 270]];
+    for (const [ox, oy, a0] of corners) {
+      for (let k = 0; k <= 6; k++) {
+        const a = (a0 + k * 15) * D2R;
+        const x = ox + r * Math.cos(a), y = oy + r * Math.sin(a);
+        pts.push([b.cx + x * c - y * sn, b.cy + x * sn + y * c]);
+      }
+    }
+    return pts;
+  }
+
+  const OUTLINE_FILL = 'rgba(42, 61, 88, 0.35)', OUTLINE_LINE = 'rgba(127, 176, 240, 0.55)';
+  const OUTLINE_HOT = 'rgba(60, 86, 121, 0.7)';
+  const OUTLINE_FACE = {
+    selected: 'rgba(201, 162, 74, 0.8)', named: 'rgba(79, 154, 98, 0.8)', revealed: 'rgba(176, 106, 85, 0.8)',
+    placed: 'rgba(79, 134, 184, 0.8)', missed: 'rgba(176, 106, 85, 0.8)',
+  };
+
+  function drawOutlines(ctx, codes, s, squared) {
+    outlines = [];
+    for (const b of layoutOutlines(codes, s, groupsOf, squared)) {
+      const pts = [];
+      let behind = false;
+      for (const [mx, my] of rectPoints(b)) {
+        const ll = G.lonLat(mx, my), p = G.project(ll.lon, ll.lat);
+        if (!p.front) { behind = true; break; }
+        pts.push(p);
+      }
+      if (behind) continue;
+      outlines.push({ code: b.code, pts });
+      const st = b.code === state.selected ? 'selected' : G.status[b.code];
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.closePath();
+      if (st) {
+        ctx.fillStyle = OUTLINE_FACE[st]; ctx.strokeStyle = FACE[st][1];
+        ctx.lineWidth = st === 'selected' ? 2 : 1.2; ctx.setLineDash([]);
+      } else if (hot === b.code) {
+        ctx.fillStyle = OUTLINE_HOT; ctx.strokeStyle = LINE; ctx.lineWidth = 1.2; ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = OUTLINE_FILL; ctx.strokeStyle = OUTLINE_LINE; ctx.lineWidth = 1.2; ctx.setLineDash([2, 3]);
+      }
+      ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  function outlineAt(x, y) {
+    for (let k = outlines.length - 1; k >= 0; k--) {
+      const pts = outlines[k].pts;
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const a = pts[i], b = pts[j];
+        if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+      }
+      if (inside) return outlines[k].code;
+    }
+    return null;
+  }
 
   const css = getComputedStyle(document.documentElement);
   const colour = (name, fallback) => (css.getPropertyValue(name).trim() || fallback);
   const FACE = {
     named: [colour('--named', '#7fd08c'), colour('--named-stroke', '#3f8f4e')],
-    placed: [colour('--placed-stroke', '#3b78b8'), '#ffffff'],
-    missed: [colour('--missed-stroke', '#c98f2e'), '#ffffff'],
+    placed: [colour('--placed', '#4f86b8'), colour('--placed-stroke', '#8fbde8')],
+    missed: [colour('--missed', '#b06a55'), colour('--missed-stroke', '#d99a86')],
     revealed: [colour('--revealed', '#f2b95c'), colour('--revealed-stroke', '#c98f2e')],
     selected: [colour('--selected', '#ffca57'), colour('--selected-stroke', '#b9821a')],
   };
+  const LINE = colour('--color-line', '#7fb0f0');
+  // An unanswered button is a ring you can see through: zoomed out they
+  // crowd a small globe, and a solid disc hid the very nations it stood
+  // for — most of all the ones it sits on top of, with no pointer to say so.
+  const RING = 'rgba(12, 21, 34, 0.4)';
+  const RING_HOT = 'rgba(42, 61, 88, 0.8)';
+  const LINE_HOT = colour('--color-accent-100', '#eff4fd');
+  const SURFACE = colour('--color-surface', '#172233');
+  const TEXT = colour('--color-text', '#e7ebf2');
+  const icon = (name) => `<svg class="ic" aria-hidden="true"><use href="icons/ph.svg#${name}"/></svg>`;
 
   function drawButtons(ctx) {
     drawn = [];
@@ -216,6 +324,8 @@
     const inLevel = new Set(codes);
     const grouped = new Set();
     const s = viewScale();
+    const squared = squaredAt(s, groupsOf);
+    drawOutlines(ctx, codes, s, squared);
 
     for (const z of BUTTON_ZONES) {
       const members = z.codes.filter(c => inLevel.has(c) && BUTTON_OFFSETS[c] && !buttonRedundant(c, s) &&
@@ -230,8 +340,8 @@
 
     for (const code of codes) {
       const off = BUTTON_OFFSETS[code];
-      if (!off || grouped.has(code)) continue;
-      const f = G.focus(code);
+      if (!off || grouped.has(code) || squared.has(code)) continue;
+      const f = buttonFocus(code);
       if (!f) continue;
       if (s < (BUTTON_MIN_SCALE[code] || 0) || buttonRedundant(code, s)) continue;
       const p = G.project(f.lon, f.lat);
@@ -260,14 +370,15 @@
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       if (b.zone) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.strokeStyle = '#4a3c26'; ctx.lineWidth = 2.5;
-        ctx.setLineDash([5, 3]); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#3f3623'; ctx.font = '700 17px system-ui, sans-serif';
+        const on = hot === 'zone:' + b.zone.name;
+        ctx.fillStyle = on ? RING_HOT : SURFACE; ctx.strokeStyle = on ? LINE_HOT : LINE; ctx.lineWidth = 2;
+        ctx.setLineDash(on ? [] : [5, 3]); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = TEXT; ctx.font = '600 17px Inter, system-ui, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(b.label, b.x, b.y + 1);
       } else {
         const [fill, stroke] = faceOf(b.code);
-        ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 2.5;
+        ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 2;
         ctx.fill(); ctx.stroke();
       }
     }
@@ -275,13 +386,33 @@
 
   function faceOf(code) {
     if (code === state.selected) return FACE.selected;
-    return FACE[G.status[code]] || ['rgba(255, 255, 255, 0.62)', '#4a3c26'];
+    const face = FACE[G.status[code]];
+    if (hot === code) return face ? [face[0], LINE_HOT] : [RING_HOT, LINE_HOT];
+    return face || [RING, LINE];
+  }
+
+  // The button under the cursor lights up, and so does its nation — the
+  // same pair a click on it would select. The globe asks this before it
+  // looks at the countries, because a click does.
+  let hot = null;
+  function hoverButton(x, y) {
+    const b = drawn.find(b => Math.hypot(b.x - x, b.y - y) <= BTN_HIT);
+    const isle = b ? null : outlineAt(x, y);
+    const key = b ? (b.zone ? 'zone:' + b.zone.name : b.code) : isle;
+    if (key !== hot) { hot = key; G.invalidate(); }
+    if (isle) return isle;
+    return !b ? undefined : b.zone ? null : b.code;
   }
 
   // A tap looks at the buttons before the countries under them.
   function tapButton(x, y) {
     const b = drawn.find(b => Math.hypot(b.x - x, b.y - y) <= BTN_HIT);
-    if (!b) return false;
+    if (!b) {
+      const isle = outlineAt(x, y);
+      if (!isle) return false;
+      onCountry(isle, x, y);
+      return true;
+    }
     if (b.zone) zoomToZone(b.zone); else onCountry(b.code, x, y);
     return true;
   }
@@ -427,7 +558,7 @@
   function buildBank() {
     el.wordBank.hidden = false;
     el.wordBank.classList.add('collapsed');
-    el.bankCollapse.textContent = '▴';
+    el.bankCollapse.innerHTML = icon('caret-up');
     el.bankChips.innerHTML = '';
     el.bankHint.textContent = '';
     el.bankHint.className = '';
@@ -516,8 +647,10 @@
 
   function boot() {
     G = window.GLOBE;
+    buildGroups();
     G.onDraw((ctx) => drawButtons(ctx));
     G.onTap(tapButton);
+    G.onHover(hoverButton);
     G.onCountry(onCountry);
 
     for (const b of el.jumpBar.querySelectorAll('button[data-key]')) {
@@ -537,12 +670,15 @@
     el.bankShow.addEventListener('click', () => revealTarget(false));
     el.bankCollapse.addEventListener('click', () => {
       const collapsed = el.wordBank.classList.toggle('collapsed');
-      el.bankCollapse.textContent = collapsed ? '▴' : '▾';
+      el.bankCollapse.innerHTML = icon(collapsed ? 'caret-up' : 'caret-down');
+      document.body.classList.toggle('bank-open', !collapsed);
     });
     for (const b of [el.bankSkip, el.bankShow, el.bankCollapse]) b.addEventListener('mousedown', (e) => e.preventDefault());
 
     // Whatever docks along the bottom changes what the globe has to itself.
     const chrome = new ResizeObserver(() => updateSafe());
+    fetch('map/world-lo.json').then(r => r.json())
+      .then(lo => drawMiniMap(lo, (id) => !!COUNTRY_BY_CODE[id])).catch(() => {});
     chrome.observe(el.card);
     chrome.observe(el.wordBank);
     chrome.observe(el.jumpBar);
@@ -559,7 +695,7 @@
       if (key) { e.preventDefault(); jumpTo(key, e.shiftKey); }
     });
 
-    window.GLOBE_PLAY = { state, LEVELS, startLevel, armChip, zoomToView, zoomToZone, fitBox, zoneOpenScale, SAFE, drawn: () => drawn };
+    window.GLOBE_PLAY = { state, LEVELS, startLevel, armChip, zoomToView, zoomToZone, fitBox, zoneOpenScale, SAFE, drawn: () => drawn, outlines: () => outlines, hot: () => hot };
     startLevel(LEVELS[0], 'place');
     markJumpKeys();
   }

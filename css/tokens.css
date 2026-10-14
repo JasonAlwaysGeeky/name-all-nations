@@ -1,0 +1,101 @@
+/* Name All Nations — design tokens.
+
+   Base: the Nocturne design system on its T3-O palette — one blue family
+   from the ground, through the outlines, to the accent. Game layer: what
+   the map's states look like on that ground. style.css takes every colour,
+   radius and shadow from here; nothing below is a layout rule. */
+
+/* Inter ships with the game (fonts/, SIL OFL) for the same reason the flags
+   do: a phone offline, or a host that will not fetch from a font CDN, would
+   otherwise fall back to whatever the system has. One variable file, Latin. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin.woff2") format("woff2");
+}
+
+:root {
+  /* ── base ──────────────────────────────────────────────────── */
+  --color-bg: #0c1522;
+  --color-surface: #172233;
+  --color-text: #e7ebf2;
+  --color-accent: #5f95e6;
+  --color-line: #7fb0f0;                     /* the outline blue the neutral ramp steps toward */
+  --color-divider: rgba(127, 176, 240, 0.5);
+
+  /* 900–600 step from the ground toward the outline blue: borders, rings,
+     tinted fills. 500–100 step toward the text: muted and secondary text. */
+  --color-neutral-100: #f3f5f9;
+  --color-neutral-200: #dce0e8;
+  --color-neutral-300: #cbcfd7;
+  --color-neutral-400: #b0b6be;
+  --color-neutral-500: #8f959f;
+  --color-neutral-600: #4f6f99;
+  --color-neutral-700: #3c5679;
+  --color-neutral-800: #2a3d58;
+  --color-neutral-900: #182537;
+
+  --color-accent-100: #eff4fd;
+  --color-accent-200: #dce8fa;
+  --color-accent-300: #bfd5f5;
+  --color-accent-400: #8fb5ee;
+  --color-accent-500: #5f95e6;
+  --color-accent-600: #4d79bb;
+  --color-accent-700: #3c5f94;
+  --color-accent-800: #2c466c;
+  --color-accent-900: #1d2f49;
+
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  /* On a dark ground elevation is a one-pixel ring plus ambient darkness. */
+  --shadow-sm: 0 0 0 1px #2a3d58;
+  --shadow-md: 0 0 0 1px #3c5679, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #4f6f99, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+  /* ── game layer: the map ───────────────────────────────────── */
+  --map-ocean: var(--color-bg);
+  --map-stroke: var(--color-bg);             /* borders are gaps of ocean between countries */
+  --map-land: #2a3d58;                       /* in the challenge, not yet answered */
+  --map-land-hot: #3c5679;                   /* …and the one a click would select */
+  --map-land-territory: #121d2c;             /* shapes that are not one of the 195 */
+  --map-land-inactive: #182537;              /* a country outside the current challenge (globe) */
+  --globe-ocean-top: #16253a;                /* the globe's sea is a step above the ground, */
+  --globe-ocean-bot: #101a29;                /* or the sphere would vanish into the page */
+  --map-selected: #c9a24a;                   /* gold: the country being asked */
+  --map-selected-stroke: #f0cf7a;
+  --map-named: #4f9a62;
+  --map-named-hot: #5fae73;
+  --map-named-rim: #7fc993;
+  --map-placed: #4f86b8;
+  --map-placed-hot: #629bcf;
+  --map-placed-rim: #8fbde8;
+  --map-missed: #b06a55;                     /* revealed, or shown to you */
+  --map-missed-hot: #c27d68;
+  --map-missed-rim: #d99a86;
+  --map-flash-good: #62d283;
+  --map-flash-bad: #d0605a;
+  --map-flash-show: #e8d56a;
+
+  /* status as text, off the map */
+  --fb-ok: #8fd8a2;
+  --fb-bad: #e89590;
+
+  /* heat map: first-try streak. One green, dark to light, the longer the
+     streak — so the map reads as how well you know it, at a glance. A
+     nation with no streak, never tried or missed last time, is plain land. */
+  --heat-none: #2a3d58;
+  --heat-1: #2b5a41;
+  --heat-2: #3b7a55;
+  --heat-3: #55a06c;
+  --heat-4: #8ed6a1;
+
+  /* ink for text that sits on a status fill (a pop, a heat-legend chip) */
+  --ink-on-fill: #0c1522;
+}

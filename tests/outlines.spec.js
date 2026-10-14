@@ -12,8 +12,7 @@
 const { test, expect } = require('@playwright/test');
 
 async function boot(page) {
-  await page.goto('/');
-  await page.locator('#hello-close').click();
+  await page.goto('/?play=name');
   await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 }

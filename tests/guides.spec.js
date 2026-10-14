@@ -5,8 +5,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('a view box drags by its edge, the jump follows it, and Copy hands the table back', async ({ page }) => {
-  await page.goto('/?guides');
-  await page.locator('#hello-close').click();
+  await page.goto('/?guides&play=name');
   await expect(page.locator('.gd-row')).toHaveCount(12);
 
   await page.locator('.gd-row', { hasText: /^Europe\d/ }).click();
@@ -44,6 +43,6 @@ test('a view box drags by its edge, the jump follows it, and Copy hands the tabl
   expect(await page.evaluate(() => [...VIEW_BOXES.Europe])).toEqual(after);
 
   // …but only under ?guides: the game proper plays the file's boxes.
-  await page.goto('/');
+  await page.goto('/?play=name');
   expect(await page.evaluate(() => [...VIEW_BOXES.Europe])).toEqual(before);
 });

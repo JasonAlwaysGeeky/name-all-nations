@@ -72,8 +72,7 @@
   // turns the globe by rate instead, and takes the point back up when the
   // finger comes back over it.
   const RATE_EDGE = 0.95;
-  const HIT_PAD = 11;          // px of click padding around a country
-  const LOD_HI_R = 900;        // above this radius, the fine borders are worth it
+  const HIT_PAD = 12;          // px of click padding around a country — the flat map's
   const RING_MIN_PX = 0.6;     // rings smaller than this on screen are skipped
 
   // ————— state —————
@@ -100,6 +99,7 @@
   const flashes = new Map();   // code -> a fill to show for a moment
   let dimTo = null;            // the codes in play; everything else fades back
   let drawHook = null;         // called over the finished globe every frame
+  let hoverHook = null;        // asked first what the cursor is over (the game's buttons)
   let tapHook = null;          // first look at a tap, before the countries
   let countryHook = null;      // a tap that reached a country (or the ocean)
   let anim = null;             // a camera flight in progress
@@ -259,27 +259,25 @@
   const FILL = {
     land: colour('--land', '#f5edd6'),
     territory: colour('--territory', '#cdc7b9'),
-    dim: '#e6e0d2',
+    dim: colour('--map-land-inactive', '#182537'),
     selected: colour('--selected', '#ffca57'),
     hover: colour('--hover', '#ffe1a0'),
     named: colour('--named', '#7fd08c'),
     placed: colour('--placed', '#8cc1ec'),
     missed: colour('--missed', '#f2b95c'),
     revealed: colour('--revealed', '#f2b95c'),
-    'flash-good': '#2ee86a',
-    'flash-bad': '#e98980',
-    'flash-show': '#fff176',
+    'flash-good': colour('--map-flash-good', '#62d283'),
+    'flash-bad': colour('--map-flash-bad', '#d0605a'),
+    'flash-show': colour('--map-flash-show', '#e8d56a'),
   };
   const STROKE = {
     land: colour('--land-stroke', '#8a7d5f'),
     territory: colour('--territory-stroke', '#a59e8c'),
-    dim: '#b9b2a3',
     selected: colour('--selected-stroke', '#b9821a'),
-    named: colour('--named-stroke', '#3f8f4e'),
-    placed: colour('--placed-stroke', '#3b78b8'),
-    missed: colour('--missed-stroke', '#c98f2e'),
-    revealed: colour('--revealed-stroke', '#c98f2e'),
   };
+  // Borders are gaps of ocean, as on the flat map: a status changes a
+  // country's fill and never its line. Only the selection has its own.
+  for (const k of ['dim', 'named', 'placed', 'missed', 'revealed']) STROKE[k] = STROKE.land;
 
   // The same order of precedence as the flat map's classes: a flash on
   // top of everything, then the selection, the hover, what the game has
@@ -305,8 +303,8 @@
 
     // ocean
     const grad = ctx.createLinearGradient(0, view.cy - view.r, 0, view.cy + view.r);
-    grad.addColorStop(0, colour('--ocean-top', '#bddbef'));
-    grad.addColorStop(1, colour('--ocean-bot', '#8ab6d8'));
+    grad.addColorStop(0, colour('--globe-ocean-top', '#16253a'));
+    grad.addColorStop(1, colour('--globe-ocean-bot', '#101a29'));
     ctx.beginPath();
     ctx.arc(view.cx, view.cy, view.r, 0, Math.PI * 2);
     ctx.fillStyle = grad;
@@ -349,7 +347,7 @@
     // the limb, last, so no coastline overhangs it
     ctx.beginPath();
     ctx.arc(view.cx, view.cy, view.r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(20, 55, 90, 0.35)';
+    ctx.strokeStyle = 'rgba(127, 176, 240, 0.4)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -361,7 +359,7 @@
   // not to show up in the frame budget.
   function drawGraticule(cam) {
     const { sp, cp, sl, cl, r, cx, cy } = cam;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.strokeStyle = 'rgba(127, 176, 240, 0.14)';
     ctx.lineWidth = 0.8;
     ctx.beginPath();
     // Chords, so the step has to shrink as the globe grows or the
@@ -396,9 +394,15 @@
   //
   // An off-screen copy of the same drawing, with every country filled in
   // a colour that is really its index — so a click is one pixel read
-  // rather than a point-in-polygon walk. Small countries are drawn last
-  // and with a fat stroke, which is the canvas version of the flat map's
-  // click padding: land just offshore still belongs to the country.
+  // rather than a point-in-polygon walk.
+  //
+  // It is painted in two layers, the way the flat map stacks its own:
+  // the click padding underneath (a fat stroke round every country, small
+  // ones last so they win the sea they share), and every country's real
+  // shape on top. So padding only ever claims water — a point that is on
+  // a country's land is that country, however small its neighbour. Done
+  // as one layer, fill and stroke together, each small country's padding
+  // was painted over its neighbours' land and took a 12px bite out of them.
 
   let pickCodes = [];
   let pickDirty = true;
@@ -424,9 +428,7 @@
     order.sort((a, b) => b.area - a.area);
     pickCodes = order.map(o => o.code);
 
-    order.forEach((o, idx) => {
-      const id = idx + 1;
-      const col = `rgb(${id & 255},${(id >> 8) & 255},${(id >> 16) & 255})`;
+    const trace = (o) => {
       pickCtx.beginPath();
       let any = false;
       for (let j = o.from; j < o.to; j++) {
@@ -437,22 +439,47 @@
         pickCtx.closePath();
         any = true;
       }
-      if (!any) return;
-      pickCtx.fillStyle = col;
-      pickCtx.fill();
-      pickCtx.strokeStyle = col;
-      pickCtx.lineWidth = HIT_PAD * 2;
+      return any;
+    };
+    const colour = (idx) => { const id = idx + 1; return `rgb(${id & 255},${(id >> 8) & 255},${(id >> 16) & 255})`; };
+
+    // the padding: countries only — a territory is not a target, and has
+    // no business claiming the sea next to one that is
+    pickCtx.lineWidth = HIT_PAD * 2;
+    order.forEach((o, idx) => {
+      if (!isCountry.has(o.code) || !trace(o)) return;
+      pickCtx.strokeStyle = colour(idx);
       pickCtx.stroke();
+    });
+    // the shapes themselves, over all of it
+    order.forEach((o, idx) => {
+      if (!trace(o)) return;
+      pickCtx.fillStyle = colour(idx);
+      pickCtx.fill();
     });
     pickDirty = false;
   }
 
+  // One pixel is not enough to go on. Where two fills meet, the canvas
+  // antialiases the edge, and the pixel on it is a blend of two colours —
+  // which, colours being indexes, is the index of some third country that
+  // is nowhere near. Moving the cursor across a border flashed it. So the
+  // read is a 3×3 block and the answer is whichever index most of it
+  // agrees on: a blended edge is one pixel wide and never has the votes.
   function codeAt(x, y) {
     if (Math.hypot(x - view.cx, y - view.cy) > view.r) return null;
     if (pickDirty) buildPick();
-    const d = pickCtx.getImageData(x, y, 1, 1).data;
-    const id = d[0] | (d[1] << 8) | (d[2] << 16);
-    return id > 0 ? pickCodes[id - 1] : null;
+    const d = pickCtx.getImageData(Math.round(x) - 1, Math.round(y) - 1, 3, 3).data;
+    const votes = new Map();
+    let best = 0, bestN = 0;
+    for (let i = 0; i < 36; i += 4) {
+      if (d[i + 3] !== 255) continue;               // a half-covered pixel on a coast: no vote
+      const id = d[i] | (d[i + 1] << 8) | (d[i + 2] << 16);
+      const n = (votes.get(id) || 0) + 1;
+      votes.set(id, n);
+      if (n > bestN) { best = id; bestN = n; }
+    }
+    return bestN >= 3 && best > 0 && best <= pickCodes.length ? pickCodes[best - 1] : null;
   }
 
   // ————— frame loop —————
@@ -492,12 +519,19 @@
     }
 
     if (needsDraw) {
+      // mid-gesture and mid-flight the right border set can change as the
+      // zoom does — a pinch that ends deep should not stay coarse all the way in
+      if (moving || anim) useCoarseWhileMoving();
       draw();
       needsDraw = false;
       pickDirty = true;
     }
 
-    frames.push(performance.now() - t0);
+    const took = performance.now() - t0;
+    if (lod === 'hi' && took > FINE_BUDGET && (moving || anim || spin.vlam || spin.vphi)) {
+      fineFromR = Math.max(fineFromR, view.r * 1.2);
+    }
+    frames.push(took);
     if (frames.length > 60) frames.shift();
 
     // The readout is throttled while frames are flowing, but the last
@@ -527,18 +561,36 @@
       `${drawnVerts.toLocaleString()} of ${geom.verts.toLocaleString()} points · ${drawnRings} of ${geom.rings} rings · ${lod} detail`;
   }
 
-  // Fine borders once you stop moving, coarse ones while you turn — the
-  // same bargain the flat map makes when it rewrites its viewBox.
+  // Fine borders once you stop moving, whatever was drawn on the way.
   function scheduleSettle() {
     clearTimeout(settleTimer);
     settleTimer = setTimeout(() => {
-      const want = view.r >= LOD_HI_R ? 'hi' : 'lo';
-      if (want !== lod && built[want]) { lod = want; geom = built[want]; invalidate(); }
+      if (lod !== 'hi' && built.hi) { lod = 'hi'; geom = built.hi; invalidate(); }
     }, 90);
   }
 
+  // The coarse borders are each country simplified on its own, so two
+  // neighbours no longer share an edge: up close there are slivers of sea
+  // between them. Coarse is the right trade when most of the globe is on
+  // screen and every frame walks tens of thousands of points; zoomed in,
+  // most rings are off screen and skipped, and the fine set costs no more
+  // little more than the coarse one did zoomed out.
+  //
+  // What "cheap enough" is depends on the device, so it is measured: the
+  // fine set is used everywhere until a moving frame runs over budget on
+  // it, and that pushes the radius it is used from out past where it
+  // happened. A fast machine never draws the coarse borders at all; a slow
+  // phone finds its own line within a frame or two. Standing still there
+  // is no budget to keep, so the globe at rest is always the fine set.
+  const FINE_BUDGET = 10;      // ms; a moving frame on the fine borders may take this long
+  let fineFromR = 0;
+  function fineIsAffordable() {
+    return !!built.hi && !!built.lo && view.r >= fineFromR;
+  }
+
   function useCoarseWhileMoving() {
-    if (lod !== 'lo' && built.lo) { lod = 'lo'; geom = built.lo; }
+    const want = fineIsAffordable() ? 'hi' : 'lo';
+    if (want !== lod && built[want]) { lod = want; geom = built[want]; }
   }
 
   // ————— input —————
@@ -829,9 +881,16 @@
     view.phi = clampPhi(phi);
   }
 
+  // What is under the cursor is what a click would get — and a click
+  // looks at the game's buttons before the countries behind them, so the
+  // hover has to as well. The hook answers with a country's code (its
+  // button is under the cursor), null (a button that is no one country),
+  // or undefined (no button here: ask the globe).
   function hover(e) {
     const rect = el.globe.getBoundingClientRect();
-    const code = codeAt(e.clientX - rect.left, e.clientY - rect.top);
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const over = hoverHook ? hoverHook(x, y) : undefined;
+    const code = over !== undefined ? over : codeAt(x, y);
     if (code === hovered) return;
     hovered = code;
     invalidate();
@@ -859,6 +918,28 @@
       y: cam.cy - cam.r * (cam.cp * sa - cam.sp * ca * cd),
       front: cam.sp * sa + cam.cp * ca * cd >= 0,
     };
+  }
+
+  // Each island of a country as an upright box in map units — what the
+  // flat map's getBBox gives it, for the island outlines (js/islands.js).
+  let pathOf = {};
+  function islandBoxes(code) {
+    const d = pathOf[code];
+    if (!d) return [];
+    const subs = d.split(/(?=M)/), boxes = [];
+    for (const sub of subs) {
+      const nums = sub.match(/-?\d*\.?\d+(?:e-?\d+)?/g);
+      if (!nums || nums.length < 2) continue;
+      let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        const x = +nums[i], y = +nums[i + 1];
+        if (x < x1) x1 = x; if (x > x2) x2 = x;
+        if (y < y1) y1 = y; if (y > y2) y2 = y;
+      }
+      if (subs.length > 1 && (x2 - x1) * (y2 - y1) < 1e-4) continue;
+      boxes.push({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+    }
+    return boxes;
   }
 
   // Where to look for a country: the middle of its biggest ring, which
@@ -926,6 +1007,7 @@
       hiPaths[p.id] = p.getAttribute('d');
     }
     const codes = Object.keys(hiPaths);
+    pathOf = hiPaths;
     const loPaths = {};
     for (const id of codes) loPaths[id] = (lo && lo[id]) || hiPaths[id];
 
@@ -956,7 +1038,7 @@
     };
     // What the game layer (globe-play.js) gets to work with.
     window.GLOBE = {
-      view, status, project, focus, unproject, codeAt, animateTo, flash, invalidate, scaleOf, radiusOf,
+      view, status, project, focus, unproject, codeAt, animateTo, flash, invalidate, scaleOf, radiusOf, islandBoxes,
       size: () => ({ W, H }),
       scale: () => scaleOf(view.r),
       lonLat: (x, y) => ({ lon: lonAt(x), lat: latAt(y) }),     // map units → degrees
@@ -968,6 +1050,7 @@
       centreAt: (x, y) => { centre = x == null ? null : { x, y }; measure(); },
       onDraw: (fn) => { drawHook = fn; invalidate(); },
       onTap: (fn) => { tapHook = fn; },
+      onHover: (fn) => { hoverHook = fn; },
       onCountry: (fn) => { countryHook = fn; },
       settled: () => !moving && !spin.vlam && !spin.vphi && !anim,
     };

@@ -36,17 +36,6 @@
   const BTN_LOCK = 5;          // px per map unit past which a button holds its place on the map
   const BTN_TAIL_MAX = 88;     // …until its pointer would outgrow this, px
   const TAIL_W = 8;            // half-width of a button's pointer where it leaves the circle, px
-  const SQ_MIN = 56;           // min on-screen size of an island outline once it replaces the button, px
-  const SQ_THIN = 30;          // …except across a tilted pill, which is long enough to be an easy target, px
-  const SQ_ROUND = 0.3;        // corner radius of an island outline, as a share of its short side
-  const SQ_GAP = 7;            // clearance two island outlines keep from each other, px
-  // An island chain strung out on a diagonal (the Bahamas down towards
-  // Cuba, Micronesia across the Pacific) is badly served by an upright
-  // box: the box has to swallow whole neighbours to reach the far
-  // island. Where a tilted fit is this much smaller than the upright
-  // one, the outline becomes a tilted pill along the chain instead.
-  const ROT_MAX = 0.75;        // tilted-fit area / upright-fit area, at or below which the pill wins
-  const ROT_THIN = 14;         // a pill never draws thinner than this on screen, px — a hairline reads as a coastline
   const TAP_SLOP = { mouse: 5, pen: 8, touch: 10 };
   // Flick momentum. A touch pan that ends while moving keeps gliding, its
   // speed decaying by e every FLING_TAU ms — so a flick travels roughly
@@ -58,13 +47,6 @@
   const FLING_WINDOW = 90;     // ms of recent movement the launch speed is measured over
   const STRIKES = 3;           // wrong placements before the answer is shown
 
-  // Island nations drawn with a dotted outline per island group — the
-  // Pacific ones, plus the Caribbean micro-islands so they get the same
-  // look once you're zoomed into the arc.
-  const ARCHIPELAGOS = new Set(['TV', 'FM', 'TO', 'MH', 'PW', 'KI', 'NR', 'CV', 'KM', 'VU', 'BS', 'FJ', 'SB', 'ST', 'WS', 'TT', 'MV',
-    'AG', 'KN', 'DM', 'LC', 'BB', 'VC', 'GD']);
-  const ARCH_GAP = 45;         // map units between islands before they split into separate groups
-
   const ZONE_BY_CODE = {};
   for (const z of BUTTON_ZONES) {
     for (const c of z.codes) ZONE_BY_CODE[c] = z;
@@ -75,6 +57,8 @@
   for (const sub of SUBREGIONS) for (const c of sub.codes) SUBREGION_BY_CODE[c] = sub.name;
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
+  // What you do to a nation, in the words of the device you are holding.
+  const TAP = matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click';
 
   // ————— state —————
   const state = {
@@ -130,8 +114,11 @@
     return (b[mode] ||= { streak: 0, best: 0, right: 0, wrong: 0 });
   }
 
+  // Two skills are kept score of: naming a nation and finding it. Hardcore
+  // is naming with the net taken away, so its answers are naming answers —
+  // filed on their own they fed neither the heat map nor mastery.
   function recordResult(code, ok) {
-    const r = rec(code, state.level.mode);
+    const r = rec(code, state.level.mode === 'place' ? 'place' : 'name');
     if (ok) { r.streak++; r.right++; r.best = Math.max(r.best, r.streak); }
     else { r.streak = 0; r.wrong++; }
     saveStats();
@@ -156,6 +143,11 @@
     return `<img class="${cls}" src="flags/${code.toLowerCase()}.svg" alt="" loading="lazy" onerror="this.remove()">`;
   }
 
+  // An icon from the sprite (icons/ph.svg, built by tools/gen-icons.mjs).
+  function icon(name) {
+    return `<svg class="ic" aria-hidden="true"><use href="icons/ph.svg#${name}"/></svg>`;
+  }
+
   // ————— speech (out) —————
 
   function speak(text) {
@@ -173,7 +165,7 @@
   let recognition = null;
   let micErrors = 0;                    // consecutive failures since the last result
   let heardSound = false;               // whether any session ever detected sound
-  const MIC_HINT = 'listening… just say the country’s name';
+  const MIC_HINT = 'listening… just say the nation’s name';
 
   // Selection clicks build an ordered queue of countries; the transcript is
   // parsed against that queue in the background, fuzzy-matching each queued
@@ -278,7 +270,7 @@
         gradeVoiceGuess(voiceBuf.join(' '), first.code);
         voiceBuf = [];
       } else {
-        setFeedback(`Heard “${voiceBuf.join(' ')}” — not a country name, no penalty. Say it again?`, 'hint');
+        setFeedback(`Heard “${voiceBuf.join(' ')}” — not a nation’s name, no penalty. Say it again?`, 'hint');
       }
     }
     if (voiceBuf.length > 8) voiceBuf = voiceBuf.slice(-8);
@@ -453,19 +445,25 @@
   for (const id of [
     'map-wrap', 'map', 'tooltip', 'toast', 'progress-text', 'progress-fill', 'progress-wrap',
     'mic-toggle', 'voice-meter', 'mic-status-text', 'stats-btn', 'help-btn', 'fs-btn',
-    'jump-bar', 'jump-flash',
-    'hello', 'hello-close', 'card', 'card-close', 'card-question',
+    'jump-bar', 'jump-flash', 'jump-caption', 'mini-map', 'mini-view', 'zoom-in', 'zoom-out',
+    'menu', 'menu-btn', 'menu-restart', 'challenges-btn', 'mode-seg', 'heat-btn', 'intro-btn', 'dev-btn',
+    'level-chip', 'idle-bar', 'idle-text',
+    'card', 'card-close', 'card-question',
     'card-prompt', 'guess-form', 'guess-input', 'mic-status', 'feedback',
     'card-actions', 'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
-    'answer-meta', 'speak-btn', 'retry-btn', 'levels-panel', 'levels-close',
-    'levels-list', 'level-banner', 'level-title', 'level-timer', 'level-mode',
-    'challenge-prev', 'challenge-next', 'level-restart',
+    'answer-meta', 'speak-btn', 'retry-btn',
+    'level-banner', 'level-title', 'level-timer',
+    'home', 'home-back', 'home-intro', 'home-heat', 'home-stats', 'home-help', 'home-continue', 'home-cards',
+    'mode-dialog', 'mode-for', 'mode-count', 'mode-opts', 'mode-cancel', 'mode-start',
+    'onboard', 'onboard-count', 'onboard-dots', 'onboard-skip', 'onboard-next',
     'word-bank', 'bank-target', 'bank-flag', 'bank-name', 'bank-strikes', 'bank-skip', 'bank-show', 'bank-collapse', 'bank-hint', 'bank-chips',
     'hardcore-bar', 'hc-find', 'hc-giveup',
     'pause-timer', 'pause-veil',
-    'results', 'results-close', 'results-title', 'results-sub', 'results-tiles', 'results-misses', 'results-again', 'results-mode', 'results-next', 'confetti',
-    'stats-panel', 'stats-close', 'stat-tiles', 'heat-toggle', 'heat-mode-note', 'flags-toggle', 'best-times', 'region-mastery', 'stats-reset',
-    'help', 'help-close',
+    'results', 'results-title', 'results-sub', 'results-time', 'results-best', 'results-tiles', 'results-misses',
+    'results-practise', 'results-again', 'results-mode', 'results-home', 'confetti',
+    'stats-panel', 'stats-close', 'stat-tiles', 'stats-heat', 'flags-toggle', 'best-times', 'region-mastery', 'stats-reset',
+    'heat-bar', 'heat-panel', 'heat-close', 'heat-seg', 'heat-sel', 'heat-flag', 'heat-name', 'heat-dot', 'heat-text', 'heat-prompt',
+    'help', 'help-close', 'dev', 'dev-close', 'dev-guides',
   ]) {
     el[id.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase())] = document.getElementById(id);
   }
@@ -563,6 +561,7 @@
 
     // Start on the coarse coastlines; bake() swaps levels as you zoom.
     for (const id of Object.keys(allPaths)) allPaths[id].setAttribute('d', dLo[id]);
+    drawMiniMap(dLo, (id) => !!COUNTRY_BY_CODE[id], fullVB);
 
     measure();
     setView(worldView());
@@ -574,6 +573,15 @@
       const w0 = W, h0 = H;
       measure();
       if (W === w0 && H === h0) return;
+      // Coming up from nothing: every fit made while the window had no
+      // size is finite but meaningless (clamped to the deepest zoom), so
+      // there is no view worth keeping — frame the challenge afresh.
+      if (!(w0 > 0 && h0 > 0) && W > 0 && H > 0) {
+        base = null;
+        setView(worldView());
+        if (state.level) zoomToCodes(state.level.codes, 0);
+        return;
+      }
       if (!vb || !isFinite(vb.x + vb.y + vb.w + vb.h)) {
         if (W > 0 && H > 0) { base = null; setView(worldView()); }
         return;
@@ -592,10 +600,7 @@
     // clamp's travel limits, so moving it while a finger is down tugs
     // the map out from under that finger.
     const chrome = new ResizeObserver(() => { if (!interacting()) updateSafe(); });
-    chrome.observe(el.card);
-    chrome.observe(el.wordBank);
-    chrome.observe(el.hardcoreBar);
-    chrome.observe(el.jumpBar);
+    for (const e of [el.card, el.idleBar, el.wordBank, el.hardcoreBar, el.jumpBar]) chrome.observe(e);
   }
 
   // A country's bounding box lies about where it "is" when its islands
@@ -629,67 +634,6 @@
       geom[code] = g;
     }
     probe.remove();
-  }
-
-  function groupIslands(boxes) {
-    const parent = boxes.map((_, i) => i);
-    const find = (i) => parent[i] === i ? i : (parent[i] = find(parent[i]));
-    const gap = (a, b) => Math.hypot(
-      Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w)),
-      Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h)));
-    for (let i = 0; i < boxes.length; i++) {
-      for (let j = i + 1; j < boxes.length; j++) {
-        if (gap(boxes[i], boxes[j]) <= ARCH_GAP) parent[find(i)] = find(j);
-      }
-    }
-    const byRoot = {};
-    boxes.forEach((b, i) => (byRoot[find(i)] ||= []).push(b));
-    return Object.values(byRoot).map(list => {
-      let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
-      for (const b of list) {
-        x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
-        x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h);
-      }
-      // The padded box is what the rest of the app treats as the island
-      // group (where to look, how big a target it already is); `raw` and
-      // `pad` are kept so the drawn outline can hug the islands closer
-      // as you zoom in.
-      const pad = Math.max(1.4, Math.max(x2 - x1, y2 - y1) * 0.12);
-      const raw = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-      return { x: x1 - pad, y: y1 - pad, w: raw.w + 2 * pad, h: raw.h + 2 * pad, raw, pad, tilt: tiltFit(list, raw) };
-    });
-  }
-
-  // The smallest tilted box that still holds every island of a group.
-  // Rotating calipers over the islands' corners, one degree at a time —
-  // cheap, and it only runs once at load. `tight` is how much smaller
-  // that box is than the upright one: near 1 the islands cluster and an
-  // upright outline is honest, well under it they run in a line and the
-  // upright box is mostly other people's sea.
-  function tiltFit(list, raw) {
-    const pts = [];
-    for (const b of list) pts.push([b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]);
-    let best = null;
-    for (let deg = 0; deg < 180; deg++) {
-      const th = deg * Math.PI / 180, c = Math.cos(th), sn = Math.sin(th);
-      let u1 = Infinity, v1 = Infinity, u2 = -Infinity, v2 = -Infinity;
-      for (const [px, py] of pts) {
-        const u = px * c + py * sn, v = py * c - px * sn;
-        if (u < u1) u1 = u; if (u > u2) u2 = u;
-        if (v < v1) v1 = v; if (v > v2) v2 = v;
-      }
-      const w = u2 - u1, h = v2 - v1;
-      const area = Math.max(w, 1e-4) * Math.max(h, 1e-4);
-      if (!best || area < best.area) best = { area, w, h, deg, cu: (u1 + u2) / 2, cv: (v1 + v2) / 2, c, sn };
-    }
-    const box = Math.max(raw.w, 1e-4) * Math.max(raw.h, 1e-4);
-    return {
-      angle: best.deg,
-      w: best.w, h: best.h,
-      cx: best.cu * best.c - best.cv * best.sn,
-      cy: best.cu * best.sn + best.cv * best.c,
-      tight: best.area / box,
-    };
   }
 
   // One rule, no exceptions: a button stands in for a country only while
@@ -919,9 +863,25 @@
     svg.setAttribute('viewBox', box);
     osvg.setAttribute('viewBox', box);
     svg.style.transform = osvg.style.transform = '';
+    markView();
     // Rebuilding the overlay mid-animation would just add to the frame's
     // work; the landing bake redraws it at the final scale anyway.
     if (settled) { updateOverlay(); landOverlay(); }
+  }
+
+  // The minimap's patch of light: what the map is showing, clipped to the
+  // map. It moves when the view is baked, not on every frame of a drag — a
+  // second svg repainting under the finger is exactly what the
+  // transform-only pan exists to avoid. Zoomed all the way out there is
+  // nothing to pick out.
+  function markView() {
+    const x1 = Math.max(vb.x, fullVB.x), y1 = Math.max(vb.y, fullVB.y);
+    const x2 = Math.min(vb.x + vb.w, fullVB.x + fullVB.w), y2 = Math.min(vb.y + vb.h, fullVB.y + fullVB.h);
+    const whole = x2 - x1 >= fullVB.w * 0.98 && y2 - y1 >= fullVB.h * 0.98;
+    if (whole || x2 <= x1 || y2 <= y1) { el.miniView.setAttribute('display', 'none'); return; }
+    el.miniView.setAttribute('x', x1); el.miniView.setAttribute('y', y1);
+    el.miniView.setAttribute('width', x2 - x1); el.miniView.setAttribute('height', y2 - y1);
+    el.miniView.removeAttribute('display');
   }
 
   // Mid-zoom the buttons would scale with the map — a button the size of
@@ -1122,25 +1082,30 @@
     return null;
   }
 
-  // The floating UI overlays the map's edges — the HUD and the tools
-  // across the top, and along the bottom the jump keys plus whatever the
-  // mode docks there. Fits aim for the window minus this border, so a
-  // framed area never starts life under the chrome (and offset buttons
-  // and tails get breathing room too). The sides are bare on every
-  // screen: 40px of a 412px phone was a tenth of the map given away.
+  // The floating UI overlays the map's edges — the HUD across the top,
+  // and along the bottom the bar plus, on a phone, the minimap above it.
+  // Fits aim for the window minus this border, so a framed area never
+  // starts life under the chrome (and offset buttons and tails get
+  // breathing room too). The sides are bare on every screen: 40px of a
+  // 412px phone was a tenth of the map given away.
   const SAFE = { top: 60, bottom: 64, left: 12, right: 12 };
   const SAFE_BASE = { ...SAFE };
 
-  // What is docked along the bottom right now — the jump keys always,
-  // and whichever of the word bank, hardcore's bar or the quiz card is
-  // open — is measured rather than guessed at, on every measure(). A fit
-  // that does not know the word bank is 50px tall frames the country it
-  // is asking you to find underneath it.
+  // What is docked along the bottom right now — whichever bar the mode
+  // has up — is measured rather than guessed at, on every measure(). A
+  // fit that does not know the bar is 70px tall frames the country it is
+  // asking you to find underneath it. The minimap counts only where it
+  // spans a real share of the width: on a phone it does, and a fit has to
+  // clear it; on a wide window it is a corner, and reserving its whole
+  // height across the bottom would cost the map a fifth of the screen to
+  // protect a ninth of it.
   function updateSafe() {
     let bottom = SAFE_BASE.bottom;
-    for (const e of [el.jumpBar, el.wordBank, el.hardcoreBar, el.card]) {
+    for (const e of [el.jumpBar, el.idleBar, el.wordBank, el.hardcoreBar, el.card]) {
       if (!e || e.hidden || !e.offsetParent) continue;
-      const top = e.getBoundingClientRect().top - rectTop;
+      const r = e.getBoundingClientRect();
+      if (e === el.jumpBar && r.width < W * 0.4) continue;
+      const top = r.top - rectTop;
       if (top < H) bottom = Math.max(bottom, Math.round(H - top) + 10);
     }
     SAFE.bottom = Math.min(bottom, Math.max(SAFE_BASE.bottom, H * 0.45));
@@ -1231,86 +1196,6 @@
 
   // ————— overlay: island outlines & buttons —————
 
-  // Island outlines that would overlap first slide apart — each as far
-  // as it can while still keeping its own islands inside, so the outline
-  // never wanders off the land it stands for — and then, if that isn't
-  // enough, give back the growth that caused it, slide again with the
-  // room that frees, and repeat. Islands whose bounding boxes genuinely
-  // interleave (Grenada and Trinidad, Antigua and Barbuda) still touch;
-  // no layout can separate those.
-  function spreadBoxes(list, gap) {
-    // How far a box can slide and still cover its own islands, keeping
-    // half its breathing room on the trailing side. A tilted pill has no
-    // such freedom — slide it sideways and the chain walks out of the end
-    // of it — so it holds still and the neighbour moves.
-    const room = (b, axis) => b.fixed ? 0
-      : Math.max(0, (axis === 'x' ? b.w - b.raw.w : b.h - b.raw.h) / 2 - b.pad / 2);
-    const over = (a, b, axis) => axis === 'x'
-      ? Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2)
-      : Math.min(a.cy + a.h / 2, b.cy + b.h / 2) - Math.max(a.cy - a.h / 2, b.cy - b.h / 2);
-    // A half of a split nation stands for islands on the far side of the
-    // map, so sliding it means nothing — like a tilted pill, it holds
-    // still and its neighbours make way for it instead.
-    for (const b of list) if (b.split) b.fixed = true;
-    const pairs = [];
-    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-      pairs.push([list[i], list[j]]);
-    }
-    // A tilted pill already hugs its chain, so there is no slack in it to
-    // give back; the shrink pass leaves those pairs alone.
-    const shrinkable = pairs.filter(([a, b]) => !a.tilt && !b.tilt);
-
-    const slide = (passes) => {
-      for (let pass = 0; pass < passes; pass++) {
-        let moved = false;
-        for (const [a, b] of pairs) {
-          const ox = over(a, b, 'x'), oy = over(a, b, 'y');
-          if (ox <= 0 || oy <= 0) continue;                   // clear on one axis is clear
-          const axis = ox <= oy ? 'x' : 'y';                  // part along whichever they're closest to clearing
-          const c = axis === 'x' ? 'cx' : 'cy', home = axis === 'x' ? 'hx' : 'hy';
-          const dir = Math.sign(a[c] - b[c]) || 1;
-          const ra = Math.max(0, room(a, axis) - dir * (a[c] - a[home]));
-          const rb = Math.max(0, room(b, axis) + dir * (b[c] - b[home]));
-          if (ra + rb <= 0) continue;
-          const move = Math.min(Math.min(ox, oy) + gap, ra + rb);
-          a[c] += dir * move * (ra / (ra + rb));
-          b[c] -= dir * move * (rb / (ra + rb));
-          moved = true;
-        }
-        if (!moved) return;
-      }
-    };
-
-    // Give back the growth that caused the overlap — and, past that, half
-    // the breathing room too, because two outlines this close are better
-    // off snug than crossed. As much as there is, even when that alone
-    // won't clear the pair: the slide that follows usually finishes the
-    // job with the room it frees.
-    const shrink = () => {
-      for (const [a, b] of shrinkable) {
-        const ox = over(a, b, 'x'), oy = over(a, b, 'y');
-        if (ox <= 0 || oy <= 0) continue;
-        const axis = ox <= oy ? 'x' : 'y', d = axis === 'x' ? 'w' : 'h';
-        const ca = Math.max(0, a[d] - (a.raw[d] + a.pad)), cb = Math.max(0, b[d] - (b.raw[d] + b.pad));
-        if (ca + cb <= 0) continue;
-        const cut = Math.min(Math.min(ox, oy) + gap, ca + cb);
-        a[d] -= cut * (ca / (ca + cb));
-        b[d] -= cut * (cb / (ca + cb));
-      }
-    };
-
-    slide(8);
-    for (let round = 0; round < 4; round++) { shrink(); slide(4); }
-
-    // A box that both slid and shrank could have left its islands
-    // behind; pull it back over them.
-    for (const b of list) {
-      const rx = room(b, 'x'), ry = room(b, 'y');
-      b.cx = Math.min(Math.max(b.cx, b.hx - rx), b.hx + rx);
-      b.cy = Math.min(Math.max(b.cy, b.hy - ry), b.hy + ry);
-    }
-  }
-
   const activeFlash = new Map();   // code -> Set of flash classes in progress
 
   function updateOverlay() {
@@ -1329,91 +1214,19 @@
       for (const cls of activeFlash.get(code) || []) elem.classList.add(cls);
     };
 
-    // Dense-zone island nations past their zone's squareScale: the
-    // dotted outline (grown to a comfortable click size below) replaces
-    // the button entirely.
-    const squared = new Set();
-    for (const z of BUTTON_ZONES) {
-      if (!z.squareScale || s < z.squareScale) continue;
-      for (const c of z.codes) if (geom[c]?.groups) squared.add(c);
-    }
-
-    // Dotted outline around each island group — a rounded box when the
-    // islands cluster, a tilted pill along the chain when they don't
-    // (the Bahamas running down past Cuba, Micronesia strung across the
-    // Pacific): an upright box around either of those is mostly someone
-    // else's sea.
-    //
-    // The outline is a fixed *geographic* shape: the islands plus a pad
-    // that is a share of the group's own size. It used to hug closer the
-    // further you zoomed in, which meant the outline quietly changed
-    // shape under you as you moved around — the one thing on the map
-    // that did. The only thing zoom still decides is growth: once the
-    // outline stands in for the button it inflates to a comfortable
-    // click size when it would otherwise be a speck, and spreadBoxes
-    // keeps that growth from swallowing the neighbouring island.
-    const outlines = [];
-    for (const code of codes) {
-      const g = geom[code];
-      if (!g?.groups) continue;
-      const takeover = squared.has(code);
-      for (const b of g.groups) {
-        if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
-        const r = b.raw, pad = b.pad;
-        const box = { code, split: g.groups.length > 1, raw: r, pad };
-        const t = b.tilt;
-        if (t && t.tight <= ROT_MAX) {
-          // Long side gets the full comfortable size, short side only
-          // enough to stay a pill you can hit.
-          const il = Math.max(t.w, t.h), iw = Math.min(t.w, t.h);   // the islands' own rect
-          const across = Math.max(iw + 2 * pad, (takeover ? SQ_THIN : ROT_THIN) / s);
-          let along = Math.max(il + 2 * pad, takeover ? SQ_MIN / s : 0);
-          // A pill has semicircular ends, and a semicircle no wider than
-          // the chain cuts the corners off the rect the chain sits in —
-          // which is exactly where the island at the end of the chain
-          // is. The pad above is usually enough to save it, but "usually"
-          // is what lost Trinidad a corner; solving the end cap against
-          // the corner gives the length that always clears it.
-          const R = across / 2, half = Math.min(iw / 2, R);
-          along = Math.max(along, il + 2 * (R - Math.sqrt(Math.max(0, R * R - half * half))));
-          const flip = t.w < t.h;                             // the tilt's own long axis
-          box.tilt = { angle: t.angle, w: flip ? across : along, h: flip ? along : across };
-          box.fixed = true;
-          box.cx = t.cx; box.cy = t.cy;
-          const th = t.angle * Math.PI / 180, c = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th));
-          box.w = box.tilt.w * c + box.tilt.h * sn;           // upright bounds, for keeping neighbours clear
-          box.h = box.tilt.w * sn + box.tilt.h * c;
-        } else {
-          box.cx = r.x + r.w / 2; box.cy = r.y + r.h / 2;
-          box.w = Math.max(r.w + 2 * pad, takeover ? SQ_MIN / s : 0);
-          box.h = Math.max(r.h + 2 * pad, takeover ? SQ_MIN / s : 0);
-        }
-        box.hx = box.cx; box.hy = box.cy;
-        outlines.push(box);
-      }
-    }
-    spreadBoxes(outlines, SQ_GAP / s);
-    for (const b of outlines) {
+    // The dotted island outlines (js/islands.js decides their shapes;
+    // here they only become SVG). Past a dense zone's squareScale an
+    // outline replaces its nation's button entirely.
+    const groupsOf = (c) => geom[c]?.groups;
+    const squared = squaredAt(s, groupsOf);
+    for (const b of layoutOutlines(codes, s, groupsOf, squared)) {
       const grp = document.createElementNS(SVG_NS, 'g');
       grp.setAttribute('class', 'ov-box');
       const shape = document.createElementNS(SVG_NS, 'rect');
-      const t = b.tilt;
-      const w = t ? t.w : b.w, h = t ? t.h : b.h;
-      shape.setAttribute('x', b.cx - w / 2); shape.setAttribute('y', b.cy - h / 2);
-      shape.setAttribute('width', w); shape.setAttribute('height', h);
-      // Fully rounded ends on a pill, a soft-cornered square otherwise.
-      // Fully rounded ends on a pill (its length already accounts for
-      // them); on a square, a radius that stops where the islands start.
-      // The same corner-cutting arithmetic as above, read the other way:
-      // with margins a and b around the islands, a corner radius up to
-      // a + b + sqrt(2ab) still leaves the island corner inside.
-      let rx = Math.min(w, h) * (t ? 0.5 : SQ_ROUND);
-      if (!t) {
-        const a = Math.max(0, (w - b.raw.w) / 2), c = Math.max(0, (h - b.raw.h) / 2);
-        rx = Math.min(rx, a + c + Math.sqrt(2 * a * c));
-      }
-      shape.setAttribute('rx', rx);
-      if (t) shape.setAttribute('transform', `rotate(${t.angle} ${b.cx} ${b.cy})`);
+      shape.setAttribute('x', b.cx - b.w / 2); shape.setAttribute('y', b.cy - b.h / 2);
+      shape.setAttribute('width', b.w); shape.setAttribute('height', b.h);
+      shape.setAttribute('rx', b.rx);
+      if (b.angle) shape.setAttribute('transform', `rotate(${b.angle} ${b.cx} ${b.cy})`);
       grp.appendChild(shape);
       decorate(grp, b.code);
       overlayLayer.appendChild(grp);
@@ -1568,7 +1381,7 @@
   // ————— pointer input —————
 
   function handleTarget(target, pt) {
-    if (state.level?.pausedAt != null) return;
+    if (state.level?.pausedAt != null && !state.heat) return;
     const zg = target.closest('g.btn.zone');
     if (zg) {
       zoomToZone(BUTTON_ZONES.find(z => z.name === zg.dataset.zone));
@@ -1580,6 +1393,7 @@
       return;
     }
     const code = target.dataset.code || target.id;
+    if (state.heat) { heatSelect(COUNTRY_BY_CODE[code] ? code : null); return; }
     const L = state.level;
     if (!L) return;
     if (COUNTRY_BY_CODE[code]) {
@@ -1819,10 +1633,10 @@
     let text = null;
     if (target?.closest('g.btn.zone')) {
       const zg2 = target.closest('g.btn.zone');
-      text = `${zg2.dataset.zone} — ${zg2.dataset.codes.split(',').length} small countries · click to zoom in`;
+      text = `${zg2.dataset.zone} — ${zg2.dataset.codes.split(',').length} small nations · click to zoom in`;
     } else if (target?.closest('g.btn.group')) {
       const n = target.closest('g.btn.group').dataset.codes.split(',').length;
-      text = `${n} small countries — click to zoom in`;
+      text = `${n} small nations — click to zoom in`;
     } else if (target) {
       const code = target.dataset.code || target.id;
       const L = state.level;
@@ -1830,11 +1644,11 @@
       if (c) {
         if (L && !L.codes.includes(code)) text = null;
         else if (state.heat) {
-          const r = stats.byCode[code]?.[L?.mode === 'place' ? 'place' : 'name'];
-          text = `${c.name} · ${r ? `${r.streak} in a row` : 'not tried yet'}`;
+          const r = stats.byCode[code]?.[heatMode()];
+          text = `${c.name} · ${r?.streak ? `${r.streak} in a row` : 'no streak yet'}`;
         }
         else if (state.status[code]) text = `${c.name} ✓`;
-        else text = L?.mode === 'place' ? null : 'Click to name this country';
+        else text = L?.mode === 'place' ? null : 'Click to name this nation';
       } else if (TERRITORIES[code] && (!L || L.codes.length === WORLD_CODES.length)) {
         text = TERRITORIES[code];
       }
@@ -1858,9 +1672,10 @@
     updateHintBtn();
     state.attempts = 0;
     setSelectedClass(code, true);
-    el.helloClose.click();
     closePanels();
     el.card.hidden = false;
+    setNote('', '');
+    updateDock();
 
     const done = state.status[code];
     if (done) {
@@ -1869,7 +1684,7 @@
     } else {
       el.cardQuestion.hidden = false;
       el.cardAnswer.hidden = true;
-      el.cardPrompt.textContent = 'What country is this?';
+      el.cardPrompt.textContent = 'What nation is this?';
       el.guessInput.value = '';
       setFeedback('', '');
       el.micStatus.hidden = !state.micOn;
@@ -1896,12 +1711,38 @@
     if (state.selected) setSelectedClass(state.selected, false);
     state.selected = null;
     el.card.hidden = true;
+    updateDock();
     stopListening();                    // pending finals still arrive and grade
+  }
+
+  // The bottom bar holds one thing at a time. With nothing selected in a
+  // naming mode it says what to do — hardcore's own bar does that job
+  // there, with its two buttons — and both step aside while a country is
+  // being asked. Place mode's bar is the word bank, which is never idle.
+  function updateDock() {
+    const L = state.level;
+    const asking = !el.card.hidden;
+    document.body.classList.toggle('asking', asking);
+    el.idleBar.hidden = !L || L.done || L.mode !== 'name' || asking;
+    if (L) {
+      el.idleText.textContent = L.t0 == null
+        ? `${TAP} any nation to name it. The clock starts on your first move.`
+        : `${TAP} a nation to name it`;
+    }
   }
 
   function setFeedback(msg, cls) {
     el.feedback.textContent = msg;
     el.feedback.className = cls;
+  }
+
+  // What the last answer came to, above the idle bar (and hardcore's):
+  // the question it belonged to has closed by the time it is read.
+  function setNote(msg, cls) {
+    for (const n of document.querySelectorAll('.dock-note')) {
+      n.textContent = msg;
+      n.className = `dock-note ${cls}`;
+    }
   }
 
   function setStatus(code, st) {
@@ -1926,7 +1767,12 @@
       setStatus(code, 'named');
       flash(code, 'flash-good', 900);
       popAt(state.selectedAt || mapToScreen(focusPoint(code).x, focusPoint(code).y), `✓ ${c.name}`, 'good');
-      showAnswerPane('✓ Correct!', 'good');
+      // A right answer closes the question: the bar goes back to idle
+      // with the result above it, and the next click is the next country
+      // — nothing to dismiss in between.
+      const first = state.level?.result[code] === true;
+      deselect();
+      setNote(`✓ ${c.name}${first ? ' · first try' : ''}`, 'good');
       checkComplete();
     } else {
       settle(code, false);
@@ -1938,7 +1784,7 @@
       const msg = viaVoice
         ? `I heard “${guess}” — not this one. Try again!`
         : state.attempts >= 3
-          ? 'Not quite — need a 💡 hint, or Reveal it?'
+          ? 'Not quite — need a hint, or Reveal it?'
           : 'Not quite — try again!';
       setFeedback(msg, 'bad');
       el.guessInput.select();
@@ -1971,9 +1817,9 @@
     if (isHardcore()) return;
     const left = MAX_HINTS - state.hintLevel;
     el.hintBtn.disabled = left <= 0;
-    el.hintBtn.textContent = left > 0
-      ? `💡 Hint ${state.hintLevel + 1}/${MAX_HINTS}`
-      : '💡 No hints left';
+    el.hintBtn.innerHTML = icon('lightbulb') + (left > 0
+      ? `Hint ${state.hintLevel + 1}/${MAX_HINTS}`
+      : 'No hints left');
   }
 
   function giveHint() {
@@ -2020,7 +1866,7 @@
   function armGiveUp(on) {
     clearTimeout(giveUpTimer);
     el.hcGiveup.classList.toggle('arming', on);
-    el.hcGiveup.textContent = on ? '— sure? this ends it' : "🏁 I'm done";
+    el.hcGiveup.innerHTML = on ? 'Sure? This ends it' : `${icon('flag-checkered')}I'm done <kbd>G</kbd>`;
     if (on) giveUpTimer = setTimeout(() => armGiveUp(false), 4000);
   }
 
@@ -2042,7 +1888,7 @@
     const n = L?.mode === 'place'
       ? codes.filter(c => state.status[c]).length
       : codes.filter(c => state.status[c] === 'named').length;
-    el.progressText.textContent = n === codes.length ? `all ${codes.length} 🏆` : `${n} / ${codes.length}`;
+    el.progressText.textContent = n === codes.length ? `all ${codes.length}` : `${n} / ${codes.length}`;
     el.progressFill.style.width = `${(n / codes.length) * 100}%`;
   }
 
@@ -2089,13 +1935,18 @@
     }
   }
 
+  // The menu's first row is pause while you play and resume while you don't.
+  function markPause(paused) {
+    el.pauseTimer.innerHTML = `${icon(paused ? 'play' : 'pause')}<span>${paused ? 'Resume' : 'Pause'}</span><kbd>P</kbd>`;
+  }
+
   function togglePause() {
     const L = state.level;
     if (!L || L.done || L.t0 == null) return;
     if (L.pausedAt == null) {
       L.pausedAt = performance.now();
       showVeil(true);
-      el.pauseTimer.textContent = '▶';
+      markPause(true);
       if (document.activeElement?.blur) document.activeElement.blur();
       // Paused means the mic is actually off, not merely ignored. Leaving
       // it open banked a transcript nothing was consuming — it grew for as
@@ -2110,7 +1961,7 @@
       L.t0 += performance.now() - L.pausedAt;
       L.pausedAt = null;
       showVeil(false);
-      el.pauseTimer.textContent = '⏸';
+      markPause(false);
       if (state.micOn) {
         startMeter();
         if (state.selected) startListening();
@@ -2151,7 +2002,10 @@
   // "which of the 195 have I missed" is a search problem rather than a
   // knowledge one, and hunting for gaps is not the game.
   const MODES = ['name', 'place', 'hardcore'];
-  const MODE_LABEL = { name: '✏️ Name mode', place: '🧩 Place mode', hardcore: '🏴 Hardcore' };
+  const MODE_LABEL = { name: 'Name mode', place: 'Place mode', hardcore: 'Hardcore' };
+  const MODE_NAME = { name: 'Name', place: 'Place', hardcore: 'Hardcore' };
+  const MODE_ICON = { name: 'pencil-simple', place: 'puzzle-piece', hardcore: 'skull' };
+  const modeLabel = (m) => icon(MODE_ICON[m]) + MODE_LABEL[m];
   const nextMode = (m) => MODES[(MODES.indexOf(m) + 1) % MODES.length];
   const isHardcore = () => state.level?.mode === 'hardcore';
 
@@ -2163,14 +2017,15 @@
     if (state.heat) { state.heat = false; applyHeat(); }
 
     state.level = {
-      id: def.id, name: def.name, tier: def.tier, region: def.region,
+      id: def.id, name: def.name, tier: def.tier, region: def.region, def,
       codes: def.codes.slice(), mode,
       armed: null, strikes: 0, result: {},
       t0: null, pausedAt: null, elapsed: 0, done: false,
     };
     deselect();
     closePanels();
-    el.hello.hidden = true;   // boot re-shows the intro afterwards if unseen
+    el.home.hidden = el.onboard.hidden = el.modeDialog.hidden = true;
+    held = false;
 
     // The whole-world challenge covers everything, so nothing dims; a
     // smaller challenge fades the rest of the map back.
@@ -2188,17 +2043,17 @@
     el.hardcoreBar.hidden = mode !== 'hardcore';
     document.body.classList.toggle('hardcore', mode === 'hardcore');
     armGiveUp(false);
-    // The card stacks above the bar rather than under it; the CSS needs
-    // the bar's real height to do that, and only the layout knows it.
-    document.documentElement.style.setProperty('--hc-h',
-      mode === 'hardcore' ? `${Math.round(el.hardcoreBar.getBoundingClientRect().height) + 10}px` : '0px');
+    document.body.classList.remove('bank-open');
+    setNote('', '');
+    updateDock();
+    closeMenu();
     updateSafe();
 
     updateOverlay();
     zoomToCodes(state.level.codes);
     el.levelBanner.hidden = false;
     el.pauseVeil.hidden = true;
-    el.pauseTimer.textContent = '⏸';
+    markPause(false);
     updateLevelUI();
     startTimer();
   }
@@ -2210,12 +2065,9 @@
   function updateLevelUI() {
     const L = state.level;
     if (!L) return;
-    // The HUD has room for one glyph, and which mode you're in matters
-    // more mid-run than which tier of challenge it is.
-    const icon = L.mode === 'place' ? '🧩' : L.mode === 'hardcore' ? '🏴'
-      : L.tier === 'world' ? '🌍' : L.tier === 'continent' ? '🗺️' : '📍';
-    el.levelTitle.textContent = `${icon} ${L.name}`;
-    el.levelMode.textContent = MODE_LABEL[nextMode(L.mode)];
+    el.levelTitle.textContent = L.name;
+    el.levelChip.textContent = MODE_NAME[L.mode];
+    for (const b of el.modeSeg.children) b.classList.toggle('on', b.dataset.mode === L.mode);
     updateProgress();
   }
 
@@ -2230,9 +2082,9 @@
   function buildBank() {
     const L = state.level;
     el.wordBank.hidden = false;
-    // Start folded — the list blocks the map otherwise; ▾ opens it.
+    // Start folded — the list blocks the map otherwise; the caret opens it.
     el.wordBank.classList.add('collapsed');
-    el.bankCollapse.textContent = '▴';
+    el.bankCollapse.innerHTML = icon('caret-up');
     el.bankChips.innerHTML = '';
     el.bankHint.className = '';
     const pending = L.codes.filter(c => !state.status[c]).sort(() => Math.random() - 0.5);
@@ -2326,7 +2178,7 @@
     }
   }
 
-  // Show where the current target is (three misses, or 👁 Show me). It
+  // Show where the current target is (three misses, or Show me). It
   // turns orange and counts as a miss, then the next name comes up.
   function revealTarget(auto = false) {
     const L = state.level;
@@ -2374,10 +2226,10 @@
     L.elapsed = L.t0 == null ? 0 : (L.pausedAt != null ? L.pausedAt : performance.now()) - L.t0;
     L.pausedAt = null;
     showVeil(false);
-    el.pauseTimer.textContent = '⏸';
+    markPause(false);
     el.hardcoreBar.hidden = true;
     document.body.classList.remove('hardcore');
-    document.documentElement.style.setProperty('--hc-h', '0px');
+    closeMenu();
     stopTimer();
     const total = L.codes.length;
     const clean = L.codes.filter(c => L.result[c] === true).length;
@@ -2387,7 +2239,10 @@
     const isClean = clean === total;
     const newClean = isClean && (!prev.clean || L.elapsed < prev.clean);
     const newAcc = clean > (prev.acc || 0);
-    stats.bests[key] = {
+    // A practice run sets no records, and neither does a run that was
+    // stopped short: giving up after two seconds is not a best time.
+    const stopped = L.codes.some(c => !state.status[c]);
+    if (L.id !== 'custom' && !stopped) stats.bests[key] = {
       ms: newFast ? L.elapsed : prev.ms,
       clean: newClean ? L.elapsed : (prev.clean || null),
       acc: Math.max(prev.acc || 0, clean),
@@ -2403,17 +2258,21 @@
 
   function showResults({ prev, newFast, newClean, newAcc, clean, total, isClean }) {
     const L = state.level;
-    el.resultsTitle.textContent = `${L.name} — complete!`;
-    el.resultsSub.textContent = L.mode === 'place' ? 'Place mode' : 'Name mode';
+    // The time leads, because the time is the score. A run that was
+    // stopped (hardcore's "I'm done") is not a finish and is not ranked.
+    const stopped = L.codes.some(c => !state.status[c]);
     const pct = Math.round((clean / total) * 100);
-    const tile = (label, value, sub, record) =>
-      `<div class="tile${record ? ' record' : ''}"><div class="tile-label">${label}</div><div class="tile-value">${value}</div><div class="tile-sub">${sub}</div></div>`;
+    el.resultsSub.textContent = `${L.name} · ${MODE_LABEL[L.mode]}`;
+    el.resultsTime.textContent = fmtTime(L.elapsed);
+    el.resultsTitle.textContent = stopped ? 'Run ended' : isClean ? 'Clean run' : 'Challenge complete';
+    el.resultsBest.hidden = stopped || !(newFast && prev.ms);
+    const tile = (label, value) =>
+      `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${value}</div></div>`;
     el.resultsTiles.innerHTML =
-      tile('⏱ Time', fmtTime(L.elapsed), newFast ? (prev.ms ? '🎉 New best!' : 'First finish') : `best ${fmtTime(prev.ms)}`, newFast && prev.ms) +
-      tile('🎯 First try', `${clean}/${total}`, newAcc ? (prev.acc ? `🎉 Best yet (${pct}%)` : `${pct}%`) : `${pct}% · best ${prev.acc}`, newAcc && prev.acc) +
-      tile('✨ Clean run', isClean ? fmtTime(L.elapsed) : '—', isClean
-        ? (newClean ? (prev.clean ? '🎉 New clean best!' : 'Flawless!') : `best ${fmtTime(prev.clean)}`)
-        : (prev.clean ? `best ${fmtTime(prev.clean)}` : 'all first-try to set one'), isClean && newClean);
+      tile('First try', `${clean} / ${total}`) +
+      tile('Accuracy', `${pct}%`) +
+      tile('Previous best', stopped ? 'Not ranked' : prev.ms ? fmtTime(prev.ms) : '—') +
+      (prev.clean ? tile('Best clean run', fmtTime(prev.clean)) : '');
 
     // "Missed" used to mean everything that was not first-try, which put
     // a country you took one hint on and then named right next to one you
@@ -2441,7 +2300,7 @@
 
     el.resultsMisses.innerHTML = '';
     if (!lost.length && !helped.length) {
-      el.resultsMisses.innerHTML = `<p class="clean">✨ Every single one on the first try.</p>`;
+      el.resultsMisses.innerHTML = `<p class="clean">Every single one on the first try.</p>`;
     } else {
       for (const [codes, title] of [
         [lost, `Never got it (${lost.length}) — click one to see it`],
@@ -2454,8 +2313,17 @@
         el.resultsMisses.appendChild(chipsFor(codes));
       }
     }
-    el.resultsMode.textContent = MODE_LABEL[nextMode(L.mode)];
+    // The misses, as a challenge of their own — in the mode they were
+    // missed in, except hardcore's, which are practised with the net up.
+    const again = [...lost, ...helped];
+    el.resultsPractise.hidden = !again.length;
+    el.resultsPractise.textContent = again.length === 1 ? 'Practise the 1 miss' : `Practise the ${again.length} misses`;
+    el.resultsPractise.onclick = () => startLevel(
+      { id: 'custom', name: `Missed from ${L.name}`, tier: 'custom', codes: again },
+      L.mode === 'hardcore' ? 'name' : L.mode);
+    el.resultsMode.textContent = `Try ${MODE_LABEL[nextMode(L.mode)]}`;
     el.results.hidden = false;
+    el.results.scrollTop = 0;
   }
 
   function confetti() {
@@ -2497,41 +2365,39 @@
     return stats.bests[`${id}|${mode}`];
   }
 
+  let statsFrom = 'play';
   function openStats() {
+    statsFrom = el.home.hidden ? 'play' : 'home';
     deselect();
     closePanels();
+    closeMenu();
+    holdRun();
+    el.home.hidden = true;
     const names = COUNTRIES.map(c => stats.byCode[c.code]?.name).filter(Boolean);
-    const places = COUNTRIES.map(c => stats.byCode[c.code]?.place).filter(Boolean);
     const mastered = names.filter(r => r.streak >= 3).length;
-    const acc = (rs) => { const r = rs.reduce((a, x) => a + x.right, 0), w = rs.reduce((a, x) => a + x.wrong, 0); return r + w ? `${Math.round(100 * r / (r + w))}%` : '—'; };
-    const tile = (label, value, sub) =>
-      `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${value}</div><div class="tile-sub">${sub}</div></div>`;
+    const longest = Math.max(0, ...names.map(r => r.best || r.streak));
+    const tile = (label, value) =>
+      `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${value}</div></div>`;
     el.statTiles.innerHTML =
-      tile('Games', stats.games, 'finished') +
-      tile('Mastered', `${mastered}`, `of 195 · 3+ in a row`) +
-      tile('Naming', acc(names), 'first-try accuracy') +
-      tile('Placing', acc(places), 'first-try accuracy');
-
-    const mode = state.level?.mode === 'place' ? 'place' : 'name';
-    el.heatModeNote.textContent = `Showing ${mode} mode. Turns off when you start a challenge.`;
-    el.heatToggle.checked = state.heat;
+      tile('Games played', stats.games) +
+      tile('Nations tried', `${names.length} / ${WORLD_CODES.length}`) +
+      tile('Mastered', mastered) +
+      tile('Longest streak', `${longest} in a row`);
     el.flagsToggle.checked = state.prefs.flags;
 
-    const rows = CHALLENGES.filter(c => bestFor(c.id, 'name') || bestFor(c.id, 'place'));
-    el.bestTimes.innerHTML = rows.length ? '' : '<p class="empty-note">Finish a challenge to set a time.</p>';
-    for (const c of rows) {
-      const row = document.createElement('div');
-      row.className = 'best-row';
-      const parts = [];
-      for (const m of ['name', 'place']) {
+    el.bestTimes.innerHTML = '';
+    for (const c of CHALLENGES) {
+      for (const m of MODES) {
         const b = bestFor(c.id, m);
-        if (!b) continue;
-        parts.push(`${m === 'name' ? '✏️' : '🧩'} <b>${fmtTime(b.ms)}</b>${b.clean ? ` · clean ${fmtTime(b.clean)}` : ''} · ${b.acc}/${c.codes.length}`);
+        if (!b?.ms) continue;
+        const row = document.createElement('div');
+        row.className = 'best-row';
+        row.innerHTML = `<span class="best-name"></span><span class="best-mode">${MODE_NAME[m]}</span><span class="best-t">${fmtTime(b.ms)}</span>`;
+        row.querySelector('.best-name').textContent = c.name;
+        el.bestTimes.appendChild(row);
       }
-      row.innerHTML = `<span class="best-name"></span><span class="best-t">${parts.join(' &nbsp; ')}</span>`;
-      row.querySelector('.best-name').textContent = c.name;
-      el.bestTimes.appendChild(row);
     }
+    if (!el.bestTimes.children.length) el.bestTimes.innerHTML = '<p class="empty-note">Finish a challenge to set a time.</p>';
 
     el.regionMastery.innerHTML = '';
     for (const region of REGIONS) {
@@ -2539,78 +2405,230 @@
       const n = codes.filter(code => (stats.byCode[code]?.name?.streak || 0) >= 3).length;
       const row = document.createElement('div');
       row.className = 'mastery-row';
-      row.innerHTML = `<span class="m-name"></span><span class="m-bar"><span class="m-fill" style="width:${(100 * n / codes.length).toFixed(0)}%"></span></span><span class="m-n">${n} / ${codes.length}</span>`;
+      row.innerHTML = `<span class="m-name"></span><span class="bar"><i style="width:${(100 * n / codes.length).toFixed(0)}%"></i></span><span class="m-n">${n} / ${codes.length}</span>`;
       row.querySelector('.m-name').textContent = region;
       el.regionMastery.appendChild(row);
     }
     el.statsPanel.hidden = false;
+    el.statsPanel.scrollTop = 0;
+  }
+
+  function closeStats() {
+    el.statsPanel.hidden = true;
+    if (statsFrom === 'home') openHome(); else releaseRun();
   }
 
   function applyHeat() {
     document.body.classList.toggle('heatmap', state.heat);
-    const mode = state.level?.mode === 'place' ? 'place' : 'name';
+    el.heatBar.hidden = el.heatPanel.hidden = !state.heat;
+    const mode = heatMode();
+    for (const b of el.heatSeg.children) b.classList.toggle('on', b.dataset.mode === mode);
+    if (!state.heat && heatSel) heatSelect(null);
     for (const code of Object.keys(shapes)) {
       const p = shapes[code];
-      p.classList.remove('heat-x', 'heat-0', 'heat-1', 'heat-2', 'heat-3', 'heat-4');
+      p.classList.remove('heat-x', 'heat-1', 'heat-2', 'heat-3', 'heat-4');
       if (!state.heat) continue;
       const r = stats.byCode[code]?.[mode];
-      const bin = !r ? 'x' : r.streak >= 5 ? 4 : r.streak >= 3 ? 3 : r.streak;
-      p.classList.add('heat-' + bin);
+      p.classList.add('heat-' + heatBin(r));
     }
   }
 
-  // ————— levels panel —————
+  // ————— screens —————
+  //
+  // Home, stats, the intro, the results and the heat map each take the
+  // whole window. A run that is under way is paused while one of them is
+  // up and picks itself back up when the last one closes — unless a new
+  // challenge was started from there, which is a fresh clock anyway.
 
-  function challengeRow(def, { big = false, place = false } = {}) {
-    const active = state.level?.id === def.id;
-    const row = document.createElement('div');
-    row.className = 'level-row' + (big ? ' level-row-big' : '') + (active ? ' active' : '');
-    const bn = bestFor(def.id, 'name'), bp = bestFor(def.id, 'place');
-    const best = [bn && `✏️ ${fmtTime(bn.ms)}`, bp && `🧩 ${fmtTime(bp.ms)}`].filter(Boolean).join(' · ');
-    row.innerHTML =
-      `<span class="level-name"></span>` +
-      (best ? `<span class="level-best">${best}</span>` : '') +
-      `<span class="level-count">${def.codes.length}</span>` +
-      `<span class="level-actions">` +
-      (place ? `<button class="level-place">Place</button>` : '') +
-      `<button class="level-play">Name</button>` +
-      `</span>`;
-    row.querySelector('.level-name').textContent = def.name;
-    const play = () => startLevel(def, 'name');
-    row.querySelector('.level-play').addEventListener('click', (e) => { e.stopPropagation(); play(); });
-    if (place) row.querySelector('.level-place').addEventListener('click', (e) => { e.stopPropagation(); startLevel(def, 'place'); });
-    row.addEventListener('click', play);
-    return row;
+  let held = false;                 // a screen paused the run, so a screen resumes it
+  const screenOpen = () => !el.home.hidden || !el.statsPanel.hidden || !el.onboard.hidden ||
+    !el.results.hidden || !el.modeDialog.hidden || state.heat;
+
+  function holdRun() {
+    const L = state.level;
+    if (L && !L.done && L.t0 != null && L.pausedAt == null) { togglePause(); held = true; }
   }
 
-  function openLevels() {
+  function releaseRun() {
+    if (!held || screenOpen()) return;
+    held = false;
+    if (state.level?.pausedAt != null) togglePause();
+  }
+
+  // Share of these countries named three times running, as a percentage.
+  function mastery(codes) {
+    const n = codes.filter(c => (stats.byCode[c]?.name?.streak || 0) >= 3).length;
+    return codes.length ? Math.round(100 * n / codes.length) : 0;
+  }
+
+  // The time to beat for a challenge, whichever mode it was set in.
+  function bestOf(id) {
+    const b = MODES.map(m => bestFor(id, m)).find(b => b?.ms);
+    return b ? fmtTime(b.ms).replace(/\.\d$/, '') : '—';
+  }
+
+  // One card: a challenge and, under it, the smaller ones inside it. The
+  // whole world is the first card and has nothing under it.
+  function homeCard(def, subs) {
+    const card = document.createElement('div');
+    card.className = 'home-card';
+    const m = mastery(def.codes);
+    const head = document.createElement('button');
+    head.className = 'home-card-head';
+    head.innerHTML =
+      `<span class="hc-row"><b></b><span>${def.codes.length} nations</span>${icon('caret-right')}</span>` +
+      `<span class="bar"><i style="width:${m}%"></i></span>` +
+      `<span class="hc-row hc-meta"><span>${m}% mastered</span><span>Best ${bestOf(def.id)}</span></span>`;
+    head.querySelector('b').textContent = def.name;
+    head.addEventListener('click', () => askMode(def));
+    card.appendChild(head);
+    if (subs.length) {
+      const list = document.createElement('div');
+      list.className = 'home-subs';
+      for (const sub of subs) {
+        const b = document.createElement('button');
+        b.innerHTML = `<span></span><span class="bar"><i style="width:${mastery(sub.codes)}%"></i></span><em>${sub.codes.length}</em>`;
+        b.firstElementChild.textContent = sub.name;
+        b.addEventListener('click', () => askMode(sub));
+        list.appendChild(b);
+      }
+      card.appendChild(list);
+    }
+    return card;
+  }
+
+  function openHome() {
+    holdRun();
     deselect();
     closePanels();
-    el.levelsList.innerHTML = '';
-
-    const worldHeader = document.createElement('div');
-    worldHeader.className = 'level-region';
-    worldHeader.textContent = 'The big one';
-    el.levelsList.appendChild(worldHeader);
-    el.levelsList.appendChild(challengeRow(CHALLENGE_BY_ID.world, { big: true, place: true }));
-
-    for (const region of REGIONS) {
-      const header = document.createElement('div');
-      header.className = 'level-region';
-      header.textContent = region;
-      el.levelsList.appendChild(header);
-      el.levelsList.appendChild(challengeRow(CHALLENGE_BY_ID['cont:' + region], { big: true, place: true }));
-      for (const sub of SUBREGIONS.filter(s => s.region === region)) {
-        el.levelsList.appendChild(challengeRow(CHALLENGE_BY_ID['sub:' + sub.name], { place: true }));
-      }
+    closeMenu();
+    if (state.heat) { state.heat = false; applyHeat(); }
+    const L = state.level;
+    const live = !!L && L.t0 != null && !L.done;
+    el.homeContinue.hidden = !live;
+    if (live) {
+      el.homeContinue.querySelector('b').textContent = `${L.name} · ${MODE_NAME[L.mode]}`;
+      el.homeContinue.querySelector('em').textContent =
+        `${el.progressText.textContent.replace(' / ', ' of ')} · ${el.levelTimer.textContent}`;
     }
-    el.levelsPanel.hidden = false;
+    el.homeCards.innerHTML = '';
+    el.homeCards.appendChild(homeCard(CHALLENGE_BY_ID.world, []));
+    for (const region of REGIONS) {
+      el.homeCards.appendChild(homeCard(CHALLENGE_BY_ID['cont:' + region],
+        SUBREGIONS.filter(s => s.region === region).map(s => CHALLENGE_BY_ID['sub:' + s.name])));
+    }
+    el.home.hidden = false;
+    el.home.scrollTop = 0;
+  }
+
+  function closeHome() {
+    el.home.hidden = true;
+    releaseRun();
+  }
+
+  // Which mode, asked once a challenge is picked. It opens on the mode
+  // you last played, so the common case is one more click.
+  let pick = null;
+  function askMode(def) {
+    pick = { def, mode: state.level?.mode || 'place' };
+    el.modeFor.textContent = def.name;
+    el.modeCount.textContent = `${def.codes.length} ${def.codes.length === 1 ? 'nation' : 'nations'}`;
+    markPick();
+    el.modeDialog.hidden = false;
+    el.modeStart.focus();
+  }
+
+  function markPick() {
+    for (const b of el.modeOpts.children) b.classList.toggle('on', b.dataset.mode === pick.mode);
+  }
+
+  function closeModeDialog() {
+    el.modeDialog.hidden = true;
+    pick = null;
+  }
+
+  // ————— the intro —————
+
+  let onboardStep = 0;
+  function showOnboardStep(n) {
+    onboardStep = n;
+    for (const s of el.onboard.querySelectorAll('.onboard-step')) s.hidden = Number(s.dataset.step) !== n;
+    el.onboardCount.textContent = `0${n + 1} / 03`;
+    [...el.onboardDots.children].forEach((d, i) => d.classList.toggle('on', i === n));
+    el.onboardNext.textContent = n === 2 ? 'Choose a challenge' : 'Next';
+  }
+
+  function openOnboard() {
+    holdRun();
+    deselect();
+    closePanels();
+    closeMenu();
+    el.home.hidden = true;
+    showOnboardStep(0);
+    el.onboard.hidden = false;
+  }
+
+  function finishOnboard() {
+    el.onboard.hidden = true;
+    if (!state.seenIntro) { state.seenIntro = true; savePrefs(); }
+    openHome();
+  }
+
+  // ————— the heat map view —————
+
+  let heatFrom = 'play';
+  function openHeat() {
+    holdRun();
+    heatFrom = el.home.hidden ? 'play' : 'home';
+    deselect();
+    closePanels();
+    closeMenu();
+    el.home.hidden = true;
+    state.heat = true;
+    if (!heatShown) heatShown = played('place') > played('name') ? 'place' : 'name';
+    applyHeat();
+    heatSelect(null);
+    animateView(worldView(), 260);
+  }
+
+  function closeHeat() {
+    state.heat = false;
+    applyHeat();
+    if (heatFrom === 'home') { openHome(); return; }
+    if (state.level) zoomToCodes(state.level.codes);
+    releaseRun();
+  }
+
+  // Which mode's streaks the heat map is showing — the switch in its bar.
+  // It opens on the one you have actually played, so a place-mode player
+  // is not shown a map of everything they have never typed.
+  let heatShown = null;
+  const heatMode = () => heatShown || 'name';
+  const played = (mode) => COUNTRIES.filter(c => stats.byCode[c.code]?.[mode]).length;
+  // A streak is what is coloured. No streak — never tried, or missed last
+  // time — is plain land: the map shows what you know, not what went wrong.
+  const heatBin = (r) => (!r?.streak ? 'x' : r.streak >= 5 ? 4 : r.streak >= 3 ? 3 : r.streak);
+
+  let heatSel = null;
+  function heatSelect(code) {
+    if (heatSel) shapes[heatSel]?.classList.remove('selected');
+    heatSel = code;
+    el.heatSel.hidden = !code;
+    el.heatPrompt.hidden = !!code;
+    if (!code) return;
+    shapes[code]?.classList.add('selected');
+    const c = COUNTRY_BY_CODE[code];
+    const r = stats.byCode[code]?.[heatMode()];
+    el.heatFlag.innerHTML = flagHTML(code);
+    el.heatName.textContent = c.name;
+    el.heatDot.className = `leg-${heatBin(r)}`;
+    el.heatText.textContent = !r ? 'Not tried yet' : r.streak === 0 ? 'No streak: missed last time' : `${r.streak} in a row on the first try`;
   }
 
   function closePanels() {
-    el.levelsPanel.hidden = true;
     el.statsPanel.hidden = true;
     el.help.hidden = true;
+    el.dev.hidden = true;
     el.results.hidden = true;
   }
 
@@ -2619,15 +2637,11 @@
   function updateMicUI() {
     el.micToggle.classList.toggle('listening', state.micOn);
     el.micToggle.classList.toggle('off', !state.micOn);
+    el.micToggle.querySelector('.menu-state').textContent = state.micOn ? 'On' : 'Off';
     el.micStatus.hidden = !(state.micOn && state.selected && !state.status[state.selected]);
     if (state.micOn) startMeter(); else stopMeter();
     updateTicker();
   }
-
-  el.helloClose.addEventListener('click', () => {
-    el.hello.hidden = true;
-    if (!state.seenIntro) { state.seenIntro = true; savePrefs(); }
-  });
 
   el.guessForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2645,22 +2659,84 @@
     if (!state.selected || state.status[state.selected] !== 'revealed') return;
     el.cardQuestion.hidden = false;
     el.cardAnswer.hidden = true;
-    el.cardPrompt.textContent = 'What country is this?';
+    el.cardPrompt.textContent = 'What nation is this?';
     el.guessInput.value = '';
     setFeedback('', '');
     el.guessInput.focus();
   });
 
-  const toggleLevels = () => {
-    if (el.levelsPanel.hidden) openLevels();
-    else el.levelsPanel.hidden = true;
-  };
-  el.progressWrap.addEventListener('click', toggleLevels);
-  el.levelsClose.addEventListener('click', () => { el.levelsPanel.hidden = true; });
+  el.progressWrap.addEventListener('click', openHome);
 
-  el.statsBtn.addEventListener('click', () => { if (el.statsPanel.hidden) openStats(); else el.statsPanel.hidden = true; });
-  el.statsClose.addEventListener('click', () => { el.statsPanel.hidden = true; });
-  el.heatToggle.addEventListener('change', () => { state.heat = el.heatToggle.checked; applyHeat(); });
+  // The menu: everything a run does not need in front of it. Any choice
+  // closes it, and so does a tap anywhere else — including on the map,
+  // where that tap is spent on closing the menu and not on a country.
+  const menuOpen = () => !el.menu.hidden;
+  function closeMenu() {
+    el.menu.hidden = true;
+    el.menuBtn.setAttribute('aria-expanded', 'false');
+  }
+  el.menuBtn.addEventListener('click', () => {
+    const open = el.menu.hidden;
+    el.menu.hidden = !open;
+    el.menuBtn.setAttribute('aria-expanded', String(open));
+  });
+  el.menu.addEventListener('click', (e) => { if (e.target.closest('button')) closeMenu(); });
+  document.addEventListener('pointerdown', (e) => {
+    if (!menuOpen() || e.target.closest('#menu, #menu-btn')) return;
+    closeMenu();
+    if (e.target.closest('#map')) e.stopPropagation();
+  }, true);
+
+  el.menuRestart.addEventListener('click', () => {
+    const L = state.level;
+    if (L) startLevel(L.def, L.mode);
+  });
+  el.challengesBtn.addEventListener('click', openHome);
+  el.modeSeg.addEventListener('click', (e) => {
+    const mode = e.target.closest('button')?.dataset.mode;
+    const L = state.level;
+    if (mode && L && mode !== L.mode) startLevel(L.def, mode);
+  });
+  el.heatBtn.addEventListener('click', openHeat);
+  el.introBtn.addEventListener('click', openOnboard);
+
+  el.homeContinue.addEventListener('click', closeHome);
+  el.homeBack.addEventListener('click', closeHome);
+  el.homeIntro.addEventListener('click', openOnboard);
+  el.homeStats.addEventListener('click', openStats);
+  el.homeHeat.addEventListener('click', openHeat);
+  el.homeHelp.addEventListener('click', () => { el.help.hidden = false; });
+
+  el.modeOpts.addEventListener('click', (e) => {
+    const mode = e.target.closest('button')?.dataset.mode;
+    if (mode && pick) { pick.mode = mode; markPick(); }
+  });
+  el.modeDialog.addEventListener('click', (e) => { if (e.target === el.modeDialog) closeModeDialog(); });
+  el.modeCancel.addEventListener('click', closeModeDialog);
+  el.modeStart.addEventListener('click', () => { if (pick) startLevel(pick.def, pick.mode); });
+
+  el.onboardSkip.addEventListener('click', finishOnboard);
+  el.onboardNext.addEventListener('click', () => { if (onboardStep < 2) showOnboardStep(onboardStep + 1); else finishOnboard(); });
+
+  el.heatClose.addEventListener('click', closeHeat);
+  el.heatSeg.addEventListener('click', (e) => {
+    const mode = e.target.closest('button')?.dataset.mode;
+    if (!mode || mode === heatMode()) return;
+    heatShown = mode;
+    applyHeat();
+    heatSelect(heatSel);
+  });
+  // …and back out of the heat map to wherever stats was opened from
+  el.statsHeat.addEventListener('click', () => { el.statsPanel.hidden = true; openHeat(); heatFrom = statsFrom; });
+
+  // (the factor scales the view's width, so zooming in is the small one)
+  for (const [b, f] of [[el.zoomIn, 1 / 1.6], [el.zoomOut, 1.6]]) {
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => zoomTowards(rectLeft + W / 2, rectTop + (SAFE.top + H - SAFE.bottom) / 2, f));
+  }
+
+  el.statsBtn.addEventListener('click', openStats);
+  el.statsClose.addEventListener('click', closeStats);
   el.flagsToggle.addEventListener('change', () => {
     state.prefs.flags = el.flagsToggle.checked;
     document.body.classList.toggle('no-flags', !state.prefs.flags);
@@ -2685,18 +2761,6 @@
     if (document.hidden && L && !L.done && L.t0 != null && L.pausedAt == null) togglePause();
   });
 
-  el.challengePrev.addEventListener('click', () => stepChallenge(-1));
-  el.challengeNext.addEventListener('click', () => stepChallenge(1));
-  el.levelRestart.addEventListener('click', () => {
-    const L = state.level;
-    if (L) startLevel(CHALLENGE_BY_ID[L.id], L.mode);
-  });
-  el.levelMode.addEventListener('click', () => {
-    const L = state.level;
-    if (!L) return;
-    startLevel(CHALLENGE_BY_ID[L.id], nextMode(L.mode));
-  });
-
   for (const b of [el.hcFind, el.hcGiveup]) b.addEventListener('mousedown', (e) => e.preventDefault());
   el.hcFind.addEventListener('click', findGap);
   el.hcGiveup.addEventListener('click', giveUp);
@@ -2706,13 +2770,13 @@
   el.bankShow.addEventListener('click', () => revealTarget(false));
   el.bankCollapse.addEventListener('click', () => {
     const collapsed = el.wordBank.classList.toggle('collapsed');
-    el.bankCollapse.textContent = collapsed ? '▴' : '▾';
+    el.bankCollapse.innerHTML = icon(collapsed ? 'caret-up' : 'caret-down');
+    document.body.classList.toggle('bank-open', !collapsed);
   });
 
-  el.resultsClose.addEventListener('click', () => { el.results.hidden = true; });
-  el.resultsAgain.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], L.mode); });
-  el.resultsNext.addEventListener('click', () => stepChallenge(1));
-  el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(CHALLENGE_BY_ID[L.id], nextMode(L.mode)); });
+  el.resultsAgain.addEventListener('click', () => { const L = state.level; startLevel(L.def, L.mode); });
+  el.resultsHome.addEventListener('click', () => { el.results.hidden = true; openHome(); });
+  el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(L.def, nextMode(L.mode)); });
 
   el.micToggle.addEventListener('click', () => {
     if (!SpeechRec) {
@@ -2818,6 +2882,15 @@
       b.classList.toggle('deep', deep);
       b.querySelector('.jump-to').textContent = on && !deep ? b.dataset.pocket : b.dataset.area;
     }
+    // Under the minimap: where you stand, and where the same key goes next.
+    const j = live ? JUMP_KEYS[jumpState.key] : null;
+    const deep = !!j && jumpState.stage === 1;
+    el.jumpCaption.hidden = !j;
+    if (j) {
+      const K = jumpState.key.toUpperCase();
+      el.jumpCaption.firstElementChild.textContent = deep ? j.subName : j.name;
+      el.jumpCaption.lastElementChild.textContent = deep ? `${K} for ${j.name}` : `${K} again for ${j.subName.replace(/^The /, 'the ')}`;
+    }
     clearTimeout(jumpMarkTimer);
     if (live) jumpMarkTimer = setTimeout(markJumpKeys, 15020 - (performance.now() - jumpState.t));
   }
@@ -2867,11 +2940,32 @@
   }
 
   document.addEventListener('keydown', (e) => {
-    if (state.level?.pausedAt != null) {
-      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { e.preventDefault(); togglePause(); }
+    // Escape backs out of whatever is on top, one layer at a time; and
+    // while a screen is up, no other key reaches the run underneath it.
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (menuOpen()) closeMenu();
+      else if (!el.modeDialog.hidden) closeModeDialog();
+      else if (!el.help.hidden) el.help.hidden = true;
+      else if (!el.dev.hidden) el.dev.hidden = true;
+      else if (state.heat) closeHeat();
+      else if (!el.statsPanel.hidden) closeStats();
+      else if (!el.onboard.hidden) finishOnboard();
+      else if (!el.home.hidden) closeHome();
+      else if (!el.results.hidden) el.results.hidden = true;
+      else if (state.level?.pausedAt != null) togglePause();
+      else deselect();
       return;
     }
-    if (e.key === 'Escape') { deselect(); closePanels(); return; }
+    if (!el.modeDialog.hidden) {
+      if (e.key === 'Enter') { e.preventDefault(); el.modeStart.click(); }
+      return;
+    }
+    if (screenOpen() && el.results.hidden) return;
+    if (state.level?.pausedAt != null) {
+      if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
+      return;
+    }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;     // don't hijack typing
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -2887,12 +2981,13 @@
       // The restart button moved into the challenge panel; the key it
       // used to sit next to is the one a run actually reaches for.
       e.preventDefault();
-      if (L) startLevel(CHALLENGE_BY_ID[L.id], L.mode);
+      if (L) startLevel(L.def, L.mode);
     }
     else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
     else if ((e.key === 'm' || e.key === 'M') && isHardcore()) { e.preventDefault(); findGap(); }
     else if ((e.key === 'g' || e.key === 'G') && isHardcore()) { e.preventDefault(); giveUp(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
+    else if (e.key === '`' && devOn) { e.preventDefault(); toggleDev(); }
     else {
       const key = jumpKeyFor(e);
       if (key) { e.preventDefault(); jumpTo(key, e.shiftKey); }
@@ -2926,10 +3021,41 @@
   // ?guides draws js/views.js over the map as boxes you can drag. It is a
   // tuning tool, so none of it ships in the game proper: the editor is a
   // separate file that only this flag ever fetches.
-  if (new URLSearchParams(location.search).has('guides')) {
+  const guidesOn = new URLSearchParams(location.search).has('guides');
+  if (guidesOn) {
     const s = document.createElement('script');
     s.src = 'js/guides.js';
     document.body.appendChild(s);
+  }
+
+  // The developer panel gathers the tools for working on the game — the
+  // globe, the view editor — out of the way of the screens a player sees.
+  // A build on this machine or the local network has it in the menu — the
+  // dev server, the preview pane, a phone on the LAN. Anywhere else (Pages,
+  // a shared artifact) a player might be looking, so it waits for ?dev,
+  // which this browser then remembers; ?dev=0 forgets it again.
+  const DEV_HOST = /^(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|.+\.local)$/;
+  const DEV_KEY = 'nan.dev';
+  const devParam = new URLSearchParams(location.search).get('dev');
+  try {
+    if (devParam === '0') localStorage.removeItem(DEV_KEY);
+    else if (devParam != null) localStorage.setItem(DEV_KEY, '1');
+  } catch { /* private window: the flag still counts for this page */ }
+  let devSaved = false;
+  try { devSaved = localStorage.getItem(DEV_KEY) === '1'; } catch { /* fine */ }
+  const devOn = guidesOn || DEV_HOST.test(location.hostname) || (devParam != null && devParam !== '0') || devSaved;
+  const toggleDev = () => { const was = el.dev.hidden; closeMenu(); closePanels(); el.dev.hidden = !was; };
+  if (devOn) {
+    el.devBtn.hidden = false;
+    el.devBtn.addEventListener('click', toggleDev);
+    el.devClose.addEventListener('click', () => { el.dev.hidden = true; });
+    if (guidesOn) el.devGuides.querySelector('b').textContent = 'Leave the view editor';
+    el.devGuides.addEventListener('click', () => {
+      const q = new URLSearchParams(location.search);
+      if (guidesOn) q.delete('guides'); else q.set('guides', '1');
+      q.set('play', state.level?.mode || 'place');   // back on the map, in the mode you were in
+      location.search = q.toString();
+    });
   }
 
   loadPrefs();
@@ -2937,7 +3063,8 @@
   document.body.classList.toggle('no-flags', !state.prefs.flags);
   updateProgress();
   el.micToggle.classList.add('off');
-  el.hello.hidden = true;
+  document.getElementById('hc-note').textContent = `${TAP} a nation to name it`;
+  el.heatPrompt.textContent = `${TAP} a nation to see its streak`;
 
   // Offline play, and the fetch handler Chrome looks for before it will
   // offer to install the game to the home screen — which is the version
@@ -2950,8 +3077,17 @@
   }
 
   initMap().then(() => {
-    startLevel(CHALLENGE_BY_ID.world, 'name');
-    el.hello.hidden = state.seenIntro;
+    // The whole world is always loaded underneath, so the map is live
+    // the moment a screen closes. ?play skips the screens: a bookmark for
+    // going straight in.
+    const play = new URLSearchParams(location.search).get('play');
+    // Place is where a new player starts: finding a named nation is the
+    // gentler way in, and naming them cold is what it builds up to.
+    // ?play=name (or hardcore) goes straight into that mode instead.
+    startLevel(CHALLENGE_BY_ID.world, MODES.includes(play) ? play : 'place');
+    if (play != null) { /* straight in */ }
+    else if (state.seenIntro) openHome();
+    else openOnboard();
     setTimeout(loadFullDetail, 2500);   // warm the deep-zoom borders once boot has settled
   }).catch((err) => {
     el.map.innerHTML = `<p style="padding:2rem">Could not load the map (${err.message}). If you opened index.html directly, run it through a local web server instead.</p>`;

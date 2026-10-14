@@ -1,66 +1,51 @@
 :root {
-  /* ocean reads as a gentle vertical gradient; these are its stops */
-  --ocean-top: #bddbef;
-  --ocean-bot: #8ab6d8;
-  --ocean: #a6cbe6;
-  --land: #f5edd6;
-  --land-stroke: #8a7d5f;
-  --territory: #cdc7b9;
-  --territory-stroke: #a59e8c;
-  --hover: #ffe1a0;
-  --selected: #ffca57;
-  --selected-stroke: #b9821a;
-  --named: #7fd08c;
-  --named-stroke: #3f8f4e;
-  /* "Shown to you" and "missed" used to be a gold one shade off
-     --selected, so a revealed country and the country under your cursor
-     looked like the same thing. Clay is nowhere near the selection gold,
-     the named green or the placed blue, and still reads as a mark
-     against you without shouting like red. */
-  --revealed: #eda58c;
-  --revealed-stroke: #bc6046;
-  --placed: #8cc1ec;
-  --placed-stroke: #3b78b8;
-  --missed: #eda58c;
-  --missed-stroke: #bc6046;
+  /* The game's own working names, each pointing at a token (tokens.css).
+     The globe reads these same names off the root, so both maps follow. */
+  --ocean-top: var(--map-ocean);
+  --ocean-bot: var(--map-ocean);
+  --ocean: var(--map-ocean);
+  --land: var(--map-land);
+  --land-stroke: var(--map-stroke);
+  --territory: var(--map-land-territory);
+  --territory-stroke: var(--map-stroke);
+  --hover: var(--map-land-hot);
+  --selected: var(--map-selected);
+  --selected-stroke: var(--map-selected-stroke);
+  --named: var(--map-named);
+  --named-stroke: var(--map-named-rim);
+  /* "Shown to you" and "missed" share clay: nowhere near the selection
+     gold, the named green or the placed blue, and it still reads as a
+     mark against you without shouting like red. */
+  --revealed: var(--map-missed);
+  --revealed-stroke: var(--map-missed-rim);
+  --placed: var(--map-placed);
+  --placed-stroke: var(--map-placed-rim);
+  --missed: var(--map-missed);
+  --missed-stroke: var(--map-missed-rim);
 
-  --heat-x: #f5edd6;
-  --heat-0: #f08a7e;
-  --heat-1: #f6bd6b;
-  --heat-2: #ece27a;
-  --heat-3: #b6e08f;
-  --heat-4: #5fc77a;
+  --heat-x: var(--heat-none);
 
-  --ink: #1e3346;
-  --ink-soft: #5b6b7d;
-  --panel-bg: #ffffff;
-  --panel-line: #e7ecf1;
-  --accent: #2472c8;
-  --accent-2: #1a86b8;
-  --accent-ink: #ffffff;
-  --danger: #c0392b;
-  --ok: #2e8b46;
+  --ink: var(--color-text);
+  --ink-soft: var(--color-neutral-400);
+  --ink-faint: var(--color-neutral-500);
+  --panel-bg: var(--color-surface);
+  --panel-line: var(--color-neutral-800);
+  --accent: var(--color-accent);
+  --accent-tint: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --danger: var(--fb-bad);
+  --ok: var(--fb-ok);
 
-  --bar-a: #123a5f;
-  --bar-b: #1d5f8c;
-
-  /* the notch / gesture-bar cutouts, and the row of jump keys along the
-     bottom of the map (44px + 10) — whatever else docks there stacks
-     above it */
+  /* the notch / gesture-bar cutouts */
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  --keys-h: 54px;
 
-  /* light only: with no scheme declared, a phone in dark mode may paint
-     the answer box black on the white card */
-  color-scheme: light;
+  /* dark only: with the scheme declared, form controls and scrollbars
+     come up dark too instead of white boxes on the surface */
+  color-scheme: dark;
 
-  --shadow-sm: 0 2px 8px rgba(20, 45, 75, 0.16);
-  --shadow-md: 0 6px 20px rgba(15, 40, 70, 0.22);
-  --shadow-lg: 0 14px 40px rgba(12, 34, 60, 0.30);
-  --radius: 16px;
+  --radius: var(--radius-lg);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -74,9 +59,11 @@ html, body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
   color: var(--ink);
-  background: var(--ocean-bot);
+  background: var(--map-ocean);
+  scrollbar-color: var(--color-neutral-800) transparent;
+  scrollbar-width: thin;
 }
 
 body {
@@ -84,28 +71,45 @@ body {
   flex-direction: column;
 }
 
+button, input { font-family: inherit; }
+h2, h3 { font-weight: 500; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--color-accent-400); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
 kbd {
-  font: 600 0.8em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 500 0.8em var(--font-mono);
   padding: 1px 6px;
-  border-radius: 5px;
-  border: 1px solid #cfd8e2;
-  border-bottom-width: 2px;
-  background: #f5f8fb;
-  color: var(--ink);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-neutral-700);
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+/* an icon from icons/ph.svg, sized and coloured by the text around it */
+.ic {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: currentColor;
+  vertical-align: -0.125em;
+  pointer-events: none;
 }
 
 /* ————— progress hairline —————
 
    The old header bar is gone: while you're playing, the whole challenge
-   reads as one green thread along the very top edge of the map. */
+   reads as one thread along the very top edge of the map. */
 #progress-bar {
   position: absolute;
   top: var(--safe-t);
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   z-index: 16;
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-neutral-900);
   pointer-events: none;
 }
 
@@ -113,79 +117,180 @@ kbd {
   display: block;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, #52c86e, #35c4a2);
-  box-shadow: 0 0 6px rgba(70, 210, 140, 0.75);
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ————— tools: the things you reach for between challenges ————— */
-#tools {
+/* ————— the heads-up display —————
+
+   Top left, one bar: which challenge (the name is the way to the list),
+   which mode, how far, how long, and the menu. Everything a run does not
+   need in front of it — pause, restart, the mode switch, stats, voice —
+   is one tap behind that last button. */
+#level-banner {
   position: absolute;
-  right: 14px;
-  top: calc(12px + var(--safe-t));
+  top: calc(14px + var(--safe-t));
+  left: calc(14px + var(--safe-l));
   display: flex;
-  gap: 6px;
-  z-index: 12;
+  align-items: center;
+  gap: 2px;
+  height: 42px;
+  padding: 0 5px;
+  background: var(--panel-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  z-index: 15;
+  max-width: calc(100% - 28px);
+  white-space: nowrap;
+  font-size: 0.875rem;
 }
 
-#tools button {
-  width: 34px;
-  height: 34px;
+#level-banner[hidden] { display: none; }
+
+#progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#progress-wrap:hover { background: var(--color-neutral-900); }
+#progress-wrap .ic:first-child { font-size: 1.06rem; color: var(--accent); }
+#progress-wrap .ic:last-child { font-size: 0.75rem; color: var(--ink-faint); }
+
+#level-title { overflow: hidden; text-overflow: ellipsis; }
+
+#level-chip {
+  font-size: 0.69rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent-300);
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-900);
+}
+
+.hud-rule { width: 1px; height: 20px; background: var(--color-neutral-800); margin: 0 8px; }
+
+#progress-text {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-200);
+  min-width: 62px;
+}
+
+#level-timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  min-width: 58px;
+}
+
+#menu-btn {
+  width: 32px;
+  height: 32px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
-  line-height: 1;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--ink);
-  box-shadow: var(--shadow-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: 1rem;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease;
 }
 
-#tools button:hover { background: #fff; }
-#tools button:active { transform: translateY(1px); }
-#tools button.off { opacity: 0.55; filter: grayscale(1); }
-#help-btn { font-weight: 800; }
+#menu-btn:hover,
+#menu-btn[aria-expanded="true"] { background: var(--color-neutral-900); color: var(--ink); }
 
-/* full screen: on a phone this is the button that doubles the map, so
-   the first visit it asks to be noticed */
-#fs-btn { font-size: 1.05rem; }
-#fs-btn[hidden] { display: none; }
-#fs-btn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-#fs-btn.nudge { animation: pulse 1.6s ease-in-out 6; }
-
-#mic-toggle.listening {
-  background: #e4574b;
-  border-color: #e4574b;
-  animation: pulse 1.4s ease-in-out infinite;
+/* ————— the menu ————— */
+#menu {
+  position: absolute;
+  top: calc(62px + var(--safe-t));
+  left: calc(14px + var(--safe-l));
+  width: 280px;
+  max-height: calc(100% - 76px - var(--safe-t));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-lg);
+  z-index: 40;
 }
 
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(228, 87, 75, 0.6); }
-  50% { box-shadow: 0 0 0 9px rgba(228, 87, 75, 0); }
+#menu[hidden] { display: none; }
+
+#menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
+
+#menu > button[hidden] { display: none; }
+#menu > button:hover { background: var(--color-neutral-900); }
+#menu > button .ic { font-size: 1rem; color: var(--ink-soft); }
+#menu > button span { flex: 1; }
+#menu kbd { border: none; padding: 0; font: inherit; font-size: 0.69rem; color: var(--ink-faint); }
+#menu hr { border: 0; height: 1px; margin: 0 8px 4px; background: var(--color-neutral-800); flex: none; }
+
+#menu #heat-btn.on .ic,
+#menu #fs-btn.on .ic { color: var(--accent); }
+#menu #mic-toggle.listening .ic { color: var(--fb-bad); }
+#menu #mic-toggle.listening .menu-state { color: var(--fb-bad); }
+
+#mode-seg {
+  display: flex;
+  flex: none;
+  padding: 2px;
+  margin: 4px 4px 6px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+#mode-seg button {
+  flex: 1;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#mode-seg button.on { background: var(--color-accent-800); color: var(--color-accent-100); }
 
 /* ————— map ————— */
 #map-wrap {
   position: relative;
   flex: 1 1 auto;
   overflow: hidden;
-  background:
-    radial-gradient(120% 90% at 50% 8%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%),
-    linear-gradient(180deg, var(--ocean-top), var(--ocean-bot));
-}
-
-/* soft vignette so the map settles into the frame */
-#map-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow: inset 0 0 120px rgba(20, 55, 90, 0.18);
-  z-index: 2;
+  background: var(--map-ocean);
 }
 
 #map {
@@ -229,6 +334,9 @@ svg.world path.territory {
   vector-effect: non-scaling-stroke;
 }
 
+/* Borders are gaps of ocean: every country carries the sea's colour as
+   its stroke, whatever its fill, so a status never thickens a border.
+   Only the selected country gets a line of its own. */
 svg.world path.country {
   fill: var(--land);
   stroke: var(--land-stroke);
@@ -246,14 +354,14 @@ svg.world path.country {
    set from the same lookup that decides the click. */
 svg.world path.country.hot { fill: var(--hover); }
 svg.world path.country.selected { fill: var(--selected); stroke: var(--selected-stroke); stroke-width: 1.6; }
-svg.world path.country.named { fill: var(--named); stroke: var(--named-stroke); }
-svg.world path.country.named.hot { fill: #9fdca8; }
-svg.world path.country.revealed { fill: var(--revealed); stroke: var(--revealed-stroke); }
-svg.world path.country.revealed.hot { fill: #f6c3b1; }
-svg.world path.country.placed { fill: var(--placed); stroke: var(--placed-stroke); }
-svg.world path.country.placed.hot { fill: #a9d2f2; }
-svg.world path.country.missed { fill: var(--missed); stroke: var(--missed-stroke); }
-svg.world path.country.missed.hot { fill: #f6c3b1; }
+svg.world path.country.named { fill: var(--named); }
+svg.world path.country.named.hot { fill: var(--map-named-hot); }
+svg.world path.country.revealed { fill: var(--revealed); }
+svg.world path.country.revealed.hot { fill: var(--map-missed-hot); }
+svg.world path.country.placed { fill: var(--placed); }
+svg.world path.country.placed.hot { fill: var(--map-placed-hot); }
+svg.world path.country.missed { fill: var(--missed); }
+svg.world path.country.missed.hot { fill: var(--map-missed-hot); }
 
 /* invisible click padding around every country — hidden paths are never
    painted, but pointer-events: stroke still hit-tests their fat stroke */
@@ -290,8 +398,8 @@ svg.world path.hit {
    mainland. */
 #overlay g.ov-box rect,
 #overlay g.ov-box ellipse {
-  fill: rgba(245, 237, 214, 0.42);
-  stroke: rgba(70, 58, 40, 0.6);
+  fill: rgba(42, 61, 88, 0.35);
+  stroke: rgba(127, 176, 240, 0.55);
   stroke-width: 1.2;
   stroke-dasharray: 2 3;
   vector-effect: non-scaling-stroke;
@@ -299,12 +407,12 @@ svg.world path.hit {
 }
 
 #overlay g.ov-box.hot rect,
-#overlay g.ov-box.hot ellipse { fill: rgba(255, 225, 160, 0.62); stroke: #3b3020; stroke-dasharray: none; }
-#overlay g.ov-box.selected rect, #overlay g.ov-box.selected ellipse { fill: rgba(255, 202, 87, 0.58); }
-#overlay g.ov-box.named rect, #overlay g.ov-box.named ellipse { fill: rgba(127, 208, 140, 0.52); }
-#overlay g.ov-box.revealed rect, #overlay g.ov-box.revealed ellipse { fill: rgba(237, 165, 140, 0.52); }
-#overlay g.ov-box.placed rect, #overlay g.ov-box.placed ellipse { fill: rgba(140, 193, 236, 0.52); }
-#overlay g.ov-box.missed rect, #overlay g.ov-box.missed ellipse { fill: rgba(237, 165, 140, 0.52); }
+#overlay g.ov-box.hot ellipse { fill: rgba(60, 86, 121, 0.7); stroke: var(--color-line); stroke-dasharray: none; }
+#overlay g.ov-box.selected rect, #overlay g.ov-box.selected ellipse { fill: rgba(201, 162, 74, 0.8); }
+#overlay g.ov-box.named rect, #overlay g.ov-box.named ellipse { fill: rgba(79, 154, 98, 0.8); }
+#overlay g.ov-box.revealed rect, #overlay g.ov-box.revealed ellipse { fill: rgba(176, 106, 85, 0.8); }
+#overlay g.ov-box.placed rect, #overlay g.ov-box.placed ellipse { fill: rgba(79, 134, 184, 0.8); }
+#overlay g.ov-box.missed rect, #overlay g.ov-box.missed ellipse { fill: rgba(176, 106, 85, 0.8); }
 #overlay g.ov-box.selected rect,
 #overlay g.ov-box.selected ellipse { stroke: var(--selected-stroke); stroke-width: 2; stroke-dasharray: none; }
 #overlay g.ov-box.named rect,
@@ -316,22 +424,28 @@ svg.world path.hit {
 #overlay g.ov-box.missed rect,
 #overlay g.ov-box.missed ellipse { stroke: var(--missed-stroke); stroke-dasharray: none; }
 
-/* round button with a pointer wedge to the country it stands for */
+/* round button with a pointer wedge to the country it stands for. An
+   unanswered one is a hollow ring — the ground's own dark inside a bright
+   rim — and an answered one is a solid disc in its status colour. Filled
+   against empty reads at a glance; the first version was a blue-grey
+   disc, which next to "placed" was one blue against another. */
 #overlay g.btn { cursor: pointer; }
 
 #overlay g.btn .face,
 #overlay g.btn .tail {
-  fill: rgba(255, 255, 255, 0.62);
-  stroke: #4a3c26;
+  /* …and see-through: zoomed out the buttons crowd the map, and the
+     nation a button sits on should still show inside its ring */
+  fill: rgba(12, 21, 34, 0.4);
+  stroke: var(--color-line);
   vector-effect: non-scaling-stroke;
 }
 
-#overlay g.btn .face { stroke-width: 2.5; }
+#overlay g.btn .face { stroke-width: 2; }
 #overlay g.btn .tail { stroke-width: 1.5; stroke-linejoin: round; pointer-events: all; }
 #overlay g.btn .pad { fill: transparent; stroke: none; pointer-events: all; }
 
 #overlay g.btn.hot .face,
-#overlay g.btn.hot .tail { fill: rgba(255, 255, 255, 0.96); stroke: #2f2616; }
+#overlay g.btn.hot .tail { fill: rgba(42, 61, 88, 0.8); stroke: var(--color-accent-100); }
 #overlay g.btn.selected .face,
 #overlay g.btn.selected .tail { fill: var(--selected); stroke: var(--selected-stroke); }
 #overlay g.btn.named .face,
@@ -339,29 +453,30 @@ svg.world path.hit {
 #overlay g.btn.revealed .face,
 #overlay g.btn.revealed .tail { fill: var(--revealed); stroke: var(--revealed-stroke); }
 #overlay g.btn.placed .face,
-#overlay g.btn.placed .tail { fill: var(--placed-stroke); stroke: #ffffff; }
+#overlay g.btn.placed .tail { fill: var(--placed); stroke: var(--placed-stroke); }
 #overlay g.btn.missed .face,
-#overlay g.btn.missed .tail { fill: var(--missed-stroke); stroke: #ffffff; }
+#overlay g.btn.missed .tail { fill: var(--missed); stroke: var(--missed-stroke); }
 
 /* two buttons that would overlap at this zoom: one numbered button */
-#overlay g.btn.group .face { fill: rgba(255, 255, 255, 0.96); stroke-width: 3; }
-#overlay g.btn.group:hover .face { stroke: #2f2616; }
+#overlay g.btn.group .face { fill: var(--color-surface); stroke-width: 2.5; }
+#overlay g.btn.group:hover .face { stroke: var(--color-accent-200); }
 
 #overlay g.btn.group text,
 #overlay g.btn.zone text {
-  fill: #3f3623;
-  font-weight: 700;
+  fill: var(--color-text);
+  font-family: var(--font-body);
+  font-weight: 600;
   pointer-events: none;
 }
 
 /* a whole dense area folded into one button — click to zoom to its layer */
 #overlay g.btn.zone .face {
-  fill: rgba(255, 255, 255, 0.9);
-  stroke-width: 2.5;
+  fill: var(--color-surface);
+  stroke-width: 2;
   stroke-dasharray: 5 3;
 }
 
-#overlay g.btn.zone:hover .face { fill: #ffffff; stroke: #2f2616; stroke-dasharray: none; }
+#overlay g.btn.zone:hover .face { fill: var(--color-neutral-800); stroke: var(--color-accent-200); stroke-dasharray: none; }
 
 /* ————— feedback flashes ————— */
 svg.world path.country.flash-good,
@@ -370,21 +485,21 @@ svg.world path.country.flash-good,
 #overlay g.btn.flash-good .face { animation: goodBtn 0.9s ease-out; }
 
 @keyframes goodPulse {
-  0%   { fill: #2ee86a; }
-  35%  { fill: #2ee86a; }
+  0%   { fill: var(--map-flash-good); }
+  35%  { fill: var(--map-flash-good); }
   100% { fill: var(--named); }
 }
 @keyframes goodBtn {
-  0%   { fill: #2ee86a; stroke-width: 8; }
-  40%  { fill: #2ee86a; stroke-width: 5; }
-  100% { stroke-width: 2.5; }
+  0%   { fill: var(--map-flash-good); stroke-width: 8; }
+  40%  { fill: var(--map-flash-good); stroke-width: 5; }
+  100% { stroke-width: 2; }
 }
 
 svg.world path.country.flash-bad,
 #overlay g.ov-box.flash-bad rect,
-#overlay g.ov-box.flash-bad ellipse { fill: #e98980 !important; }
+#overlay g.ov-box.flash-bad ellipse { fill: var(--map-flash-bad) !important; }
 #overlay g.btn.flash-bad .face,
-#overlay g.btn.flash-bad .tail { fill: #e98980 !important; stroke: #c0392b !important; }
+#overlay g.btn.flash-bad .tail { fill: var(--map-flash-bad) !important; stroke: var(--fb-bad) !important; }
 
 /* "here it is" after three misses or Show me: three bright pulses */
 svg.world path.country.flash-show,
@@ -394,16 +509,15 @@ svg.world path.country.flash-show,
 
 @keyframes showPulse {
   0%, 100% { fill: var(--missed); }
-  50% { fill: #fff176; }
+  50% { fill: var(--map-flash-show); }
 }
 @keyframes showBtn {
-  0%, 100% { fill: var(--missed-stroke); stroke-width: 3; }
-  50% { fill: #fff176; stroke-width: 7; }
+  0%, 100% { fill: var(--missed); stroke-width: 3; }
+  50% { fill: var(--map-flash-show); stroke-width: 7; }
 }
 
 /* ————— heat map (stats view) ————— */
 body.heatmap svg.world path.country.heat-x { fill: var(--heat-x); }
-body.heatmap svg.world path.country.heat-0 { fill: var(--heat-0); }
 body.heatmap svg.world path.country.heat-1 { fill: var(--heat-1); }
 body.heatmap svg.world path.country.heat-2 { fill: var(--heat-2); }
 body.heatmap svg.world path.country.heat-3 { fill: var(--heat-3); }
@@ -411,10 +525,10 @@ body.heatmap svg.world path.country.heat-4 { fill: var(--heat-4); }
 body.heatmap svg.world path.country:hover { fill: var(--hover); }
 
 /* ————— challenge dimming ————— */
-body.level-active svg.world path.territory { opacity: 0.28; }
+body.level-active svg.world path.territory { opacity: 0.45; }
 
 body.level-active svg.world path.country:not(.in-level) {
-  opacity: 0.28;
+  opacity: 0.45;
   pointer-events: none;
   cursor: default;
 }
@@ -425,20 +539,21 @@ body.level-active svg.world path.country:not(.in-level) {
   z-index: 30;
   transform: translate(-50%, -100%);
   padding: 6px 12px;
-  border-radius: 999px;
-  font-weight: 750;
+  border-radius: var(--radius-md);
+  font-weight: 600;
   font-size: 0.95rem;
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   gap: 6px;
   animation: popUp 1.1s ease-out forwards;
 }
 
-.pop.good { background: #1f9d47; color: #fff; }
-.pop.show { background: #ffd54a; color: #4a3a00; }
+.pop.good { background: var(--map-flash-good); color: var(--ink-on-fill); }
+.pop.show { background: var(--map-flash-show); color: var(--ink-on-fill); }
+.pop.bad { background: var(--panel-bg); color: var(--fb-bad); box-shadow: var(--shadow-md); }
 .pop .flag { height: 18px; border-radius: 2px; }
 
 @keyframes popUp {
@@ -452,12 +567,12 @@ body.level-active svg.world path.country:not(.in-level) {
   position: absolute;
   z-index: 31;
   transform: translate(-50%, -130%);
-  background: rgba(18, 34, 54, 0.94);
-  color: #fff;
+  background: var(--panel-bg);
+  color: var(--ink);
   font-size: 0.86rem;
-  font-weight: 550;
+  font-weight: 500;
   padding: 7px 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
   max-width: calc(100% - 24px);
   box-shadow: var(--shadow-md);
@@ -477,7 +592,7 @@ body.level-active svg.world path.country:not(.in-level) {
   width: auto;
   vertical-align: -4px;
   border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 body.no-flags .flag { display: none; }
@@ -486,12 +601,12 @@ body.no-flags .flag { display: none; }
 #tooltip {
   position: absolute;
   pointer-events: none;
-  background: rgba(18, 34, 54, 0.94);
-  color: #fff;
+  background: var(--panel-bg);
+  color: var(--ink);
   font-size: 0.8rem;
   font-weight: 500;
   padding: 5px 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
   z-index: 30;
   box-shadow: var(--shadow-sm);
@@ -502,7 +617,6 @@ body.no-flags .flag { display: none; }
 .panel {
   position: absolute;
   background: var(--panel-bg);
-  border: 1px solid var(--panel-line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   padding: 18px 20px;
@@ -511,103 +625,186 @@ body.no-flags .flag { display: none; }
 
 .panel[hidden] { display: none; }
 
-.panel-close,
-#card-close, #levels-close, #stats-close, #help-close, #results-close {
+#help-close,
+#dev-close {
   position: absolute;
   top: 8px;
-  right: 12px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
+  border-radius: var(--radius-md);
   background: none;
-  font-size: 1.5rem;
-  color: var(--ink-soft);
+  font-size: 1rem;
+  color: var(--ink-faint);
   cursor: pointer;
   line-height: 1;
 }
-#card-close:hover, #levels-close:hover, #stats-close:hover, #help-close:hover, #results-close:hover { color: var(--ink); }
-
-#hello {
-  left: 50%;
-  top: 42%;
-  transform: translate(-50%, -50%);
-  max-width: 460px;
-  width: calc(100% - 32px);
-  text-align: center;
+#help-close:hover,
+#dev-close:hover {
+  background: var(--color-neutral-900);
+  color: var(--ink);
 }
 
-#hello h2 { margin-bottom: 10px; font-size: 1.3rem; letter-spacing: -0.01em; }
-#hello p { color: var(--ink-soft); line-height: 1.55; margin-bottom: 14px; }
-#hello .hello-keys { font-size: 0.82rem; line-height: 1.9; margin-bottom: 18px; }
-
+/* The primary action is an accent outline, never a fill: the accent is a
+   line and a glow in this system, and the only saturated fields on screen
+   are the map's own states. */
 .btn-primary,
-#hello button,
-#guess-btn {
-  font-size: 1rem;
-  font-weight: 650;
-  padding: 11px 26px;
-  border: none;
-  border-radius: 11px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: var(--accent-ink);
+#hello button {
+  font-size: 0.94rem;
+  font-weight: 500;
+  padding: 10px 22px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-200);
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(30, 110, 190, 0.35);
-  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .btn-primary:hover,
-#hello button:hover,
-#guess-btn:hover { filter: brightness(1.06); box-shadow: 0 5px 14px rgba(30, 110, 190, 0.4); }
+#hello button:hover { background: var(--accent-tint); }
 .btn-primary:active,
-#hello button:active,
-#guess-btn:active { transform: translateY(1px); }
+#hello button:active { transform: translateY(1px); }
 
-/* ————— quiz card ————— */
-#card {
+/* ————— the bottom bar —————
+
+   One bar along the bottom, and exactly one thing in it at a time: what
+   to do next (idle), the answer box (a country is selected), the name to
+   find (place mode), or hardcore's two buttons. Whatever the game has to
+   say back — a miss, a hint, the list of names — floats just above it,
+   so the bar itself never changes height under the map's fit. */
+.dock {
+  position: absolute;
   left: 50%;
-  bottom: calc(20px + var(--keys-h) + var(--safe-b));
+  bottom: calc(18px + var(--safe-b));
   transform: translateX(-50%);
-  width: min(440px, calc(100% - 24px));
+  width: min(560px, calc(100% - 560px));
+  min-width: 400px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 14px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-md);
+  z-index: 25;
 }
 
-/* Hardcore's bar docks where the card already is, so the card steps up
-   over it — they are both in play at once, unlike the word bank, which
-   only ever appears in a mode the card is not used in. */
-body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var(--safe-b)); }
+.dock[hidden] { display: none; }
 
-#card-prompt { font-weight: 650; margin-bottom: 12px; padding-right: 22px; }
+.dock-above {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
 
-#guess-form { display: flex; gap: 8px; }
+.dock-above > p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 11px;
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.81rem;
+  font-weight: 500;
+  pointer-events: auto;
+}
+
+.dock-above > p:empty,
+.dock-above > p[hidden] { display: none; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#idle-bar { color: var(--color-neutral-300); font-size: 0.84rem; }
+#idle-bar .ic, #hardcore-bar > .ic { font-size: 1.06rem; color: var(--accent); }
+#idle-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* a quiet square button that sits inside a bar */
+.dock button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dock button:hover { background: var(--color-neutral-900); color: var(--ink); }
+.dock button:disabled { opacity: 0.45; cursor: not-allowed; }
+.dock button[hidden] { display: none; }
+.dock button .ic { font-size: 1rem; }
+.dock kbd { font: inherit; font-size: 0.625rem; padding: 2px 5px; }
+
+/* ————— the answer box ————— */
+#card-question { flex: 1; min-width: 0; }
+#card-question[hidden] { display: none; }
+
+#guess-form {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  padding: 0 3px 0 10px;
+  border: 1px solid var(--color-accent-700);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  transition: border-color 0.15s ease;
+}
+
+#guess-form:focus-within { border-color: var(--accent); }
 
 #guess-input {
   flex: 1;
-  font-size: 1rem;
-  background: #fff;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
   color: var(--ink);
-  padding: 11px 13px;
-  border: 2px solid #d3dde6;
-  border-radius: 11px;
-  min-width: 0;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-#guess-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(36, 114, 200, 0.15);
-}
-
-#guess-btn { padding: 11px 20px; }
-
-#mic-status {
-  margin-top: 8px;
-  font-size: 0.85rem;
-  color: var(--danger);
+  caret-color: var(--accent);
+  font-size: 0.94rem;
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
 }
-#mic-status[hidden] { display: none; }
+
+#guess-input::placeholder { color: var(--color-neutral-600); font-weight: 400; }
+#guess-input:focus { outline: none; }
+
+#card-actions { display: flex; flex: none; gap: 2px; }
+#card-actions[hidden] { display: none; }
+#guess-form button { height: 30px; min-width: 30px; padding: 0 7px; }
+
+#card.shake #guess-form { animation: shakeX 0.35s; border-color: var(--map-flash-bad); }
+
+#mic-status { color: var(--danger); min-width: 0; }
 
 #mic-status-text {
   overflow: hidden;
@@ -637,171 +834,78 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 #voice-meter i:nth-child(4) { height: 13px; opacity: max(0.25, calc((var(--vol) - 0.50) * 5)); }
 #voice-meter i:nth-child(5) { height: 14px; opacity: max(0.25, calc((var(--vol) - 0.72) * 5)); }
 
-#feedback {
-  margin-top: 10px;
-  min-height: 1.2em;
-  font-size: 0.92rem;
-  font-weight: 550;
-}
+.dock-note.good { color: var(--ok); }
 
+#feedback { color: var(--color-neutral-300); }
 #feedback.good { color: var(--ok); }
 #feedback.bad { color: var(--danger); }
-#feedback.hint { color: var(--ink-soft); }
+#feedback.hint { color: var(--color-accent-300); letter-spacing: 0.02em; }
 
-#card.shake { animation: shake 0.35s; }
-
-@keyframes shake {
-  0%, 100% { transform: translateX(-50%); }
-  25% { transform: translateX(calc(-50% - 8px)); }
-  75% { transform: translateX(calc(-50% + 8px)); }
+/* the answer: flag, name over what happened, and what you can do next.
+   The name's own flag and text are laid out as cells of this grid. */
+#card-answer {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "flag name speak retry" "flag note speak retry";
+  align-items: center;
+  column-gap: 10px;
 }
 
-#card-actions { display: flex; gap: 8px; margin-top: 12px; }
-#card-actions[hidden] { display: none; }
+#card-answer[hidden] { display: none; }
+#answer-name { display: contents; }
+#answer-name .flag { grid-area: flag; width: 40px; height: 30px; object-fit: cover; border-radius: 3px; }
+#answer-name span { grid-area: name; align-self: end; font-size: 1rem; font-weight: 500; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#answer-result { grid-area: note; align-self: start; font-size: 0.75rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#answer-result.good { color: var(--ok); }
+#answer-result.meh { color: var(--ink-soft); }
+#speak-btn { grid-area: speak; }
+#retry-btn { grid-area: retry; border-color: var(--accent); color: var(--color-accent-200); padding: 0 12px; }
+#retry-btn:hover { background: var(--accent-tint); color: var(--color-accent-200); }
+
+#card-close { color: var(--ink-faint); padding: 0; }
 
 .btn-soft,
-#card-actions button,
-#speak-btn,
-#retry-btn,
-.bank-buttons button,
 .results-actions button,
 #stats-reset {
-  font-size: 0.88rem;
-  font-weight: 550;
-  padding: 8px 14px;
-  border: 1px solid #d3dde6;
-  border-radius: 9px;
-  background: #f5f8fb;
-  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-200);
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .btn-soft:hover,
-#card-actions button:hover,
-#speak-btn:hover,
-#retry-btn:hover,
-.bank-buttons button:hover,
 .results-actions button:hover,
-#stats-reset:hover { background: #e9eef4; }
+#stats-reset:hover { background: var(--color-neutral-900); }
 
-#card-answer { text-align: center; }
-#answer-result { font-size: 0.9rem; font-weight: 650; margin-bottom: 4px; }
-#answer-result.good { color: var(--ok); }
-#answer-result.meh { color: var(--revealed-stroke); }
-#answer-name { font-size: 1.6rem; margin-bottom: 2px; letter-spacing: -0.01em; display: flex; align-items: center; justify-content: center; gap: 10px; }
-#answer-name .flag { height: 30px; border-radius: 3px; }
-#answer-meta { color: var(--ink-soft); font-size: 0.88rem; margin-bottom: 14px; }
-
-#speak-btn {
-  background: linear-gradient(135deg, #eaf2fb, #dcebf8);
-  border-color: #c6dcf0;
-  color: #1a5490;
-  font-weight: 600;
-}
-#speak-btn:hover { background: linear-gradient(135deg, #dfecf9, #cfe3f5); }
-#retry-btn { margin-left: 8px; }
-
-/* ————— the heads-up display —————
-
-   Everything a run actually needs, in one small pill: where you are,
-   the clock, pause. Prev/next/restart/mode moved into the challenge
-   panel, one tap behind the same pill. */
-#level-banner {
-  position: absolute;
-  top: calc(11px + var(--safe-t));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid var(--panel-line);
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-  padding: 3px 4px;
-  z-index: 15;
-  max-width: calc(100% - 24px);
-  white-space: nowrap;
-}
-
-#level-banner[hidden] { display: none; }
-
-#progress-wrap {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  min-width: 0;
-  padding: 3px 9px;
-  border: none;
-  border-radius: 999px;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-#progress-wrap:hover { background: #eef2f6; }
-
-#level-title {
-  font-weight: 700;
-  font-size: 0.82rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 30vw;
-}
-
-#progress-text {
-  font-size: 0.76rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-
-#level-timer {
-  font: 700 1.02rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  padding: 0 8px 0 4px;
-  letter-spacing: -0.01em;
-}
-
-#pause-timer {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border: none;
-  border-radius: 50%;
-  background: #eef2f6;
-  color: var(--ink);
-  font-size: 0.82rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-
-#pause-timer:hover { background: #dde5ec; }
-#pause-timer:active { transform: scale(0.92); }
-
-/* the same challenge controls the HUD gave up, gathered above the list */
+/* the challenge controls, gathered above the list */
 #now-playing {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 8px 0 2px;
-  padding: 7px 8px;
-  border-radius: 10px;
-  background: #f1f5f9;
+  padding: 6px 6px 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
 }
 
 #now-playing .np-label {
   flex: 1;
-  font-size: 0.74rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
 }
 
 #challenge-prev,
@@ -810,11 +914,14 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--ink);
-  font-size: 1.1rem;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: 1rem;
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
@@ -822,11 +929,10 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
 
 #challenge-prev:hover,
 #challenge-next:hover,
-#level-restart:hover { background: #dde5ec; }
+#level-restart:hover { background: var(--color-neutral-900); color: var(--ink); }
 #challenge-prev:active,
 #challenge-next:active,
 #level-restart:active { transform: scale(0.92); }
-#level-restart { font-size: 0.95rem; }
 
 /* ————— pause veil: no scouting while the clock is stopped ————— */
 /* Auto-pause fires whenever the tab loses focus, so this is what an
@@ -839,7 +945,7 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   position: absolute;
   inset: 0;
   z-index: 50;
-  background: linear-gradient(180deg, #16344f, #0d2036);
+  background: var(--color-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -864,175 +970,120 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   #pause-veil, .pause-box { transition-duration: 0.01s; }
 }
 
-.pause-box { text-align: center; color: #fff; }
-.pause-icon { font-size: 3.4rem; line-height: 1; margin-bottom: 10px; }
-.pause-box h2 { font-size: 1.5rem; margin-bottom: 6px; }
-.pause-box p { color: rgba(255, 255, 255, 0.75); margin-bottom: 18px; }
-.pause-box kbd { margin-left: 6px; }
+.pause-box { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-width: 320px; padding: 20px; }
+.pause-icon { font-size: 2.25rem; line-height: 1; color: var(--accent); }
+.pause-box h2 { font-size: 1.6rem; }
+.pause-box p { color: var(--ink-soft); font-size: 0.9rem; }
+.pause-box .btn-primary { margin-top: 6px; display: inline-flex; align-items: center; gap: 8px; }
+.pause-box kbd { border: none; padding: 0; color: var(--color-accent-400); }
 
 #level-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
   padding: 7px 12px;
   flex: 0 0 auto;
-  border: none;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-200);
   cursor: pointer;
-  box-shadow: 0 2px 7px rgba(30, 110, 190, 0.3);
-  transition: filter 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
-#level-mode:hover { filter: brightness(1.07); }
+#level-mode:hover { background: var(--accent-tint); }
 #level-mode:active { transform: translateY(1px); }
 
-/* ————— word bank (place mode) ————— */
-#word-bank {
-  position: absolute;
-  left: 50%;
-  bottom: calc(18px + var(--keys-h) + var(--safe-b));
-  transform: translateX(-50%);
-  width: min(720px, calc(100% - 24px));
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 11px 14px;
-  z-index: 25;
-}
-
-#word-bank[hidden] { display: none; }
-
-/* ————— hardcore mode's bar —————
-
-   Same dock as the word bank, deliberately slimmer: there is nothing to
-   read here, only the two things the mode gives you. */
-#hardcore-bar {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(14px + var(--keys-h) + var(--safe-b));
-  width: min(640px, calc(100% - 24px));
+/* ————— the name to find (place mode) ————— */
+#bank-target {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
-  background: var(--panel-bg);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 10px 14px;
-  z-index: 25;
+  border-radius: 10px;
 }
 
-#hardcore-bar[hidden] { display: none; }
-
-#hc-title { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em; }
-#hc-note { font-size: 0.8rem; color: var(--ink-soft); }
-.hc-buttons { margin-left: auto; display: flex; gap: 6px; }
-.hc-buttons button { padding: 6px 11px; font-size: 0.82rem; }
-.hc-buttons kbd { margin-left: 5px; font-size: 0.72em; }
-
-/* The second click is the one that ends the run, so it has to look like
-   a different button from the one that only asked. */
-#hc-giveup.arming {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
-}
-
-@media (max-width: 640px) {
-  #hc-note { display: none; }
-  .hc-buttons kbd { display: none; }
-}
-
-#bank-target {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-#bank-find {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-}
+/* the flag is the thing to learn here, so it leads the bar */
+#bank-flag { flex: none; display: flex; }
+#bank-flag .flag { width: 40px; height: 30px; object-fit: cover; border-radius: 3px; }
 
 #bank-name {
-  font-size: 1.3rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   animation: targetIn 0.25s ease-out;
 }
-
-/* the flag is the thing to learn here, so it is the biggest thing in
-   the row on every screen */
-#bank-flag .flag { height: 32px; border-radius: 3px; }
 
 @keyframes targetIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
 
-@keyframes hintPill {
-  0%, 75% { opacity: 1; }
-  100%    { opacity: 0; }
-}
+#bank-strikes { flex: none; color: var(--danger); font-weight: 700; letter-spacing: 0.1em; }
 
-#bank-strikes { color: var(--danger); font-weight: 800; letter-spacing: 0.1em; min-width: 2.2em; }
+.bank-buttons { flex: none; display: flex; gap: 2px; }
+.bank-buttons .lbl { display: inline-flex; align-items: center; gap: 6px; }
+#bank-collapse { padding: 0; }
 
-.bank-buttons { margin-left: auto; display: flex; gap: 6px; }
-.bank-buttons button { padding: 6px 11px; font-size: 0.82rem; }
-#bank-collapse { width: 34px; padding: 6px 0; }
-
-#bank-hint {
-  font-size: 0.84rem;
-  color: var(--ink-soft);
-  margin-top: 6px;
-  min-height: 1.1em;
-}
-
-#bank-hint.good { color: var(--ok); font-weight: 600; }
-#bank-hint.bad { color: var(--danger); font-weight: 600; }
-
+/* the names still to place, above the bar, when the caret opens it */
 #bank-chips {
+  align-self: stretch;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-  max-height: 15vh;
+  gap: 5px;
+  padding: 12px;
+  max-height: 132px;
   overflow-y: auto;
-  padding-right: 2px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
 }
 
+#bank-chips:empty,
 #word-bank.collapsed #bank-chips { display: none; }
+
+#bank-hint { color: var(--color-neutral-300); }
+#bank-hint.good { color: var(--ok); }
+#bank-hint.bad { color: var(--danger); }
+
+/* the target row pulses whenever the name changes */
+#bank-target.switch #bank-name { animation: targetSwitch 0.8s ease-out; }
+
+@keyframes targetSwitch {
+  0%   { color: var(--color-accent-300); }
+  100% { color: var(--ink); }
+}
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.82rem;
-  padding: 5px 11px;
-  border: 1px solid #d3dde6;
-  border-radius: 999px;
-  background: #f5f8fb;
-  color: var(--ink);
+  height: 26px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0 9px 0 5px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 13px;
+  background: transparent;
+  color: var(--color-neutral-300);
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
-.chip .flag { height: 16px; }
-.chip:hover { background: #e9eef4; }
+.chip .flag { width: 20px; height: 14px; object-fit: cover; border-radius: 3px; }
+.chip:hover { background: var(--color-neutral-900); }
 
 .chip.armed {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-  font-weight: 650;
-  box-shadow: 0 2px 8px rgba(30, 110, 190, 0.35);
+  border-color: var(--accent);
+  color: var(--color-accent-200);
 }
 
 .chip.shake-x { animation: shakeX 0.35s; }
@@ -1043,63 +1094,300 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   75% { transform: translateX(6px); }
 }
 
-/* ————— results ————— */
-#results {
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: min(520px, calc(100% - 24px));
-  max-height: calc(100% - 24px);
+/* ————— hardcore mode's bar —————
+
+   The idle bar with the mode's two buttons in it: there is nothing to
+   read here, only the two things hardcore gives you. It steps aside
+   while a country is being asked, like the idle bar does. */
+#hc-note { flex: 1; min-width: 0; font-size: 0.84rem; color: var(--color-neutral-300); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-buttons { flex: none; display: flex; gap: 6px; }
+.hc-buttons button { border-color: var(--color-neutral-700); color: var(--color-neutral-200); }
+#hc-giveup { border-color: var(--accent); color: var(--color-accent-200); }
+#hc-giveup:hover { background: var(--accent-tint); color: var(--color-accent-200); }
+body.asking #hardcore-bar { display: none; }
+
+/* The second click is the one that ends the run, so it has to look like
+   a different button from the one that only asked. */
+#hc-giveup.arming {
+  background: color-mix(in srgb, var(--map-flash-bad) 22%, transparent);
+  border-color: var(--map-flash-bad);
+  color: var(--fb-bad);
+}
+
+/* ————— full screens —————
+
+   Home, stats, the intro and the results each take the whole window, on
+   the page's own ground: no card, no box, left-aligned, and separated by
+   space instead of rules. They sit above the pause veil, because the run
+   underneath is paused while one of them is up. */
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
   overflow-y: auto;
-  z-index: 28;
-  text-align: center;
-  animation: resultsIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  background: var(--color-bg);
 }
 
-@keyframes resultsIn {
-  from { opacity: 0; transform: translate(-50%, -44%) scale(0.92); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.screen[hidden] { display: none; }
+
+.screen-body {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: calc(24px + var(--safe-t)) calc(24px + var(--safe-r)) calc(48px + var(--safe-b)) calc(24px + var(--safe-l));
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
 }
 
-.results-trophy { font-size: 3rem; line-height: 1; animation: trophy 0.9s ease-out; }
-
-@keyframes trophy {
-  0% { transform: scale(0.3) rotate(-20deg); }
-  60% { transform: scale(1.25) rotate(6deg); }
-  100% { transform: scale(1) rotate(0); }
+/* one line where the window allows it, and an even break where it does not */
+.screen h1 {
+  font-size: clamp(1.75rem, 4.4vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
-#results-title { font-size: 1.35rem; margin: 6px 0 2px; }
-#results-sub { color: var(--ink-soft); font-size: 0.9rem; margin-bottom: 14px; }
+.brand { font-size: 0.875rem; font-weight: 500; }
 
-.results-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+.screen-title { display: flex; align-items: center; gap: 6px; }
+.screen-title h2 { font-size: 1.4rem; }
+.screen-title button { margin-left: -8px; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: 0.81rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-ghost:hover { background: var(--color-neutral-900); color: var(--ink); }
+
+.btn-primary { display: inline-flex; align-items: center; gap: 8px; }
+
+/* a thin bar that fills with the accent: mastery, wherever it is shown */
+.bar { display: block; height: 3px; border-radius: 2px; background: var(--color-neutral-800); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 2px; background: var(--color-accent-600); }
+
+/* ————— home ————— */
+.home-body { max-width: 1080px; gap: 30px; padding-top: calc(22px + var(--safe-t)); }
+.home-top { display: flex; align-items: center; gap: 8px; }
+.home-top .brand { flex: 1; }
+#home-back { margin-left: -8px; }
+
+.home-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; }
+.home-head > div { flex: 1 1 320px; }
+.home-head p { margin-top: 10px; color: var(--ink-soft); font-size: 0.94rem; line-height: 1.5; max-width: 440px; }
+
+#home-continue {
+  flex: 0 1 320px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-accent-700);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+#home-continue[hidden] { display: none; }
+#home-continue:hover { border-color: var(--accent); }
+#home-continue > span { flex: 1; display: flex; flex-direction: column; }
+#home-continue small { font-size: 0.75rem; color: var(--color-accent-300); }
+#home-continue b { font-size: 0.94rem; font-weight: 500; }
+#home-continue em { font-style: normal; font-size: 0.78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+#home-continue .ic { font-size: 1.1rem; color: var(--color-accent-200); }
+
+#home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; align-items: start; }
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+}
+
+/* The heading is the card's main button, so it gets what the rows under
+   it get: a click area out to the card's edge and a hover that says so. */
+.home-card-head {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-bottom: 14px;
+  margin: -8px -8px 0;
+  padding: 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  transition: background 0.13s ease;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
 }
 
-.tile {
-  background: #f3f7fb;
-  border: 1px solid #e1e9f1;
-  border-radius: 12px;
-  padding: 10px 8px;
+.hc-row { display: flex; align-items: baseline; gap: 8px; font-size: 0.75rem; color: var(--ink-soft); }
+.hc-row b { flex: 1; font-size: 1.125rem; font-weight: 500; color: var(--ink); }
+.hc-meta { color: var(--ink-faint); }
+.hc-meta span:first-child { flex: 1; }
+.home-card-head:hover { background: var(--color-neutral-900); }
+.home-card-head .ic { align-self: center; font-size: 0.8rem; color: var(--ink-faint); }
+.home-card-head:hover .ic { color: var(--color-accent-200); }
+
+.home-subs { display: flex; flex-direction: column; margin: 0 -8px; }
+
+.home-subs button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-200);
+  font-size: 0.81rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
 
-.tile .tile-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 700; }
-.tile .tile-value { font-size: 1.35rem; font-weight: 800; margin: 2px 0; font-variant-numeric: tabular-nums; }
-.tile .tile-sub { font-size: 0.75rem; color: var(--ink-soft); }
-.tile.record { background: linear-gradient(135deg, #fff6d6, #ffe9a8); border-color: #f3d77a; }
-.tile.record .tile-sub { color: #8a6400; font-weight: 700; }
+.home-subs button:hover { background: var(--color-neutral-900); }
+.home-subs span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-subs .bar { width: 40px; height: 2px; flex: none; }
+.home-subs em { width: 20px; flex: none; text-align: right; font-style: normal; font-size: 0.75rem; color: var(--ink-faint); }
 
-#results-misses { text-align: left; margin-bottom: 14px; }
-#results-misses h3 { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 6px; }
-#results-misses .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 22vh; overflow-y: auto; }
-#results-misses .chip { cursor: pointer; }
-#results-misses .clean { color: var(--ok); font-weight: 650; }
+/* ————— dialogs ————— */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+}
 
-.results-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.results-actions .btn-primary { padding: 9px 18px; font-size: 0.92rem; }
+.scrim[hidden] { display: none; }
+
+.dialog {
+  width: min(440px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog h2 { font-size: 1.5rem; }
+.dialog h2 + p { font-size: 0.81rem; color: var(--ink-soft); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.dialog-actions button { height: 40px; }
+
+#mode-opts { display: flex; flex-direction: column; gap: 6px; }
+
+#mode-opts button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+#mode-opts b { font-size: 0.94rem; font-weight: 500; color: var(--color-neutral-300); }
+#mode-opts span { font-size: 0.78rem; line-height: 1.4; color: var(--ink-soft); }
+#mode-opts button.on { border-color: var(--accent); background: var(--color-accent-900); }
+#mode-opts button.on b { color: var(--color-accent-200); }
+
+/* ————— the intro ————— */
+.onboard-body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: calc(28px + var(--safe-t)) calc(28px + var(--safe-r)) calc(28px + var(--safe-b)) calc(28px + var(--safe-l));
+}
+
+.onboard-steps { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; max-width: 760px; padding: 24px 0; }
+#onboard-count { font-size: 0.875rem; color: var(--color-accent-300); font-variant-numeric: tabular-nums; }
+.onboard-step { display: flex; flex-direction: column; gap: 18px; }
+.onboard-step[hidden] { display: none; }
+.onboard-step p { font-size: 1rem; line-height: 1.55; color: var(--color-neutral-300); max-width: 460px; }
+/* A touch screen has no keys to press: it is told to tap, and the zones
+   are shown without their key letters — here and on the minimap itself. */
+.onboard-step .coarse { display: none; }
+@media (pointer: coarse) {
+  .onboard-step .fine { display: none; }
+  .onboard-step .coarse { display: revert; }
+  .onboard-mini text, #mini kbd { display: none; }
+}
+
+.onboard-mini { width: 300px; max-width: 100%; padding: 8px; border-radius: 12px; background: var(--panel-bg); overflow: visible; }
+.onboard-mini use:first-child { fill: var(--color-neutral-900); }
+.onboard-mini use { fill: var(--map-land); }
+.onboard-mini rect { fill: none; stroke: var(--color-neutral-700); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.onboard-mini text { font: 600 64px var(--font-body); fill: var(--color-neutral-300); text-anchor: middle; dominant-baseline: central; }
+
+.onboard-foot { display: flex; align-items: center; gap: 10px; }
+#onboard-dots { flex: 1; display: flex; gap: 5px; }
+#onboard-dots i { height: 4px; width: 6px; border-radius: 2px; background: var(--color-neutral-700); transition: width 0.2s ease, background 0.2s ease; }
+#onboard-dots i.on { width: 18px; background: var(--accent); }
+.onboard-foot button { height: 44px; }
+
+/* ————— results ————— */
+.results-body { gap: 28px; padding-top: calc(40px + var(--safe-t)); }
+#results-sub { font-size: 0.81rem; color: var(--ink-soft); }
+
+.results-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 28px; }
+
+#results-time {
+  font-size: clamp(3.5rem, 11vw, 6.5rem);
+  font-weight: 500;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+#results-title { font-size: 1.4rem; }
+#results-best { font-size: 0.875rem; color: var(--color-accent-300); }
+.results-head > div:last-child { padding-bottom: 8px; }
+
+.results-tiles, .stat-tiles { display: flex; flex-wrap: wrap; gap: 16px 28px; }
+.stat-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; }
+
+.tile .tile-label { font-size: 0.75rem; color: var(--ink-soft); }
+.tile .tile-value { font-size: 1.4rem; font-weight: 500; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+
+#results-misses h3 { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 10px; }
+#results-misses .chips + h3 { margin-top: 18px; }
+#results-misses .chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 220px; overflow-y: auto; }
+#results-misses .clean { color: var(--ok); font-weight: 500; }
+
+.results-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.results-actions button { height: 44px; padding: 0 16px; font-size: 0.875rem; }
+.results-actions button[hidden] { display: none; }
 
 #confetti {
   position: absolute;
@@ -1107,245 +1395,340 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 40;
+  z-index: 56;
 }
 #confetti[hidden] { display: none; }
 
-/* ————— challenge picker ————— */
-#levels-panel, #stats-panel, #help {
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: min(470px, calc(100% - 24px));
-  max-height: min(84vh, 700px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-#levels-panel[hidden], #stats-panel[hidden], #help[hidden] { display: none; }
-
-/* the shortcut list is taller than a short phone — let it scroll rather
-   than clip (the challenge picker and stats already scroll inside) */
-#help { overflow-y: auto; }
-
-#levels-panel h2, #stats-panel h2, #help h2 { font-size: 1.15rem; margin-bottom: 6px; }
-
-.levels-blurb {
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  line-height: 1.45;
-  margin-bottom: 12px;
-}
-
-#levels-list { overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
-
-.level-region {
-  font-size: 0.72rem;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-  padding: 14px 0 5px;
-  border-bottom: 1px solid var(--panel-line);
-  margin-bottom: 5px;
-}
-
-.level-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
-  margin: 2px 0;
-  border-radius: 10px;
-  font-size: 0.92rem;
-  cursor: pointer;
-  transition: background 0.13s ease;
-}
-
-.level-row:hover { background: #f1f5f9; }
-
-.level-row.active {
-  background: #e7f1fb;
-  box-shadow: inset 0 0 0 1px rgba(36, 114, 200, 0.35);
-}
-
-.level-row-big {
-  background: linear-gradient(135deg, #f3f8fd, #eaf2fb);
-  border: 1px solid #dce9f5;
-  padding: 10px 12px;
-  margin: 4px 0;
-}
-.level-row-big .level-name { font-weight: 700; }
-.level-row-big:hover { background: linear-gradient(135deg, #ecf4fc, #e0edf8); }
-
-.level-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.level-best { font-size: 0.72rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-.level-count {
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.8rem;
-  flex: 0 0 auto;
-  background: rgba(30, 60, 90, 0.07);
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-
-.level-actions { display: flex; gap: 6px; flex: 0 0 auto; }
-
-.level-actions button {
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  border: 1px solid #d3dde6;
-  border-radius: 8px;
-  background: #f5f8fb;
-  cursor: pointer;
-  transition: background 0.13s ease, filter 0.13s ease;
-}
-
-.level-actions .level-play {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-}
-.level-actions .level-play:hover { filter: brightness(1.07); }
-.level-actions .level-place:hover { background: #e9eef4; }
-
-/* ————— stats panel ————— */
-#stats-panel { overflow-y: auto; display: block; }
-#stats-panel h3 { font-size: 0.85rem; margin: 16px 0 6px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
-#stats-panel h3 small { text-transform: none; letter-spacing: 0; font-weight: 500; }
-
-.stat-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 14px; }
+/* ————— stats ————— */
+.stats-body { max-width: 720px; gap: 22px; }
+.stats-body h3 { font-size: 0.7rem; margin: 0 0 -12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.stats-body h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 0.74rem; margin-left: 6px; }
+#stats-heat, #stats-reset { align-self: flex-start; }
+#stats-heat { height: 40px; padding: 0 14px; font-size: 0.875rem; }
 
 .toggle {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 9px 10px;
-  border-radius: 10px;
-  background: #f5f8fb;
-  font-size: 0.88rem;
-  line-height: 1.4;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-neutral-300);
   cursor: pointer;
-  margin-top: 8px;
 }
+.toggle strong { color: var(--ink); font-weight: 500; }
 .toggle input { margin-top: 3px; width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--accent); }
-.toggle small { display: block; color: var(--ink-soft); }
 
-#heat-legend { display: flex; gap: 4px; margin: 6px 0 0 36px; flex-wrap: wrap; }
-.leg { font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); }
+.best-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--color-neutral-900); font-size: 0.81rem; }
+.best-row .best-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.best-row .best-mode { color: var(--ink-faint); font-size: 0.75rem; }
+.best-row .best-t { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.empty-note { font-size: 0.84rem; color: var(--ink-soft); }
+
+.mastery-row { display: grid; grid-template-columns: 120px 1fr 54px; align-items: center; gap: 10px; font-size: 0.81rem; padding: 5px 0; }
+.mastery-row .m-n { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.75rem; color: var(--ink-soft); }
+
+#stats-reset { border: none; padding: 0; background: none; color: var(--ink-faint); font-size: 0.78rem; font-weight: 500; cursor: pointer; }
+#stats-reset:hover { background: none; color: var(--danger); }
+
+/* ————— the heat map view —————
+
+   The map coloured by streak, with nothing of the run on it: the HUD,
+   the bar and the minimap step out, and the veil with them — the run is
+   paused under this view, but the map is the whole point of it. */
+body.heatmap #level-banner,
+body.heatmap #menu,
+body.heatmap .dock,
+body.heatmap #jump-bar,
+body.heatmap #pause-veil { display: none; }
+
+body.heatmap.level-active svg.world path.country:not(.in-level) { opacity: 1; pointer-events: auto; cursor: pointer; }
+
+#heat-bar {
+  position: absolute;
+  top: calc(14px + var(--safe-t));
+  left: calc(14px + var(--safe-l));
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  max-width: calc(100% - 28px);
+  padding: 0 12px 0 4px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+#heat-bar[hidden], #heat-panel[hidden] { display: none; }
+#heat-bar b { font-size: 0.94rem; font-weight: 500; }
+#heat-bar span { margin-left: 6px; font-size: 0.78rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* whose streaks: naming a nation and finding it are different skills */
+#heat-seg { display: flex; flex: none; margin-left: 10px; padding: 2px; border-radius: var(--radius-md); background: var(--color-bg); }
+#heat-seg button { height: 28px; padding: 0 12px; border: none; border-radius: 6px; background: transparent; color: var(--ink-soft); font-size: 0.75rem; font-weight: 500; cursor: pointer; }
+#heat-seg button.on { background: var(--color-accent-800); color: var(--color-accent-100); }
+
+#heat-close {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: 1.06rem;
+  cursor: pointer;
+}
+
+#heat-close:hover { background: var(--color-neutral-900); color: var(--ink); }
+
+#heat-panel {
+  position: absolute;
+  left: calc(14px + var(--safe-l));
+  bottom: calc(14px + var(--safe-b));
+  z-index: 15;
+  width: 340px;
+  max-width: calc(100% - 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-md);
+}
+
+#heat-sel { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-neutral-800); }
+#heat-sel[hidden], #heat-prompt[hidden] { display: none; }
+#heat-flag { flex: none; display: flex; }
+#heat-flag .flag { width: 40px; height: 30px; object-fit: cover; border-radius: 3px; }
+#heat-name { font-size: 1.06rem; font-weight: 500; }
+#heat-sel p { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--color-neutral-300); }
+#heat-dot { width: 10px; height: 10px; border-radius: 3px; }
+#heat-prompt { font-size: 0.81rem; color: var(--ink-soft); }
+
+#heat-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 14px; }
+#heat-legend span { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--color-neutral-200); }
+#heat-legend i { width: 14px; height: 10px; border-radius: 3px; flex: none; }
 .leg-x { background: var(--heat-x); }
-.leg-0 { background: var(--heat-0); }
 .leg-1 { background: var(--heat-1); }
 .leg-2 { background: var(--heat-2); }
 .leg-3 { background: var(--heat-3); }
 .leg-4 { background: var(--heat-4); }
 
-.best-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--panel-line); font-size: 0.86rem; }
-.best-row .best-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.best-row .best-t { font-variant-numeric: tabular-nums; color: var(--ink-soft); white-space: nowrap; }
-.best-row .best-t b { color: var(--ink); }
-.empty-note { font-size: 0.84rem; color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .screen-body { padding-left: calc(18px + var(--safe-l)); padding-right: calc(18px + var(--safe-r)); }
+  #heat-bar { top: calc(10px + var(--safe-t)); left: calc(10px + var(--safe-l)); right: calc(10px + var(--safe-r)); max-width: none; }
+  #heat-panel { left: calc(10px + var(--safe-l)); right: calc(10px + var(--safe-r)); bottom: calc(10px + var(--safe-b)); width: auto; max-width: none; }
+}
 
-.mastery-row { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; padding: 3px 0; }
-.mastery-row .m-name { width: 120px; flex: 0 0 auto; }
-.mastery-row .m-bar { flex: 1; height: 8px; border-radius: 999px; background: #e6edf4; overflow: hidden; }
-.mastery-row .m-fill { height: 100%; background: linear-gradient(90deg, #6fd884, #43c9a0); }
-.mastery-row .m-n { width: 54px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.results-actions .btn-primary { border-color: var(--accent); color: var(--color-accent-200); }
+.results-actions .btn-primary:hover { background: var(--accent-tint); }
+.results-actions .btn-ghost { border-color: transparent; color: var(--color-neutral-300); }
 
-#stats-reset { margin-top: 16px; color: var(--danger); }
+/* ————— help —————
 
-/* ————— help ————— */
-#help { display: block; }
-.keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin-top: 12px; font-size: 0.9rem; align-items: baseline; }
-.keys dt { white-space: nowrap; font-weight: 600; }
-.keys dd { color: var(--ink-soft); }
-.help-note { margin-top: 14px; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.45; }
+   Two columns of keys where there is room for them — where you go on the
+   left, what you do on the right — then the three things on the map that
+   are not obvious, and the credits. A key is its own small chip, and the
+   same width column holds every one, so the descriptions line up. */
+#help {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(760px, calc(100% - 20px));
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  z-index: 62;
+}
 
-/* ————— jump keys —————
+#help h2 { font-size: 1.4rem; margin-bottom: 4px; }
+#help h3 { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin: 20px 0 10px; }
 
-   One row along the bottom on every screen, six keys, one label each:
-   where the next tap takes you. From anywhere else that is the area;
-   standing on the area it is the dense pocket inside it; standing in
-   the pocket it is the area again, the way out. The key itself is
-   printed on a desktop, where it is the faster way in; a touch screen
-   has no keys to press and gets the bare label. */
+.help-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+
+.keys { display: grid; grid-template-columns: 96px 1fr; gap: 9px 14px; font-size: 0.81rem; line-height: 1.45; align-items: baseline; }
+.keys dt { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; color: var(--color-accent-300); font-weight: 500; white-space: nowrap; }
+.keys dd { color: var(--color-neutral-300); }
+.keys kbd {
+  min-width: 22px;
+  padding: 2px 6px;
+  text-align: center;
+  font: 500 0.72rem var(--font-body);
+  color: var(--color-accent-200);
+  border: 1px solid var(--color-accent-800);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-900);
+}
+
+.help-note { margin-top: 12px; font-size: 0.78rem; line-height: 1.5; color: var(--ink-soft); }
+
+.help-list { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 24px; font-size: 0.78rem; line-height: 1.5; color: var(--ink-soft); }
+.help-list b { display: block; margin-bottom: 2px; font-size: 0.81rem; font-weight: 500; color: var(--color-neutral-200); }
+
+.help-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; margin-top: 22px; font-size: 0.75rem; color: var(--ink-faint); }
+.help-foot > a { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; text-decoration: none; }
+.help-foot span a { color: inherit; }
+
+@media (max-width: 700px) {
+  #help { padding: 20px 18px; }
+  .help-cols, .help-list { grid-template-columns: 1fr; }
+}
+
+/* ————— developer —————
+
+   The tools for working on the game, one row each: what it is, and a
+   line on what it does. Same frame as the shortcuts page, narrower. */
+#dev {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 20px));
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  z-index: 62;
+}
+#dev h2 { font-size: 1.4rem; margin-bottom: 4px; }
+.dev-note { font-size: 0.78rem; line-height: 1.5; color: var(--ink-soft); margin-bottom: 16px; }
+.dev-tools { display: grid; gap: 8px; }
+.dev-tool {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.dev-tool:hover { border-color: var(--color-accent-700); }
+.dev-tool > .ic { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--color-accent-300); }
+.dev-tool b { display: block; font-size: 0.88rem; font-weight: 500; }
+.dev-tool small { display: block; margin-top: 2px; font-size: 0.76rem; line-height: 1.45; color: var(--ink-soft); }
+
+/* ————— the minimap —————
+
+   The world in a corner, cut into six zones — the same six the keyboard
+   reaches with 1 2 3 over Q W E. A tap (or the key) lands on the zone's
+   area; again, on the dense pocket inside it; once more comes back out.
+   The caption says where you stand and where the next tap goes.
+
+   Only the zones are drawn as lines. What the map is showing now is a
+   patch of light with no outline: a white frame over six outlined zones
+   was a tangle of thin lines that never quite lined up, and a second,
+   dashed frame for the pocket made it three. The patch already sits on
+   the pocket once you are in it. */
 #jump-bar {
   position: absolute;
-  left: 50%;
-  bottom: calc(10px + var(--safe-b));
-  transform: translateX(-50%);
+  left: calc(14px + var(--safe-l));
+  bottom: calc(14px + var(--safe-b));
   z-index: 10;
   display: flex;
-  gap: 4px;
-  width: min(calc(100% - 20px), 620px);
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 6px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-sm);
 }
 
-#jump-bar button {
-  flex: 1 1 0;
-  min-width: 0;
+#mini { position: relative; width: 228px; aspect-ratio: 1010 / 666; }
+#mini-map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }
+#mini-land { fill: var(--map-land); }
+#mini-terr { fill: var(--color-neutral-900); }
+#mini-view { fill: rgba(231, 235, 242, 0.2); stroke: none; }
+
+#mini button {
+  position: absolute;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  height: 44px;
-  padding: 2px 3px;
-  font-size: 0.64rem;
-  line-height: 1.15;
-  font-weight: 650;
-  text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--ink);
+  padding: 0;
+  border: 1px solid rgba(60, 86, 121, 0.7);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-neutral-300);
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: background 0.15s ease, transform 0.1s ease;
 }
 
-#jump-bar button:hover { background: #fff; }
-#jump-bar button:active { transform: translateY(1px); }
-#jump-bar kbd { font-size: 0.64rem; padding: 0 4px; }
-#jump-bar .jump-to {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+#mini button:hover { border-color: var(--color-neutral-400); }
+#mini kbd { border: none; padding: 0; font: 600 0.875rem var(--font-body); color: inherit; }
+#mini .jump-to { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* the zone you're standing in; the pocket inside it has its own outline */
+#mini button.armed,
+#mini button.deep {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent-100);
+}
+
+#jump-caption { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: 0.72rem; }
+#jump-caption[hidden] { display: none; }
+#jump-caption b { font-weight: 500; color: var(--color-neutral-100); white-space: nowrap; }
+#jump-caption span { flex: 1; min-width: 0; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ————— zoom ————— */
+#zoom {
+  position: absolute;
+  right: calc(14px + var(--safe-r));
+  bottom: calc(14px + var(--safe-b));
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
-@media (pointer: coarse) { #jump-bar kbd { display: none; } }
 
-/* the key you're standing on, and which floor of it */
-#jump-bar button.armed { background: #fff3d0; border-color: #e7b95a; }
-#jump-bar button.deep { background: #ffe1a0; border-color: #d99b28; }
-#jump-bar button.armed .jump-to,
-#jump-bar button.deep .jump-to { color: #7a5200; font-weight: 800; }
+#zoom button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#zoom button:hover { background: var(--color-neutral-900); color: var(--ink); }
 
 /* where that key just put you — a beat of confirmation, then gone */
 #jump-flash {
   position: absolute;
-  top: calc(52px + var(--safe-t));
+  top: calc(18px + var(--safe-t));
   left: 50%;
   transform: translateX(-50%);
   z-index: 14;
   pointer-events: none;
-  padding: 4px 13px;
-  border-radius: 999px;
-  background: rgba(24, 44, 68, 0.88);
-  color: #fff;
+  padding: 5px 12px;
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  color: var(--ink);
   font-size: 0.78rem;
-  font-weight: 650;
+  font-weight: 500;
   white-space: nowrap;
   box-shadow: var(--shadow-sm);
   animation: jumpFlash 0.85s ease-out forwards;
 }
 
 #jump-flash[hidden] { display: none; }
-#jump-flash .jf-key { opacity: 0.6; margin-right: 5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-#jump-flash .jf-deep { color: #ffd77a; }
+#jump-flash .jf-key { color: var(--ink-faint); margin-right: 6px; font-family: var(--font-mono); }
+#jump-flash .jf-deep { color: var(--color-accent-300); }
 
 @keyframes jumpFlash {
   0%   { opacity: 0; transform: translate(-50%, -5px); }
@@ -1354,85 +1737,92 @@ body.hardcore #card { bottom: calc(20px + var(--hc-h, 0px) + var(--keys-h) + var
   100% { opacity: 0; }
 }
 
-/* place mode: the target row pulses whenever the name changes */
-#bank-target { border-radius: 10px; padding: 3px 8px; margin: -3px -8px; }
-#bank-target.switch { animation: targetSwitch 0.8s ease-out; }
-
-@keyframes targetSwitch {
-  0%   { background: #fff0b8; box-shadow: 0 0 0 3px #ffd86b; }
-  100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+/* a mid-size window: the bar cannot be 560px and clear both corners, so
+   it takes what is left between the minimap and the zoom buttons */
+@media (max-width: 1160px) and (min-width: 641px) {
+  .dock { left: calc(270px + var(--safe-l)); right: calc(64px + var(--safe-r)); width: auto; min-width: 0; transform: none; }
 }
 
-/* phone landscape: height is the scarce axis, so the jump row drops to
-   one line per label and the card gives back the padding it can spare */
-@media (max-width: 900px) and (max-height: 560px), (max-height: 560px) and (pointer: coarse) {
-  :root { --keys-h: 46px; }
-  #jump-bar button { height: 36px; font-size: 0.6rem; }
-  #jump-bar .jump-to { -webkit-line-clamp: 1; }
+/* ————— a phone —————
 
-  #card { padding: 11px 14px; }
-  #card-prompt { margin-bottom: 8px; font-size: 0.92rem; }
-  #guess-input, #guess-btn { padding: 8px 12px; }
-  #card-actions { margin-top: 8px; }
-  #bank-chips { max-height: 22vh; }
-}
-
+   The HUD runs the width of the screen, the bar becomes a sheet docked to
+   the bottom edge, and the minimap sits just above its right-hand end —
+   under the thumb, which is where the jump keys always were. */
 @media (max-width: 640px) {
-  #card { bottom: calc(10px + var(--keys-h) + var(--safe-b)); }
-  #tools { right: calc(10px + var(--safe-r)); top: calc(9px + var(--safe-t)); }
-  /* the HUD shares the top edge with the tools, so it gives up the
-     challenge name and keeps the clock */
-  #level-banner { top: calc(8px + var(--safe-t)); left: 12px; transform: none; max-width: calc(100% - 190px); }
-  #level-title { max-width: 34vw; font-size: 0.78rem; }
-  #level-timer { font-size: 0.95rem; }
-  /* The find bar is one row on a phone. It was three — the target, the
-     buttons wrapped under it, a line of instructions — 128px of a map
-     that has the jump keys under it already, and every fit frames above
-     whatever this measures. The buttons keep their glyphs and lose their
-     words; "FIND" goes (the mode says so); the instructions go, and the
-     hit/miss line floats above the bar instead of holding a row open for
-     the moments it has something to say. */
-  #word-bank { bottom: calc(6px + var(--keys-h) + var(--safe-b)); padding: 6px 8px 6px 12px; }
-  #bank-target { flex-wrap: nowrap; gap: 7px; margin: 0; padding: 0; }
-  #bank-find { display: none; }
-  #bank-name { font-size: 1.05rem; line-height: 1.15; min-width: 0; }
-  #bank-strikes { min-width: 0; }
-  .bank-buttons { flex: none; gap: 5px; }
-  .bank-buttons .lbl { display: none; }
-  .bank-buttons button, #bank-collapse { width: 40px; height: 36px; padding: 0; font-size: 1rem; }
-  #bank-hint { display: none; }
-  #bank-hint.good, #bank-hint.bad {
-    display: block;
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 6px);
-    transform: translateX(-50%);
-    margin: 0;
-    padding: 5px 12px;
-    max-width: 100%;
-    border-radius: 999px;
-    background: var(--panel-bg);
-    box-shadow: var(--shadow-sm);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    pointer-events: none;
-    animation: hintPill 2.6s ease-out forwards;
+  #level-banner {
+    top: calc(10px + var(--safe-t));
+    left: calc(10px + var(--safe-l));
+    right: calc(10px + var(--safe-r));
+    max-width: none;
+    height: 44px;
+    padding: 0 0 0 4px;
+    border-radius: 12px;
+    font-size: 0.81rem;
   }
-  #bank-chips { max-height: 14vh; }
+  #progress-wrap { flex: 1; height: 40px; padding: 0 8px; gap: 7px; text-align: left; font-size: 0.875rem; }
+  #level-title { flex: 0 1 auto; }
+  #level-chip, .hud-rule { display: none; }
+  #progress-text, #level-timer { min-width: 0; }
+  #level-timer { margin-left: 8px; }
+  #menu-btn { width: 44px; height: 44px; font-size: 1.2rem; }
+
+  #menu { top: calc(62px + var(--safe-t)); left: calc(10px + var(--safe-l)); right: calc(10px + var(--safe-r)); width: auto; }
+
+  .dock {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: none;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 66px;
+    padding: 10px calc(12px + var(--safe-r)) calc(10px + var(--safe-b)) calc(12px + var(--safe-l));
+    border-radius: 16px 16px 0 0;
+  }
+  /* what floats above the bar keeps to the left of the minimap */
+  .dock-above { left: 10px; right: 10px; }
+  .dock-above > p { max-width: calc(100% - 222px); }
+  .dock button { height: 44px; min-width: 44px; }
+  .dock kbd { display: none; }
+  #guess-form { height: 46px; border-radius: 10px; padding: 0 0 0 12px; }
+  #guess-form button { height: 44px; min-width: 40px; }
+  #guess-input { font-size: 1rem; }
+  #hint-btn { font-size: 0.72rem; }
+  #answer-name span { font-size: 1.1rem; }
+  #bank-name { font-size: 1.1rem; }
+  .bank-buttons .lbl { display: none; }
+  #bank-skip .lbl { display: inline-flex; }
+  #bank-skip .ic { display: none; }
+  #bank-skip { border-color: var(--color-neutral-800); padding: 0 14px; }
+  /* no room to explain the mode here: the line speaks up for a miss or
+     a reveal, and stays out of the way of the open list */
+  #bank-hint:not(.good):not(.bad),
+  #word-bank:not(.collapsed) #bank-hint { display: none; }
+
+  #jump-bar { left: auto; right: calc(10px + var(--safe-r)); bottom: calc(74px + var(--safe-b)); padding: 6px; }
+  #mini { width: 196px; }
+  #jump-caption { display: none; }
+  /* the open list of names takes the minimap's place until it is closed */
+  body.bank-open #jump-bar { visibility: hidden; }
+  #zoom { display: none; }
+  #jump-flash { top: calc(62px + var(--safe-t)); }
+
   .stat-tiles { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* a phone on its side: height is the scarce axis, so the minimap shrinks */
+@media (max-height: 560px) and (pointer: coarse), (max-width: 900px) and (max-height: 560px) {
+  #mini { width: 150px; }
+  #mini kbd { font-size: 0.75rem; }
 }
 
 /* ————— bigger flags where there is room —————
 
    On a desktop there is room to actually study the flag, not just tell
-   two of them apart — and place mode spends its whole run looking at
-   one. This is the only breakpoint where flags differ, so it reads as
-   one rule rather than five. */
+   two of them apart. This is the only breakpoint where inline flags
+   differ, so it reads as one rule rather than five. */
 @media (min-width: 901px) and (min-height: 561px) {
   .flag { height: 22px; vertical-align: -5px; }
   .pop .flag { height: 20px; }
-  .chip .flag { height: 18px; }
-  #answer-name .flag { height: 44px; }
-  #bank-flag .flag { height: 52px; border-radius: 4px; }
 }

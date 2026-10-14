@@ -7,8 +7,7 @@
 const { test, expect } = require('@playwright/test');
 
 async function boot(page) {
-  await page.goto('/');
-  await page.locator('#hello-close').click();
+  await page.goto('/?play=name');
   await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 }
@@ -68,11 +67,11 @@ test('"find a gap" lands on one you have not named, and does not name it', async
   await answer(page, 'guatemala');
   await expect.poll(() => page.evaluate(() => window.NAN_DEBUG.state.status.GT)).toBe('named');
 
-  // It pans first and selects when it lands, so wait for the selection
-  // to actually move off the one we just answered.
+  // A right answer closes its question, so nothing is selected now. The
+  // button pans first and selects when it lands — wait for that.
   await page.locator('#hc-find').click();
   await expect.poll(() => page.evaluate(() => window.NAN_DEBUG.state.selected), { timeout: 5000 })
-    .not.toBe('GT');
+    .toBeTruthy();
 
   const picked = await page.evaluate(() => window.NAN_DEBUG.state.selected);
   const level = await page.evaluate(() => window.NAN_DEBUG.state.level.codes);
@@ -106,17 +105,18 @@ test('giving up asks once, then ends the run', async ({ page }) => {
   await expect(page.locator('#results-misses')).not.toContainText('Guatemala');
 });
 
-test('the mode button cycles name, place, hardcore', async ({ page }) => {
+test('the menu switches between name, place and hardcore', async ({ page }) => {
   await boot(page);
 
-  const cycle = async () => {
-    await page.locator('#progress-wrap').click();
-    await page.locator('#level-mode').click();
+  const to = async (mode) => {
+    await page.locator('#menu-btn').click();
+    await page.locator(`#mode-seg [data-mode="${mode}"]`).click();
     await page.waitForTimeout(250);
     return page.evaluate(() => window.NAN_DEBUG.state.level.mode);
   };
   expect(await page.evaluate(() => window.NAN_DEBUG.state.level.mode)).toBe('name');
-  expect(await cycle()).toBe('place');
-  expect(await cycle()).toBe('hardcore');
-  expect(await cycle()).toBe('name');
+  expect(await to('place')).toBe('place');
+  expect(await to('hardcore')).toBe('hardcore');
+  expect(await to('name')).toBe('name');
+  await expect(page.locator('#level-chip')).toHaveText('Name');
 });

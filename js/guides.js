@@ -9,10 +9,13 @@
  *   · the dashed green frame is this screen's safe area — every box lands
  *     centred in it. A row marked ⚠ lands below the zoom that zone's
  *     buttons were spaced for, so some of them may pair up there
- *   · Copy hands back the table to paste over VIEW_BOXES
- *
- * Edits live in this browser's storage (and only apply in ?guides), so a
- * half-tuned set survives a reload on the phone it was tuned on.
+ *   · on the local server (npm run serve) every change is written
+ *     straight into js/views.js, from whatever device made it — the
+ *     panel's title says so. Nothing to copy
+ *   · anywhere else there is nowhere to write to: edits live in this
+ *     browser's storage (and only apply in ?guides), so a half-tuned set
+ *     survives a reload on the phone it was tuned on, and Copy hands back
+ *     the table to paste over VIEW_BOXES
  */
 (() => {
   'use strict';
@@ -31,7 +34,31 @@
     }
   } catch { /* private window, corrupt entry — start from the file */ }
 
-  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(VIEW_BOXES)); } catch { /* fine */ } };
+  // Where an edit goes. The local server takes it and rewrites the file;
+  // once it has, the file is the truth and the browser's copy is dropped,
+  // so an old one can never come back over a newer file. A host with no
+  // such endpoint (a plain static server, the live site) answers with an
+  // error once and is not asked again — there the browser's copy is all
+  // there is. A test driving the page never writes the file at all.
+  let toFile = !navigator.webdriver, fileTimer = null, saved = '';
+  const keep = () => { try { localStorage.setItem(STORE, JSON.stringify(VIEW_BOXES)); } catch { /* fine */ } };
+  function save() {
+    keep();
+    if (!toFile) return;
+    clearTimeout(fileTimer);
+    fileTimer = setTimeout(async () => {
+      try {
+        const r = await fetch('__views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(VIEW_BOXES) });
+        if (!r.ok) throw new Error(r.status);
+        try { localStorage.removeItem(STORE); } catch { /* fine */ }
+        saved = 'saved to js/views.js';
+      } catch {
+        toFile = false;
+        saved = 'saved in this browser';
+      }
+      renderRows();
+    }, 350);
+  }
 
   const css = document.createElement('style');
   css.textContent = `
@@ -146,7 +173,7 @@
   }
 
   function renderRows() {
-    titleEl.textContent = `${open ? '▾' : '▸'} View guides`;
+    titleEl.textContent = `${open ? '▾' : '▸'} View guides${saved ? ' · ' + saved : ''}`;
     rowsEl.hidden = !open;
     if (!open) return;
     rowsEl.innerHTML = '';
@@ -188,6 +215,7 @@
   panel.querySelector('#gd-reset').addEventListener('click', () => {
     for (const n of names) VIEW_BOXES[n].splice(0, 4, ...ORIGINAL[n]);
     try { localStorage.removeItem(STORE); } catch { /* fine */ }
+    if (toFile) save();               // back to what the file held when this page loaded
     renderRows();
   });
 

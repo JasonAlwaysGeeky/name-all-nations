@@ -3,7 +3,8 @@
 const { test, expect } = require('@playwright/test');
 const { boot, clickCountry } = require('./voice-helpers');
 
-const micOn = (page) => page.locator('#mic-toggle').click();
+// voice input lives in the menu
+const micOn = async (page) => { await page.locator('#menu-btn').click(); await page.locator('#mic-toggle').click(); };
 const say = (page, text, isFinal = true) =>
   page.evaluate(([t, f]) => window.__voice.say(t, f), [text, isFinal]);
 const listening = (page) => page.evaluate(() => !!window.__voice.rec?.running);
@@ -15,7 +16,7 @@ test('one utterance names the selected country', async ({ page }) => {
   await expect(page.locator('#card')).toBeVisible();
 
   expect(await say(page, 'brazil')).toBe(true);
-  await expect(page.locator('#answer-result')).toHaveText('✓ Correct!');
+  await expect(page.locator('#idle-bar .dock-note')).toContainText('✓');
   await expect.poll(() => page.locator('#progress-text').textContent()).toBe('1 / 195');
 });
 
@@ -56,7 +57,7 @@ test('close spellings still count when spoken', async ({ page }) => {
   await micOn(page);
   await clickCountry(page, 'BR');
   expect(await say(page, 'brasil')).toBe(true);
-  await expect(page.locator('#answer-result')).toHaveText('✓ Correct!');
+  await expect(page.locator('#idle-bar .dock-note')).toContainText('✓');
 });
 
 test('an interim result banks a correct answer before the final arrives', async ({ page }) => {
@@ -65,7 +66,7 @@ test('an interim result banks a correct answer before the final arrives', async 
   await clickCountry(page, 'BR');
 
   expect(await say(page, 'brazil', false)).toBe(true);
-  await expect(page.locator('#answer-result')).toHaveText('✓ Correct!');
+  await expect(page.locator('#idle-bar .dock-note')).toContainText('✓');
   await expect.poll(() => page.locator('#progress-text').textContent()).toBe('1 / 195');
 });
 
@@ -92,6 +93,7 @@ test('pause stops the mic, and words from the pause do not grade on resume', asy
   await clickCountry(page, 'BR');
   expect(await listening(page)).toBe(true);
 
+  await page.locator('#menu-btn').click();
   await page.locator('#pause-timer').click();
   await expect(page.locator('#pause-veil')).toBeVisible();
 
@@ -137,7 +139,7 @@ test('toggling the mic quickly never leaves a capture running', async ({ page })
 
   // Now switch off for real. However many captures got requested along the
   // way, none of them may still be holding the mic.
-  await page.locator('#mic-toggle').click();
+  await micOn(page);
   await expect.poll(() => page.evaluate(() => window.__voice.liveStreams())).toBe(0);
   expect(await listening(page)).toBe(false);
 });

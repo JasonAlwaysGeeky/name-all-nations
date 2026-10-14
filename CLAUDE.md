@@ -13,15 +13,27 @@ Repo: https://github.com/JasonAlwaysGeeky/name-all-nations — work lands via
 Static site, but it can't run from `file://` (the map is fetched at runtime):
 
 ```bash
-npx http-server -p 5173 -c-1 .
+npm run serve
 ```
+
+That is `tools/serve.mjs`: the files, never cached, on port 5173 — plus the
+one thing a static server can't do, which is let the `?guides` editor write
+the view boxes back into `js/views.js` as they are dragged (from a phone on
+the LAN too). Any static server still runs the game; the editor then keeps
+its edits in the browser and offers Copy instead.
 
 `.claude/launch.json` already defines this as the `name-all-nations` preview
 server, so the Browser pane can start it directly.
 
 ## Shape of it
 
-- `index.html` — the whole DOM: map, jump bar, quiz card, word bank, panels
+- `index.html` — the whole DOM: map, the HUD and its menu (top left), the
+  minimap (six jump zones), the bottom bar (idle / answer box / name to find
+  / hardcore), and the full screens around it — home, the mode picker, the
+  intro, results, stats, the heat map. The layout follows the Atlas3 design.
+  A first visit opens on the intro and every later one on home;
+  `?play` skips both and lands on the map. Place is the starting mode;
+  `?play=name` (or `hardcore`) lands in that one instead (the tests use it)
 - `js/app.js` — everything else. Transform-based SVG pan/zoom (the viewBox
   is only rewritten once a gesture settles), three levels of border detail,
   the rings/boxes/clusters overlay, timed Name/Place modes, stats + heat map
@@ -33,15 +45,29 @@ server, so the Browser pane can start it directly.
 - `js/views.js` — where each jump key lands: twelve hand-set boxes, each the
   area that must be on screen. One rule fits them (tightest zoom that holds
   the box in the safe area), so a wrong view is a box to drag, not code.
-  `?guides` loads `js/guides.js`, the on-map editor that sets them by eye
+  `?guides` loads `js/guides.js`, the on-map editor that sets them by eye.
+  It and the globe live in the Developer panel (menu, or `` ` ``), which every
+  build but the live one shows; on the live one `?dev` switches it on for
+  that browser and `?dev=0` off
+- `js/minimap.js` — the minimap's picture (all land as two paths). Shared by
+  the flat map and the globe
 - `js/names.js` — does a guess name this country: normalise, typo budget,
   the phonetic pass for the mic. Shared by the flat map and the globe
+- `js/islands.js` — the dotted outlines round an island nation's islands:
+  which nations, how the islands group, and each outline's rect in map
+  units at a zoom. The flat map draws them as SVG, the globe drapes the
+  same rects over the sphere
 - `js/globe.js` + `js/globe-play.js` + `globe.html` — the globe: a canvas
   renderer over the same borders (every frame re-projects; nothing is
   transformed) with the flat map's gesture on a sphere, and a cut-down copy
-  of the game loop on top — name and place, the buttons and zones, the jump
-  keys on the same boxes — enough to judge how it plays. Not a mode of the
+  of the game loop on top — name and place, the buttons, zones and island
+  outlines, the jump keys on the same boxes — enough to judge how it plays. Not a mode of the
   game yet; nothing there is scored or saved
+- `css/tokens.css` — every colour, radius and shadow: the Nocturne design
+  system on its T3-O palette, plus the map's own states. `css/style.css` is
+  layout and components and takes all of its colours from there
+- `icons/ph.svg` — the Phosphor icons the game uses, as one sprite; generated
+  by `npm run icons` from the list in `tools/gen-icons.mjs`. `fonts/` is Inter
 - `flags/` — the 195 flags, SVG, from flag-icons (MIT). Cache-first like `map/`
 - `map/` — the simplified amCharts world map, plus the 1.4MB full-detail
   version fetched lazily for deep zoom

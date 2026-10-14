@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#1c4b7a">
+  <meta name="theme-color" content="#0c1522">
   <!-- Installed to the home screen, Chrome on Android drops the address
        bar and the system bars entirely — the manifest's display mode is
        what does it, no tap required. -->
@@ -15,6 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <title>Name All Nations</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -25,219 +26,384 @@
     <!-- the challenge's progress, as a hairline along the very top edge -->
     <div id="progress-bar"><span id="progress-fill"></span></div>
 
-    <!-- one row, one label each: where the next tap goes (see markJumpKeys).
-         West to east, each keyboard column in turn: 1 over Q, 2 over W, 3 over E. -->
-    <nav id="jump-bar" aria-label="Jump around the map">
-      <button data-key="1" data-area="N. America" data-pocket="Central America"><kbd>1</kbd><span class="jump-to">N. America</span></button>
-      <button data-key="q" data-area="S. America" data-pocket="Caribbean"><kbd>Q</kbd><span class="jump-to">S. America</span></button>
-      <button data-key="2" data-area="Europe" data-pocket="Micro-states"><kbd>2</kbd><span class="jump-to">Europe</span></button>
-      <button data-key="w" data-area="Africa" data-pocket="West coast"><kbd>W</kbd><span class="jump-to">Africa</span></button>
-      <button data-key="3" data-area="Asia" data-pocket="Middle East"><kbd>3</kbd><span class="jump-to">Asia</span></button>
-      <button data-key="e" data-area="South Asia" data-pocket="Pacific isles"><kbd>E</kbd><span class="jump-to">South Asia</span></button>
-    </nav>
-
-    <div id="tools">
-      <button id="fs-btn" title="Full screen (F)" aria-label="Full screen" hidden>⛶</button>
-      <button id="stats-btn" title="Stats &amp; heat map" aria-label="Stats">📊</button>
-      <button id="help-btn" title="Shortcuts (?)" aria-label="Help">?</button>
-      <button id="mic-toggle" title="Voice input on/off" aria-label="Toggle voice input">🎤</button>
+    <!-- The heads-up display, top left: which challenge (tap it for the
+         list), which mode, how far, how long — and the menu, which holds
+         everything a run does not need in front of it. -->
+    <div id="level-banner" hidden>
+      <button id="progress-wrap" title="Choose a challenge" aria-label="Choose a challenge">
+        <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#globe-hemisphere-west"/></svg><span id="level-title"></span><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-down"/></svg>
+      </button>
+      <span id="level-chip"></span>
+      <span class="hud-rule"></span>
+      <span id="progress-text">0 / 195</span>
+      <span id="level-timer">0:00.0</span>
+      <button id="menu-btn" title="Menu" aria-label="Menu" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#list"/></svg></button>
     </div>
 
+    <div id="menu" hidden>
+      <button id="pause-timer" title="Pause — hides the map, stops the clock (P)"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#pause"/></svg><span>Pause</span><kbd>P</kbd></button>
+      <button id="menu-restart"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-counter-clockwise"/></svg><span>Restart</span><kbd>R</kbd></button>
+      <button id="challenges-btn"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#squares-four"/></svg><span>All challenges</span></button>
+      <div id="mode-seg" role="group" aria-label="Mode">
+        <button data-mode="place">Place</button>
+        <button data-mode="name">Name</button>
+        <button data-mode="hardcore">Hardcore</button>
+      </div>
+      <hr>
+      <button id="stats-btn"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#chart-bar"/></svg><span>Stats</span></button>
+      <button id="heat-btn"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#thermometer-simple"/></svg><span>Heat map</span></button>
+      <button id="help-btn"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#keyboard"/></svg><span>Shortcuts</span><kbd>?</kbd></button>
+      <button id="mic-toggle" title="Voice input on/off"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#microphone"/></svg><span>Voice input</span><kbd class="menu-state">Off</kbd></button>
+      <button id="fs-btn" title="Full screen (F)" hidden><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#corners-out"/></svg><span>Full screen</span><kbd>F</kbd></button>
+      <button id="intro-btn"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#info"/></svg><span>Replay the intro</span></button>
+      <button id="dev-btn" hidden><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#flask"/></svg><span>Developer</span><kbd>`</kbd></button>
+    </div>
+
+    <!-- The minimap: six zones, one per jump key — 1 2 3 across the north,
+         Q W E across the south. A tap lands on the zone's area, a second on
+         the dense pocket inside it, a third comes back out; the caption
+         says where the next one goes (see markJumpKeys). -->
+    <nav id="jump-bar" aria-label="Jump around the map">
+      <div id="mini">
+        <svg id="mini-map" viewBox="0 0 1010 666" aria-hidden="true"><path id="mini-terr"/><path id="mini-land"/><rect id="mini-view" rx="6" display="none"/></svg>
+        <button data-key="1" data-area="N. America" data-pocket="Central America" style="left:0;top:0;width:35.64%;height:63.81%"><kbd>1</kbd><span class="jump-to">N. America</span></button>
+        <button data-key="q" data-area="S. America" data-pocket="Caribbean" style="left:14.85%;top:63.81%;width:23.27%;height:36.19%"><kbd>Q</kbd><span class="jump-to">S. America</span></button>
+        <button data-key="2" data-area="Europe" data-pocket="Micro-states" style="left:38.12%;top:15.02%;width:20.3%;height:39.79%"><kbd>2</kbd><span class="jump-to">Europe</span></button>
+        <button data-key="w" data-area="Africa" data-pocket="West coast" style="left:40.1%;top:54.8%;width:22.28%;height:42.04%"><kbd>W</kbd><span class="jump-to">Africa</span></button>
+        <button data-key="3" data-area="Asia" data-pocket="Middle East" style="left:58.42%;top:15.02%;width:41.58%;height:45.05%"><kbd>3</kbd><span class="jump-to">Asia</span></button>
+        <button data-key="e" data-area="South Asia" data-pocket="Pacific isles" style="left:63.37%;top:60.06%;width:36.63%;height:39.94%"><kbd>E</kbd><span class="jump-to">South Asia</span></button>
+      </div>
+      <p id="jump-caption" hidden><b></b><span></span></p>
+    </nav>
+
+    <div id="zoom">
+      <button id="zoom-in" title="Zoom in" aria-label="Zoom in"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#plus"/></svg></button>
+      <button id="zoom-out" title="Zoom out" aria-label="Zoom out"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#minus"/></svg></button>
+    </div>
 
     <div id="tooltip" hidden></div>
     <div id="toast" hidden></div>
     <div id="jump-flash" hidden></div>
 
-    <div id="hello" class="panel">
-      <h2>Can you name all 195 countries?</h2>
-      <p>Click any country and type its name — close spellings count.
-         Turn on the 🎤 to just say the names out loud.
-         Pick a continent or region from the pill at the top for a smaller, timed challenge.</p>
-      <p class="hello-keys">Keys: <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> over <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd>
-         lay the world out on your keyboard — or tap the row along the bottom.
-         Every key has two floors, the area and its dense pocket, and the button says where the next tap goes ·
-         <kbd>0</kbd> whole world · <kbd>[</kbd> <kbd>]</kbd> next challenge · <kbd>R</kbd> restart ·
-         <kbd>Space</kbd> skip (place mode)</p>
-      <button id="hello-close">Let's go</button>
+    <!-- The bottom bar, name mode. Idle it says what to do; with a country
+         selected it is the answer box (#card), and what the game has to say
+         back floats just above it. -->
+    <div id="idle-bar" class="dock" hidden>
+      <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#cursor-click"/></svg><span id="idle-text">Click a nation to name it</span>
+      <div class="dock-above"><p class="dock-note" role="status"></p></div>
     </div>
 
-    <section id="card" class="panel" hidden>
-      <button id="card-close" aria-label="Close">×</button>
+    <section id="card" class="dock" hidden>
+      <div id="card-above" class="dock-above">
+        <p id="mic-status" hidden><span id="voice-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span id="mic-status-text">listening… just say the nation’s name</span></p>
+        <p id="feedback" role="status"></p>
+      </div>
 
       <div id="card-question">
-        <p id="card-prompt">What country is this?</p>
+        <p id="card-prompt" class="sr-only">What nation is this?</p>
         <form id="guess-form" autocomplete="off">
           <input id="guess-input" type="text" autocomplete="off" autocapitalize="words"
-                 spellcheck="false" placeholder="Type its name…" aria-label="Country name guess">
-          <button type="submit" id="guess-btn">Guess</button>
+                 spellcheck="false" placeholder="Name the highlighted nation, then Enter" aria-label="Nation name guess">
+          <span id="card-actions">
+            <button type="button" id="hint-btn" title="Hint"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#lightbulb"/></svg>Hint</button>
+            <button type="button" id="reveal-btn" title="Reveal" aria-label="Reveal"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#eye"/></svg></button>
+          </span>
+          <button type="submit" id="guess-btn" title="Guess (Enter)" aria-label="Guess"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-right"/></svg></button>
         </form>
-        <p id="mic-status" hidden><span id="voice-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span id="mic-status-text">listening… just say the country’s name</span></p>
-        <p id="feedback" role="status"></p>
-        <div id="card-actions">
-          <button id="hint-btn">💡 Hint</button>
-          <button id="reveal-btn">Reveal</button>
-        </div>
       </div>
 
       <div id="card-answer" hidden>
-        <p id="answer-result"></p>
         <h2 id="answer-name"></h2>
-        <p id="answer-meta"></p>
-        <button id="speak-btn">🔊 Pronounce</button>
-        <button id="retry-btn" hidden>✏️ Try to name it</button>
+        <p id="answer-result"></p>
+        <p id="answer-meta" class="sr-only"></p>
+        <button id="speak-btn" title="Pronounce" aria-label="Pronounce"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#speaker-high"/></svg></button>
+        <button id="retry-btn" hidden>Try to name it</button>
       </div>
-    </section>
 
-    <!-- the whole heads-up display while you play: where you are, the
-         clock, and pause. Everything else is one tap away in a panel. -->
-    <div id="level-banner" hidden>
-      <button id="progress-wrap" title="Choose a challenge" aria-label="Choose a challenge">
-        <span id="level-title"></span>
-        <span id="progress-text">0 / 195</span>
-      </button>
-      <span id="level-timer">0:00.0</span>
-      <button id="pause-timer" title="Pause — hides the map, stops the clock (P)" aria-label="Pause">⏸</button>
-    </div>
+      <button id="card-close" title="Close (Esc)" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#x"/></svg></button>
+    </section>
 
     <div id="pause-veil" hidden>
       <div class="pause-box">
-        <div class="pause-icon">⏸</div>
+        <div class="pause-icon"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#pause"/></svg></div>
         <h2>Paused</h2>
         <p>The map is hidden and the clock is stopped.</p>
-        <button class="btn-primary">▶ Resume <kbd>P</kbd></button>
+        <button class="btn-primary"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#play"/></svg>Resume <kbd>P</kbd></button>
       </div>
     </div>
 
-    <!-- Hardcore mode's whole interface: no hints, no reveal, and the two
+    <!-- Hardcore mode's bottom bar: no hints, no reveal, and the two
          things you do need — a way to find a gap without being told what
-         fills it, and a way to stop. -->
-    <section id="hardcore-bar" hidden>
-      <span id="hc-title">🏴 Hardcore</span>
-      <span id="hc-note">No hints, no reveals. Stop when you're done.</span>
+         fills it, and a way to stop. It steps aside while a country is
+         being asked. -->
+    <section id="hardcore-bar" class="dock" hidden>
+      <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#cursor-click"/></svg><span id="hc-note">Click a nation to name it</span>
+      <div class="dock-above"><p class="dock-note" role="status"></p></div>
       <span class="hc-buttons">
-        <button id="hc-find" title="Pan to one you haven't named yet (M)">🔍 Find a gap <kbd>M</kbd></button>
-        <button id="hc-giveup" title="End the run and see the results (G)">🏁 I'm done <kbd>G</kbd></button>
+        <button id="hc-find" title="Pan to one you haven't named yet (M)"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#magnifying-glass"/></svg>Find a gap <kbd>M</kbd></button>
+        <button id="hc-giveup" title="End the run and see the results (G)"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#flag-checkered"/></svg>I'm done <kbd>G</kbd></button>
       </span>
     </section>
 
-    <section id="word-bank" hidden>
+    <!-- The bottom bar, place mode: the name to find. The list of what is
+         left opens above it. -->
+    <section id="word-bank" class="dock" hidden>
+      <div id="bank-above" class="dock-above">
+        <div id="bank-chips"></div>
+        <p id="bank-hint"></p>
+      </div>
       <div id="bank-target">
-        <span id="bank-find">Find</span>
         <span id="bank-flag"></span>
         <strong id="bank-name"></strong>
         <span id="bank-strikes" aria-label="Wrong tries"></span>
         <span class="bank-buttons">
-          <button id="bank-skip" title="Skip for now (Space)" aria-label="Skip">⏭<span class="lbl"> Skip</span></button>
-          <button id="bank-show" title="Show me where it is (counts as a miss)" aria-label="Show me">👁<span class="lbl"> Show me</span></button>
-          <button id="bank-collapse" title="Show / hide the list" aria-label="Toggle list">▾</button>
+          <button id="bank-skip" title="Skip for now (Space)" aria-label="Skip"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#skip-forward"/></svg><span class="lbl">Skip <kbd>Space</kbd></span></button>
+          <button id="bank-show" title="Show me where it is (counts as a miss)" aria-label="Show me"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#eye"/></svg><span class="lbl">Show me</span></button>
+          <button id="bank-collapse" title="Show / hide the list" aria-label="Toggle list"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-up"/></svg></button>
         </span>
       </div>
-      <p id="bank-hint"></p>
-      <div id="bank-chips"></div>
     </section>
 
-    <section id="results" class="panel" hidden>
-      <button id="results-close" aria-label="Close">×</button>
-      <div class="results-head">
-        <div class="results-trophy">🏆</div>
-        <h2 id="results-title"></h2>
-        <p id="results-sub"></p>
+    <!-- The heat map is a view of its own: the map coloured by streak, a
+         bar to get back out, and a panel that says what the colours mean
+         and how the country you tap is doing. -->
+    <div id="heat-bar" hidden>
+      <button id="heat-close" title="Back (Esc)" aria-label="Back"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-left"/></svg></button>
+      <b>Heat map</b>
+      <span id="heat-mode-note">First-try streak</span>
+      <div id="heat-seg" role="group" aria-label="Which mode's streaks">
+        <button data-mode="name">Name</button>
+        <button data-mode="place">Place</button>
       </div>
-      <div class="results-tiles" id="results-tiles"></div>
-      <div id="results-misses"></div>
-      <div class="results-actions">
-        <button id="results-again">↻ Play again</button>
-        <button id="results-mode"></button>
-        <button id="results-next" class="btn-primary">Next challenge ›</button>
+    </div>
+    <div id="heat-panel" hidden>
+      <div id="heat-sel" hidden>
+        <span id="heat-flag"></span>
+        <div><b id="heat-name"></b><p><i id="heat-dot"></i><span id="heat-text"></span></p></div>
+      </div>
+      <p id="heat-prompt">Click a nation to see its streak</p>
+      <div id="heat-legend">
+        <span><i class="leg-x"></i>No streak yet</span><span><i class="leg-1"></i>1 in a row</span>
+        <span><i class="leg-2"></i>2 in a row</span><span><i class="leg-3"></i>3 or 4 in a row</span>
+        <span><i class="leg-4"></i>5 or more</span>
+      </div>
+    </div>
+
+    <!-- What a finished run came to: the time first, because the time is
+         the score; then how clean it was, and what to do about the misses. -->
+    <section id="results" class="screen" hidden>
+      <div class="screen-body results-body">
+        <p id="results-sub"></p>
+        <div class="results-head">
+          <div id="results-time"></div>
+          <div><h2 id="results-title"></h2><p id="results-best" hidden>New best time</p></div>
+        </div>
+        <div class="results-tiles" id="results-tiles"></div>
+        <div id="results-misses"></div>
+        <div class="results-actions">
+          <button id="results-practise" class="btn-primary" hidden></button>
+          <button id="results-again">Play again</button>
+          <button id="results-mode"></button>
+          <button id="results-home" class="btn-ghost">All challenges</button>
+        </div>
       </div>
     </section>
     <canvas id="confetti" hidden></canvas>
 
-    <aside id="levels-panel" class="panel" hidden>
-      <button id="levels-close" aria-label="Close">×</button>
-      <h2>🎯 Challenges</h2>
-      <div id="now-playing">
-        <span class="np-label">Playing now</span>
-        <button id="challenge-prev" title="Previous challenge ([)" aria-label="Previous challenge">‹</button>
-        <button id="level-restart" title="Restart this challenge (R)" aria-label="Restart">↻</button>
-        <button id="level-mode" title="Switch mode"></button>
-        <button id="challenge-next" title="Next challenge (])" aria-label="Next challenge">›</button>
+    <!-- Home: every challenge, the whole world first, then each continent
+         with its regions under it. -->
+    <section id="home" class="screen" hidden>
+      <div class="screen-body home-body">
+        <div class="home-top">
+          <button id="home-back" class="btn-ghost" title="Back to the map (Esc)" aria-label="Back to the map"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-left"/></svg></button>
+          <span class="brand">Name All Nations</span>
+          <button id="home-heat" class="btn-ghost"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#thermometer-simple"/></svg>Heat map</button>
+          <button id="home-stats" class="btn-ghost"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#chart-bar"/></svg>Stats</button>
+          <button id="home-help" class="btn-ghost" title="Shortcuts (?)" aria-label="Shortcuts"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#keyboard"/></svg></button>
+          <button id="home-intro" class="btn-ghost" title="Replay the intro" aria-label="Replay the intro"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#info"/></svg></button>
+        </div>
+        <div class="home-head">
+          <div>
+            <h1>Name all 195 nations</h1>
+            <p>Take on the whole world, a continent, or one of its regions.</p>
+          </div>
+          <button id="home-continue" hidden>
+            <span><small>Continue</small><b></b><em></em></span><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#play"/></svg>
+          </button>
+        </div>
+        <div id="home-cards"></div>
       </div>
-      <p class="levels-blurb">Pick how much of the world to take on. Every challenge starts fresh, and the
-        clock starts on your first move.
-        <strong>Place</strong> is level one — put the listed names on the map.
-        <strong>Name</strong> is the real test — type or say each country.</p>
-      <div id="levels-list"></div>
-    </aside>
+    </section>
 
-    <aside id="stats-panel" class="panel" hidden>
-      <button id="stats-close" aria-label="Close">×</button>
-      <h2>📊 Your stats</h2>
-      <div class="stat-tiles" id="stat-tiles"></div>
-
-      <label class="toggle">
-        <input type="checkbox" id="heat-toggle">
-        <span>🔥 <strong>Heat map</strong> — colour every country by how many times in a row you've got it right
-          <small id="heat-mode-note"></small></span>
-      </label>
-      <div id="heat-legend">
-        <span class="leg leg-x">not tried</span><span class="leg leg-0">0</span><span class="leg leg-1">1</span>
-        <span class="leg leg-2">2</span><span class="leg leg-3">3–4</span><span class="leg leg-4">5+ in a row</span>
+    <div id="mode-dialog" class="scrim" hidden>
+      <div class="dialog" role="dialog" aria-labelledby="mode-for">
+        <div><h2 id="mode-for"></h2><p id="mode-count"></p></div>
+        <div id="mode-opts">
+          <button data-mode="place"><b>Place</b><span>Names come up one at a time. Click where each belongs.</span></button>
+          <button data-mode="name"><b>Name</b><span>Click each nation and type or say its name.</span></button>
+          <button data-mode="hardcore"><b>Hardcore</b><span>Name mode with no hints and no reveals. Stop when you are done.</span></button>
+        </div>
+        <div class="dialog-actions">
+          <button id="mode-cancel" class="btn-ghost">Cancel</button>
+          <button id="mode-start" class="btn-primary">Start</button>
+        </div>
       </div>
+    </div>
 
-      <label class="toggle">
-        <input type="checkbox" id="flags-toggle">
-        <span>🏳️ <strong>Show flags</strong> next to names in place mode and on answers</span>
-      </label>
+    <!-- The intro, three steps, shown once (and again from the menu). -->
+    <section id="onboard" class="screen" hidden>
+      <div class="onboard-body">
+        <span class="brand">Name All Nations</span>
+        <div class="onboard-steps">
+          <p id="onboard-count">01 / 03</p>
+          <div class="onboard-step" data-step="0">
+            <h1><span class="fine">Click</span><span class="coarse">Tap</span> a nation and type its name</h1>
+            <p>The nation you pick lights up gold, and you type its name in the bar at the bottom. It turns green
+              when you're right and flashes red when you're not. Spelling is forgiving: Brasil, luxemburg and
+              Cote d'Ivoire all count.</p>
+          </div>
+          <div class="onboard-step" data-step="1" hidden>
+            <h1>Use the minimap to get around</h1>
+            <svg class="onboard-mini" viewBox="0 0 1010 666" aria-hidden="true">
+              <use href="#mini-terr"/><use href="#mini-land"/>
+              <g><rect x="0" y="0" width="360" height="425" rx="22"/><text x="180" y="212">1</text></g>
+              <g><rect x="385" y="100" width="205" height="265" rx="22"/><text x="487" y="232">2</text></g>
+              <g><rect x="590" y="100" width="420" height="300" rx="22"/><text x="800" y="250">3</text></g>
+              <g><rect x="150" y="425" width="235" height="241" rx="22"/><text x="267" y="545">Q</text></g>
+              <g><rect x="405" y="365" width="225" height="280" rx="22"/><text x="517" y="505">W</text></g>
+              <g><rect x="640" y="400" width="370" height="266" rx="22"/><text x="825" y="533">E</text></g>
+            </svg>
+            <p class="fine">It sits in the corner while you play. Click a zone or press its key: 1 2 3 across the north,
+              Q W E across the south. Press again to zoom into the crowded area inside it. 0 shows the whole world.</p>
+            <p class="coarse">It sits above the bottom bar while you play. Tap a zone to jump there, and tap it again
+              to zoom into the crowded area inside it.</p>
+          </div>
+          <div class="onboard-step" data-step="2" hidden>
+            <h1>Choose a challenge and a mode</h1>
+            <p>Place gives you a name to find on the map. Name asks you to type it, with hints and reveals if you're
+              stuck. Hardcore takes those away. The clock waits for your first move, and the menu at the top pauses,
+              restarts or switches mode.</p>
+          </div>
+        </div>
+        <div class="onboard-foot">
+          <div id="onboard-dots"><i></i><i></i><i></i></div>
+          <button id="onboard-skip" class="btn-ghost">Skip</button>
+          <button id="onboard-next" class="btn-primary">Next</button>
+        </div>
+      </div>
+    </section>
 
-      <h3>Best times</h3>
-      <div id="best-times"></div>
-
-      <h3>Mastery by region <small>(3+ in a row, name mode)</small></h3>
-      <div id="region-mastery"></div>
-
-      <button id="stats-reset">Reset all stats</button>
-    </aside>
+    <section id="stats-panel" class="screen" hidden>
+      <div class="screen-body stats-body">
+        <div class="screen-title">
+          <button id="stats-close" class="btn-ghost" title="Back (Esc)" aria-label="Back"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-left"/></svg></button>
+          <h2>Stats</h2>
+        </div>
+        <div class="stat-tiles" id="stat-tiles"></div>
+        <button id="stats-heat" class="btn-primary"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#thermometer-simple"/></svg>Open the heat map</button>
+        <h3>Mastered, by continent <small>3 or more in a row, name mode</small></h3>
+        <div id="region-mastery"></div>
+        <h3>Best times</h3>
+        <div id="best-times"></div>
+        <label class="toggle">
+          <input type="checkbox" id="flags-toggle">
+          <span><strong>Show flags</strong> next to names in place mode and on answers</span>
+        </label>
+        <button id="stats-reset">Reset all stats</button>
+      </div>
+    </section>
 
     <aside id="help" class="panel" hidden>
-      <button id="help-close" aria-label="Close">×</button>
+      <button id="help-close" title="Close (Esc)" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#x"/></svg></button>
       <h2>Shortcuts</h2>
-      <dl class="keys">
-        <dt><kbd>0</kbd></dt><dd>Whole-world view (on a touch screen, pinch all the way out)</dd>
-        <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd></dt>
-        <dd>The map on your keyboard — top row north: N. America · Europe · Asia;
-          bottom row south: S. America · Africa · South Asia (India across to New Zealand).
-          Every key has a second floor: tap the same key again for that area's dense pocket —
-          Central America · micro-states · Middle East · Caribbean · West coast · Pacific islands —
-          and once more to come back out. The row of buttons along the bottom is the same six
-          keys, and each one says where its next tap goes.
-          Hold <kbd>Shift</kbd> (or shift-click the button) to drop straight onto that second floor
-          in one move, with no stop at the area view on the way — the same key without Shift
-          steps back out of it.</dd>
-        <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next challenge</dd>
-        <dt><kbd>R</kbd></dt><dd>Restart this challenge</dd>
-        <dt><kbd>Space</kbd> <kbd>→</kbd></dt><dd>Skip the current name (place mode)</dd>
-        <dt><kbd>F</kbd></dt><dd>Full screen — on a phone this is what gets rid of the address bar and the
-          system bars; in landscape they cost more of the screen than the map does</dd>
-        <dt><kbd>M</kbd> <kbd>G</kbd></dt><dd>Hardcore mode only — <kbd>M</kbd> takes you to a country you
-          haven't named yet (without telling you which), <kbd>G</kbd> ends the run. Hardcore is the third
-          setting of the mode button in the challenge panel: no hints, no reveals, and nothing making you
-          finish — you stop when you're done and whatever you never got is what you never got.</dd>
-        <dt><kbd>P</kbd></dt><dd>Pause — hides the map and stops the clock (it starts on your first move)</dd>
-        <dt><kbd>Esc</kbd></dt><dd>Close panels</dd>
-        <dt>Scroll / pinch</dt><dd>Zoom at the cursor</dd>
-        <dt>Drag</dt><dd>Pan the map</dd>
-      </dl>
-      <p class="help-note">Small countries have a round button with a pointer to the shape — click the button;
-        it retires the moment the country is a bigger target than the button is.
-        A numbered button is a dense area (the Caribbean, the Pacific, the micro-states…) — click it to zoom
-        to the layer where each country has its own button. Dotted outlines group an island nation's islands
-        and are clickable too: a rounded square when the islands cluster, a tilted pill when they string out
-        across the sea (the Bahamas, Micronesia).</p>
-      <p class="help-note">🧪 <a href="globe.html">Globe experiment</a> — the same borders drawn as a
-        turning globe, with the cost of every frame on screen. Not a mode yet, and nothing there is scored.</p>
-      <p class="help-note">Map © <a href="https://www.amcharts.com" target="_blank" rel="noopener">amCharts</a> ·
-        flags from <a href="https://github.com/lipis/flag-icons" target="_blank" rel="noopener">flag-icons</a> (MIT)</p>
+
+      <div class="help-cols">
+        <section>
+          <h3>Getting around</h3>
+          <dl class="keys">
+            <dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></dt>
+            <dd>North America, Europe, Asia</dd>
+            <dt><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd></dt>
+            <dd>South America, Africa, South Asia (India across to New Zealand)</dd>
+            <dt>Same key again</dt>
+            <dd>Into that area's crowded pocket, and once more to come back out</dd>
+            <dt><kbd>Shift</kbd> + key</dt>
+            <dd>Straight into the pocket in one move</dd>
+            <dt><kbd>0</kbd></dt>
+            <dd>The whole world. On a touch screen, pinch all the way out</dd>
+            <dt>Scroll, pinch</dt>
+            <dd>Zoom at the cursor</dd>
+            <dt>Drag</dt>
+            <dd>Pan the map</dd>
+          </dl>
+          <p class="help-note">The six zones on the minimap are the same six keys. The pockets are Central America,
+            the micro-states, the Middle East, the Caribbean, the West African coast and the Pacific islands.</p>
+        </section>
+
+        <section>
+          <h3>Playing</h3>
+          <dl class="keys">
+            <dt><kbd>Enter</kbd></dt>
+            <dd>Submit your answer</dd>
+            <dt><kbd>Esc</kbd></dt>
+            <dd>Close the question, or back out of a screen</dd>
+            <dt><kbd>Space</kbd> <kbd>→</kbd></dt>
+            <dd>Skip the current name (Place)</dd>
+            <dt><kbd>P</kbd></dt>
+            <dd>Pause. Hides the map and stops the clock</dd>
+            <dt><kbd>R</kbd></dt>
+            <dd>Restart this challenge</dd>
+            <dt><kbd>[</kbd> <kbd>]</kbd></dt>
+            <dd>Previous, next challenge</dd>
+            <dt><kbd>F</kbd></dt>
+            <dd>Full screen. On a phone this is what clears the browser's bars</dd>
+            <dt><kbd>?</kbd></dt>
+            <dd>This page</dd>
+          </dl>
+
+          <h3>Hardcore only</h3>
+          <dl class="keys">
+            <dt><kbd>M</kbd></dt>
+            <dd>Go to a nation you haven't named yet, without saying which</dd>
+            <dt><kbd>G</kbd></dt>
+            <dd>End the run. Asks once</dd>
+          </dl>
+        </section>
+      </div>
+
+      <h3>On the map</h3>
+      <ul class="help-list">
+        <li><b>A round button</b> stands in for a nation too small to click, with a pointer to its shape. It retires
+          once the nation itself is the bigger target.</li>
+        <li><b>A numbered button</b> is a crowded area folded into one. Click it to zoom to where each nation has
+          its own button.</li>
+        <li><b>A dotted outline</b> groups an island nation's islands and is clickable too: a rounded square when
+          they cluster, a tilted pill when they string out across the sea.</li>
+      </ul>
+
+      <p class="help-foot">
+        <span>Map © <a href="https://www.amcharts.com" target="_blank" rel="noopener">amCharts</a> ·
+          flags from <a href="https://github.com/lipis/flag-icons" target="_blank" rel="noopener">flag-icons</a> ·
+          icons from <a href="https://phosphoricons.com" target="_blank" rel="noopener">Phosphor</a></span>
+      </p>
+    </aside>
+
+    <!-- Tools for working on the game rather than playing it. Only in the
+         menu on a dev build, or once ?dev has switched it on (see app.js). -->
+    <aside id="dev" class="panel" hidden>
+      <button id="dev-close" title="Close (Esc)" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#x"/></svg></button>
+      <h2>Developer</h2>
+      <p class="dev-note">Tools for building the game. Nothing here is scored or saved to your stats.</p>
+      <div class="dev-tools">
+        <a class="dev-tool" id="dev-globe" href="globe.html">
+          <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#globe-hemisphere-west"/></svg>
+          <span><b>Globe</b><small>The game on a sphere: name and place, the buttons, zones and jump keys.</small></span>
+        </a>
+        <button class="dev-tool" id="dev-guides">
+          <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#pencil-simple"/></svg>
+          <span><b>Edit the view boxes</b><small>Drag the area each jump key lands on. Under npm run serve every edit saves to js/views.js.</small></span>
+        </button>
+      </div>
     </aside>
   </main>
 
@@ -245,6 +411,8 @@
   <script src="js/targets.js"></script>
   <script src="js/views.js"></script>
   <script src="js/names.js"></script>
+  <script src="js/minimap.js"></script>
+  <script src="js/islands.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
