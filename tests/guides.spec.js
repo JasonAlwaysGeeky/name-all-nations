@@ -53,3 +53,11 @@ test('a view box drags by its edge, the jump follows it, and Copy hands the tabl
   await page.goto('/?play=name');
   expect(await page.evaluate(() => [...VIEW_BOXES.Europe])).toEqual(before);
 });
+
+test('the panel closes the editor and goes back to the game in the same mode', async ({ page }) => {
+  await page.goto('/?guides&play=name');
+  await expect(page.locator('.gd-row')).toHaveCount(12);
+  await page.locator('#gd-close').click();
+  await expect(page).toHaveURL(/\?play=name$/);
+  await expect(page.locator('#gd-panel')).toHaveCount(0);
+});

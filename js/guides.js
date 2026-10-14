@@ -140,6 +140,9 @@
     #gd-panel button.primary { border-color: var(--accent); color: var(--color-accent-200); }
     #gd-panel button:disabled { opacity: 0.45; cursor: default; border-color: var(--color-neutral-800); }
     #gd-done { margin-left: auto; }
+    #gd-panel #gd-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0;
+      margin: -4px -4px -4px 0; border: none; background: none; color: var(--ink-faint); }
+    #gd-panel #gd-close:hover { background: var(--color-neutral-900); color: var(--ink); }
     #gd-rows { margin-top: 10px; max-height: 44vh; overflow: auto; border-top: 1px solid var(--color-neutral-800); padding-top: 6px; }
     .gd-row { display: flex; gap: 10px; padding: 5px 7px; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
     .gd-row:hover { background: var(--color-neutral-900); }
@@ -159,7 +162,8 @@
   const safe = Object.assign(document.createElement('div'), { id: 'gd-safe' });
   layer.appendChild(safe);
   const panel = Object.assign(document.createElement('div'), { id: 'gd-panel' });
-  panel.innerHTML = `<header><b id="gd-title">View guides</b><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-down"/></svg></header>
+  panel.innerHTML = `<header><b id="gd-title">View guides</b><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-down"/></svg>
+      <button id="gd-close" title="Leave the view editor" aria-label="Leave the view editor"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#x"/></svg></button></header>
     <p id="gd-status"></p>
     <div id="gd-actions"><button id="gd-save" class="primary">Save</button><button id="gd-copy">Copy</button><button id="gd-reset">Reset</button><button id="gd-done" hidden>Done</button></div>
     <div id="gd-rows"></div><textarea id="gd-out" hidden readonly></textarea>`;
@@ -276,6 +280,15 @@
   doneEl.addEventListener('click', () => select(null));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') select(null); });
   saveEl.addEventListener('click', save);
+  // Back to the game, in the mode it was in. Unsaved boxes stay in this
+  // browser for the next time the editor opens.
+  panel.querySelector('#gd-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const q = new URLSearchParams(location.search);
+    q.delete('guides');
+    q.set('play', D?.state.level?.mode || 'place');
+    location.search = q.toString();
+  });
   panel.querySelector('#gd-copy').addEventListener('click', copy);
   // Back to what the file held when this page loaded: an edit like any
   // other, so it waits for Save too.
