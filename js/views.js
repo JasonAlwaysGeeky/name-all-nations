@@ -24,7 +24,7 @@
 const VIEW_BOXES = {
   'North America':          [123, 243, 315, 452],
   'Central America':        [215, 406, 262, 446],
-  'Europe':                 [408, 207, 590, 360],
+  'Europe':                 [408, 207, 590, 366],
   'European microstates':   [476, 296, 543, 360],
   'Asia':                   [548, 270, 896, 464],
   'Middle East':            [560, 345, 637, 403],

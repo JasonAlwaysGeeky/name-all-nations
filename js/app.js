@@ -2099,7 +2099,7 @@
       el.bankChips.appendChild(b);
     }
     if (pending.length) {
-      setBankHint('Click where it is on the map · Space skips · three misses shows you.', '');
+      setBankHint('', '');
       armChip(pending[0]);
     } else {
       el.bankName.textContent = 'All placed!';
