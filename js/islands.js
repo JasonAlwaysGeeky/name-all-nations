@@ -199,23 +199,43 @@ function squaredAt(s, groupsOf) {
 //
 // Each outline comes back as a rect in map units: centre, size, corner
 // radius, and the angle it is turned by about its centre.
+//
+// The growth is fixed too. A nation whose zone hands its button over to
+// the outline (Caribbean, Oceania) is sized for the zoom that happens at,
+// the zone's squareScale, and keeps that size in map units everywhere —
+// at the area view, in the pocket, and deeper still — so the outline is
+// one shape that simply gets bigger as you zoom in. It used to be grown
+// to SQ_MIN pixels at whatever zoom you were at, which drew it one size
+// on the area view and another in the pocket.
+function growthScales() {
+  const ref = {};
+  for (const z of BUTTON_ZONES) {
+    if (!z.squareScale) continue;
+    for (const c of z.codes) ref[c] = Math.min(ref[c] ?? Infinity, z.squareScale);
+  }
+  return ref;
+}
+let GROWTH_AT = null;
+
 function layoutOutlines(codes, s, groupsOf, squared) {
+  GROWTH_AT ||= growthScales();
   const outlines = [];
   for (const code of codes) {
     const groups = groupsOf(code);
     if (!groups) continue;
     const takeover = squared.has(code);
+    const at = GROWTH_AT[code];                             // the zoom this nation's outline is sized for, if any
     for (const b of groups) {
       if (!takeover && Math.max(b.w, b.h) * s < 12) continue;
       const r = b.raw, pad = b.pad;
-      const box = { code, split: groups.length > 1, raw: r, pad };
+      const box = { code, split: groups.length > 1, raw: r, pad, at };
       const t = b.tilt;
       if (t && t.tight <= ROT_MAX) {
         // Long side gets the full comfortable size, short side only
         // enough to stay a pill you can hit.
         const il = Math.max(t.w, t.h), iw = Math.min(t.w, t.h);   // the islands' own rect
-        const across = Math.max(iw + 2 * pad, (takeover ? SQ_THIN : ROT_THIN) / s);
-        let along = Math.max(il + 2 * pad, takeover ? SQ_MIN / s : 0);
+        const across = Math.max(iw + 2 * pad, at ? SQ_THIN / at : ROT_THIN / s);
+        let along = Math.max(il + 2 * pad, at ? SQ_MIN / at : 0);
         // A pill has semicircular ends, and a semicircle no wider than
         // the chain cuts the corners off the rect the chain sits in —
         // which is exactly where the island at the end of the chain
@@ -233,14 +253,18 @@ function layoutOutlines(codes, s, groupsOf, squared) {
         box.h = box.tilt.w * sn + box.tilt.h * c;
       } else {
         box.cx = r.x + r.w / 2; box.cy = r.y + r.h / 2;
-        box.w = Math.max(r.w + 2 * pad, takeover ? SQ_MIN / s : 0);
-        box.h = Math.max(r.h + 2 * pad, takeover ? SQ_MIN / s : 0);
+        box.w = Math.max(r.w + 2 * pad, at ? SQ_MIN / at : 0);
+        box.h = Math.max(r.h + 2 * pad, at ? SQ_MIN / at : 0);
       }
       box.hx = box.cx; box.hy = box.cy;
       outlines.push(box);
     }
   }
-  spreadBoxes(outlines, SQ_GAP / s);
+  // Neighbours are kept apart at the same fixed zoom their size was set
+  // for, zone by zone, so where an outline sits doesn't drift either.
+  const byAt = new Map();
+  for (const b of outlines) (byAt.get(b.at) || byAt.set(b.at, []).get(b.at)).push(b);
+  for (const [at, list] of byAt) spreadBoxes(list, SQ_GAP / (at || s));
   return outlines.map(b => {
     const t = b.tilt;
     const w = t ? t.w : b.w, h = t ? t.h : b.h;
