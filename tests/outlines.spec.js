@@ -134,7 +134,8 @@ test('an island outline keeps its size and shape from the area view to the pocke
   const rectAt = (how) => page.evaluate(async (how) => {
     const D = window.NAN_DEBUG;
     if (how.view) D.zoomToView(how.view, 0); else D.zoomToCodes(how.codes, 0);
-    await new Promise(r => setTimeout(r, 60));
+    // under a busy runner the jump can still be in flight at 60ms
+    for (let t = 0; t < 40 && !D.settled(); t++) await new Promise(r => setTimeout(r, 50));
     D.bake();
     const g = document.querySelector('#overlay-layer g.ov-box[data-code="GD"] rect');
     return g && ['x', 'y', 'width', 'height', 'rx'].map(a => +(+g.getAttribute(a)).toFixed(2));

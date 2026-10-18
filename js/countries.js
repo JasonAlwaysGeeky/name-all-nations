@@ -157,17 +157,17 @@ const COUNTRIES = [
   { code: 'VA', name: 'Vatican City', region: 'Europe', aliases: ['Vatican', 'Holy See'] },
 
   // ——— North America (23) ———
-  { code: 'AG', name: 'Antigua and Barbuda', region: 'North America', aliases: ['Antigua'] },
+  { code: 'AG', name: 'Antigua and Barbuda', region: 'South America', aliases: ['Antigua'] },
   { code: 'BS', name: 'Bahamas', region: 'North America', aliases: ['The Bahamas'] },
-  { code: 'BB', name: 'Barbados', region: 'North America', aliases: [] },
+  { code: 'BB', name: 'Barbados', region: 'South America', aliases: [] },
   { code: 'BZ', name: 'Belize', region: 'North America', aliases: [] },
   { code: 'CA', name: 'Canada', region: 'North America', aliases: [] },
   { code: 'CR', name: 'Costa Rica', region: 'North America', aliases: [] },
   { code: 'CU', name: 'Cuba', region: 'North America', aliases: [] },
-  { code: 'DM', name: 'Dominica', region: 'North America', aliases: [] },
+  { code: 'DM', name: 'Dominica', region: 'South America', aliases: [] },
   { code: 'DO', name: 'Dominican Republic', region: 'North America', aliases: [] },
   { code: 'SV', name: 'El Salvador', region: 'North America', aliases: [] },
-  { code: 'GD', name: 'Grenada', region: 'North America', aliases: [] },
+  { code: 'GD', name: 'Grenada', region: 'South America', aliases: [] },
   { code: 'GT', name: 'Guatemala', region: 'North America', aliases: [] },
   { code: 'HT', name: 'Haiti', region: 'North America', aliases: [] },
   { code: 'HN', name: 'Honduras', region: 'North America', aliases: [] },
@@ -175,10 +175,10 @@ const COUNTRIES = [
   { code: 'MX', name: 'Mexico', region: 'North America', aliases: [] },
   { code: 'NI', name: 'Nicaragua', region: 'North America', aliases: [] },
   { code: 'PA', name: 'Panama', region: 'North America', aliases: [] },
-  { code: 'KN', name: 'Saint Kitts and Nevis', region: 'North America', aliases: ['St Kitts and Nevis', 'Saint Kitts', 'St Kitts'] },
-  { code: 'LC', name: 'Saint Lucia', region: 'North America', aliases: ['St Lucia'] },
-  { code: 'VC', name: 'Saint Vincent and the Grenadines', region: 'North America', aliases: ['St Vincent and the Grenadines', 'Saint Vincent', 'St Vincent'] },
-  { code: 'TT', name: 'Trinidad and Tobago', region: 'North America', aliases: ['Trinidad'] },
+  { code: 'KN', name: 'Saint Kitts and Nevis', region: 'South America', aliases: ['St Kitts and Nevis', 'Saint Kitts', 'St Kitts'] },
+  { code: 'LC', name: 'Saint Lucia', region: 'South America', aliases: ['St Lucia'] },
+  { code: 'VC', name: 'Saint Vincent and the Grenadines', region: 'South America', aliases: ['St Vincent and the Grenadines', 'Saint Vincent', 'St Vincent'] },
+  { code: 'TT', name: 'Trinidad and Tobago', region: 'South America', aliases: ['Trinidad'] },
   { code: 'US', name: 'United States', region: 'North America', aliases: ['USA', 'US', 'America', 'United States of America'] },
 
   // ——— South America (12) ———
@@ -236,9 +236,16 @@ const SUBREGIONS = [
   // North America
   { name: 'USA, Canada & Mexico', region: 'North America', codes: ['CA', 'US', 'MX'] },
   { name: 'Central America', region: 'North America', codes: ['BZ', 'CR', 'SV', 'GT', 'HN', 'NI', 'PA'] },
-  { name: 'Caribbean', region: 'North America', codes: ['AG', 'BS', 'BB', 'CU', 'DM', 'DO', 'GD', 'HT', 'JM', 'KN', 'LC', 'VC', 'TT'] },
+  // The Caribbean as geographers cut it: the big islands of the north-west
+  // (with the Bahamas, Atlantic but always counted here) stay with North
+  // America; the arc of small ones curving down to South America is filed
+  // under it, below. Atlases put the whole Caribbean in North America, but
+  // in this game the Caribbean already belongs to South America's key (Q
+  // dives into it), and the arc is where that key takes you.
+  { name: 'Greater Antilles & Bahamas', region: 'North America', codes: ['BS', 'CU', 'DO', 'HT', 'JM'] },
   // South America
-  { name: 'South America', region: 'South America', codes: ['AR', 'BO', 'BR', 'CL', 'CO', 'EC', 'GY', 'PY', 'PE', 'SR', 'UY', 'VE'] },
+  { name: 'South American mainland', region: 'South America', codes: ['AR', 'BO', 'BR', 'CL', 'CO', 'EC', 'GY', 'PY', 'PE', 'SR', 'UY', 'VE'] },
+  { name: 'Lesser Antilles', region: 'South America', codes: ['AG', 'BB', 'DM', 'GD', 'KN', 'LC', 'VC', 'TT'] },
   // Oceania
   { name: 'Australia & Melanesia', region: 'Oceania', codes: ['AU', 'FJ', 'NZ', 'PG', 'SB', 'VU'] },
   { name: 'Micronesia & Polynesia', region: 'Oceania', codes: ['FM', 'KI', 'MH', 'NR', 'PW', 'TO', 'TV', 'WS'] },
