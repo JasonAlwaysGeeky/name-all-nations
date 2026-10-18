@@ -1,11 +1,11 @@
 # Name All Nations
 
-**Live: https://jasonalwaysgeeky.github.io/name-all-nations/** (GitHub Pages,
+**Live: https://moffatjason.github.io/name-all-nations/** (GitHub Pages,
 public repo, served from `main` — pushing `main` redeploys). This is the
 build to test on a real device; there is an old published Artifact floating
 around that is stale and unmaintained.
 
-Repo: https://github.com/JasonAlwaysGeeky/name-all-nations — work lands via
+Repo: https://github.com/moffatjason/name-all-nations — work lands via
 `jmoffat/` branches and PRs, not straight to `main`.
 
 ## Running it locally
