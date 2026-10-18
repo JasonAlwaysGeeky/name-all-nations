@@ -16,6 +16,10 @@ Static site, but it can't run from `file://` (the map is fetched at runtime):
 npm run serve
 ```
 
+Or `npm start`: the same server, and it opens the game in Chrome, where voice
+input works (an artifact can't use the mic). Either one prints the address a
+phone on the same Wi-Fi can use. Claude runs it in the app's Terminal panel.
+
 That is `tools/serve.mjs`: the files, never cached, on port 5173 — plus the
 one thing a static server can't do, which is let the `?guides` editor write
 the view boxes back into `js/views.js` as they are dragged (from a phone on

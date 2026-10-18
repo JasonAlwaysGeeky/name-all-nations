@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "serve": "node tools/serve.mjs",
+    "start": "node tools/serve.mjs --open",
     "targets": "node tools/gen-targets.mjs",
     "icons": "node tools/gen-icons.mjs",
     "test": "playwright test"

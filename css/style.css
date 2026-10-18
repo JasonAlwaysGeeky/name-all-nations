@@ -736,6 +736,14 @@ body.no-flags .flag { display: none; }
 }
 
 #idle-bar { color: var(--color-neutral-300); font-size: 0.84rem; }
+
+/* voice input, in the bar: quiet until it is on, then unmistakably on */
+.dock .mic-btn { border-color: var(--color-neutral-700); color: var(--color-neutral-200); }
+.dock .mic-btn[hidden] { display: none; }
+.dock .mic-btn.listening { border-color: var(--map-flash-bad); color: var(--fb-bad); background: color-mix(in srgb, var(--map-flash-bad) 14%, transparent); }
+#guess-form .mic-btn { border-color: transparent; }
+.dock .mic-btn.unavailable, #menu #mic-toggle.unavailable { opacity: 0.5; }
+#guess-form .mic-btn.listening { border-color: var(--map-flash-bad); }
 #idle-bar .ic, #hardcore-bar > .ic { font-size: 1.06rem; color: var(--accent); }
 #idle-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1211,7 +1219,28 @@ body.asking #hardcore-bar { display: none; }
 #home-continue em { font-style: normal; font-size: 0.78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 #home-continue .ic { font-size: 1.1rem; color: var(--color-accent-200); }
 
-#home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; align-items: start; }
+/* three across, two rows, laid out like the keyboard: north over south.
+   Where three will not fit, one column: two across would scramble it. */
+#home-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (min-width: 760px) { #home-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+#home-world { margin-bottom: -18px; }   /* sits with the grid, not a section of its own */
+
+/* the whole world: one wide card — its name, its two numbers, one bar */
+.home-world-card { padding: 18px 20px; }
+.home-world-card .home-card-head { gap: 12px; margin: -10px -12px; padding: 10px 12px; }
+.hw-row { display: flex; align-items: center; gap: 28px; }
+.hw-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hw-title b { font-size: 1.5rem; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); }
+.hw-title span { font-size: 0.81rem; color: var(--ink-soft); }
+.hw-stat { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.hw-stat em { font-style: normal; font-size: 1.125rem; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hw-stat span { font-size: 0.72rem; color: var(--ink-faint); }
+.home-world-card .home-card-head:hover b { color: var(--color-accent-200); }
+@media (max-width: 640px) {
+  .hw-row { gap: 16px; }
+  .hw-title b { font-size: 1.25rem; }
+  .hw-title span { display: none; }
+}
 
 .home-card {
   display: flex;

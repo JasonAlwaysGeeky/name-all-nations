@@ -90,6 +90,7 @@
          back floats just above it. -->
     <div id="idle-bar" class="dock" hidden>
       <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#cursor-click"/></svg><span id="idle-text">Click a nation to name it</span>
+      <button type="button" class="mic-btn" title="Voice input (V): say the names instead of typing" aria-label="Voice input" aria-pressed="false" hidden><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#microphone"/></svg><span>Voice</span></button>
       <div class="dock-above"><p class="dock-note" role="status"></p></div>
     </div>
 
@@ -108,6 +109,7 @@
             <button type="button" id="hint-btn" title="Hint"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#lightbulb"/></svg>Hint</button>
             <button type="button" id="reveal-btn" title="Reveal" aria-label="Reveal"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#eye"/></svg></button>
           </span>
+          <button type="button" class="mic-btn" title="Voice input (V): say the names instead of typing" aria-label="Voice input" aria-pressed="false" hidden><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#microphone"/></svg></button>
           <button type="submit" id="guess-btn" title="Guess (Enter)" aria-label="Guess"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-right"/></svg></button>
         </form>
       </div>
@@ -138,6 +140,7 @@
          being asked. -->
     <section id="hardcore-bar" class="dock" hidden>
       <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#cursor-click"/></svg><span id="hc-note">Click a nation to name it</span>
+      <button type="button" class="mic-btn" title="Voice input (V): say the names instead of typing" aria-label="Voice input" aria-pressed="false" hidden><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#microphone"/></svg><span>Voice</span></button>
       <div class="dock-above"><p class="dock-note" role="status"></p></div>
       <span class="hc-buttons">
         <button id="hc-find" title="Pan to one you haven't named yet (M)"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#magnifying-glass"/></svg>Find a gap <kbd>M</kbd></button>
@@ -231,6 +234,7 @@
             <span><small>Continue</small><b></b><em></em></span><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#play"/></svg>
           </button>
         </div>
+        <div id="home-world"></div>
         <div id="home-cards"></div>
       </div>
     </section>
@@ -260,7 +264,7 @@
             <h1><span class="fine">Click</span><span class="coarse">Tap</span> a nation and type its name</h1>
             <p>The nation you pick lights up gold, and you type its name in the bar at the bottom. It turns green
               when you're right and flashes red when you're not. Spelling is forgiving: Brasil, luxemburg and
-              Cote d'Ivoire all count.</p>
+              Cote d'Ivoire all count. Or turn on the microphone in the bar and just say the names.</p>
           </div>
           <div class="onboard-step" data-step="1" hidden>
             <h1>Use the minimap to get around</h1>
@@ -345,6 +349,8 @@
           <dl class="keys">
             <dt><kbd>Enter</kbd></dt>
             <dd>Submit your answer</dd>
+            <dt><kbd>V</kbd></dt>
+            <dd>Voice input on or off: say the names instead of typing them</dd>
             <dt><kbd>Esc</kbd></dt>
             <dd>Close the question, or back out of a screen</dd>
             <dt><kbd>Space</kbd> <kbd>→</kbd></dt>

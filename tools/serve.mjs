@@ -13,6 +13,9 @@ import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { networkInterfaces } from 'node:os';
+import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = Number(process.env.PORT) || 5173;
@@ -38,6 +41,21 @@ async function saveViews(boxes) {
   }
   if (changed.length) await writeFile(VIEWS, src);
   return changed;
+}
+
+// --open (start.cmd passes it): once the server is up, open the game in
+// Chrome — where voice input works — or the default browser without it.
+function openBrowser() {
+  if (!process.argv.includes('--open')) return;
+  const url = `http://localhost:${PORT}/`;
+  if (process.platform !== 'win32') {
+    spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+    return;
+  }
+  const chrome = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA]
+    .filter(Boolean).map(d => join(d, 'Google', 'Chrome', 'Application', 'chrome.exe')).find(existsSync);
+  if (chrome) spawn(chrome, [url], { detached: true, stdio: 'ignore' }).unref();
+  else spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
 }
 
 createServer(async (req, res) => {
@@ -66,4 +84,19 @@ createServer(async (req, res) => {
     const missing = err.code === 'ENOENT' || err.code === 'EISDIR';
     res.writeHead(missing ? 404 : 400, { 'Content-Type': 'text/plain; charset=utf-8' }).end(missing ? 'Not found' : String(err.message));
   }
-}).listen(PORT, () => console.log(`Name All Nations on http://localhost:${PORT}`));
+}).on('error', (err) => {
+  // Already running (the preview pane, another window): that one is serving
+  // the same files, so there is nothing to do but say where it is.
+  if (err.code !== 'EADDRINUSE') throw err;
+  console.log(`Already running on http://localhost:${PORT} — that one is serving the game.`);
+  openBrowser();
+  setTimeout(() => process.exit(0), 500);
+}).listen(PORT, () => {
+  openBrowser();
+  // A phone on the same Wi-Fi reaches the game at this machine's LAN address.
+  const lan = Object.values(networkInterfaces()).flat()
+    .filter(a => a && a.family === 'IPv4' && !a.internal).map(a => `http://${a.address}:${PORT}`);
+  console.log(`Name All Nations on http://localhost:${PORT}`);
+  if (lan.length) console.log(`On a phone on this Wi-Fi: ${lan.join('  ')}`);
+  console.log('Ctrl+C stops it.');
+});

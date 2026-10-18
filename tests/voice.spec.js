@@ -143,3 +143,25 @@ test('toggling the mic quickly never leaves a capture running', async ({ page })
   await expect.poll(() => page.evaluate(() => window.__voice.liveStreams())).toBe(0);
   expect(await listening(page)).toBe(false);
 });
+
+// Voice is in the bar where you are naming, not only in the menu — and the
+// bar's button, the menu row and V all switch the same thing.
+test('the voice button in the bar switches the mic, and says when it is listening', async ({ page }) => {
+  await boot(page);
+  const bar = page.locator('#idle-bar .mic-btn');
+  await expect(bar).toBeVisible();
+  await expect(bar).toHaveText('Voice');
+
+  await bar.click();
+  await expect(bar).toHaveText('Listening');
+  await expect(bar).toHaveAttribute('aria-pressed', 'true');
+
+  await clickCountry(page, 'BR');
+  expect(await listening(page)).toBe(true);
+  await expect(page.locator('#guess-form .mic-btn')).toHaveClass(/listening/);
+
+  await page.locator('#guess-input').blur();
+  await page.keyboard.press('v');
+  expect(await listening(page)).toBe(false);
+  await expect(page.locator('#guess-form .mic-btn')).not.toHaveClass(/listening/);
+});

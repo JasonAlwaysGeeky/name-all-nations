@@ -453,7 +453,7 @@
     'card-actions', 'hint-btn', 'reveal-btn', 'card-answer', 'answer-result', 'answer-name',
     'answer-meta', 'speak-btn', 'retry-btn',
     'level-banner', 'level-title', 'level-timer',
-    'home', 'home-back', 'home-intro', 'home-heat', 'home-stats', 'home-help', 'home-continue', 'home-cards',
+    'home', 'home-world', 'home-back', 'home-intro', 'home-heat', 'home-stats', 'home-help', 'home-continue', 'home-cards',
     'mode-dialog', 'mode-for', 'mode-count', 'mode-opts', 'mode-cancel', 'mode-start',
     'onboard', 'onboard-count', 'onboard-dots', 'onboard-skip', 'onboard-next',
     'word-bank', 'bank-target', 'bank-flag', 'bank-name', 'bank-strikes', 'bank-skip', 'bank-show', 'bank-collapse', 'bank-hint', 'bank-chips',
@@ -2467,8 +2467,28 @@
     return b ? fmtTime(b.ms).replace(/\.\d$/, '') : '—';
   }
 
-  // One card: a challenge and, under it, the smaller ones inside it. The
-  // whole world is the first card and has nothing under it.
+  // The whole world is not one more card in the grid: it is the challenge
+  // the game is named for, so it gets the full width above the continents,
+  // and the six of them fill the grid evenly — three by two, two by three
+  // or one column — instead of one left over on a row of its own.
+  function worldCard() {
+    const def = CHALLENGE_BY_ID.world, m = mastery(def.codes);
+    const card = document.createElement('div');
+    card.className = 'home-card home-world-card';
+    const head = document.createElement('button');
+    head.className = 'home-card-head';
+    head.innerHTML =
+      `<span class="hw-row"><span class="hw-title"><b></b><span>All ${def.codes.length} nations, every continent</span></span>` +
+      `<span class="hw-stat"><em>${m}%</em><span>mastered</span></span>` +
+      `<span class="hw-stat"><em>${bestOf(def.id)}</em><span>best time</span></span>${icon('caret-right')}</span>` +
+      `<span class="bar"><i style="width:${m}%"></i></span>`;
+    head.querySelector('b').textContent = def.name;
+    head.addEventListener('click', () => askMode(def));
+    card.appendChild(head);
+    return card;
+  }
+
+  // One card: a continent and, under it, the regions inside it.
   function homeCard(def, subs) {
     const card = document.createElement('div');
     card.className = 'home-card';
@@ -2497,6 +2517,11 @@
     return card;
   }
 
+  // The continents sit where they are on the map — and where their keys
+  // are on the keyboard: the north across the top (1 2 3), the south under
+  // it (Q W E). Not alphabetical: you find a card the way you find the area.
+  const HOME_ORDER = ['North America', 'Europe', 'Asia', 'South America', 'Africa', 'Oceania'];
+
   function openHome() {
     holdRun();
     deselect();
@@ -2511,9 +2536,9 @@
       el.homeContinue.querySelector('em').textContent =
         `${el.progressText.textContent.replace(' / ', ' of ')} · ${el.levelTimer.textContent}`;
     }
+    el.homeWorld.replaceChildren(worldCard());
     el.homeCards.innerHTML = '';
-    el.homeCards.appendChild(homeCard(CHALLENGE_BY_ID.world, []));
-    for (const region of REGIONS) {
+    for (const region of HOME_ORDER) {
       el.homeCards.appendChild(homeCard(CHALLENGE_BY_ID['cont:' + region],
         SUBREGIONS.filter(s => s.region === region).map(s => CHALLENGE_BY_ID['sub:' + s.name])));
     }
@@ -2638,6 +2663,12 @@
     el.micToggle.classList.toggle('listening', state.micOn);
     el.micToggle.classList.toggle('off', !state.micOn);
     el.micToggle.querySelector('.menu-state').textContent = state.micOn ? 'On' : 'Off';
+    for (const b of document.querySelectorAll('.mic-btn')) {
+      b.classList.toggle('listening', state.micOn);
+      b.setAttribute('aria-pressed', String(state.micOn));
+      const label = b.querySelector('span');
+      if (label) label.textContent = state.micOn ? 'Listening' : 'Voice';
+    }
     el.micStatus.hidden = !(state.micOn && state.selected && !state.status[state.selected]);
     if (state.micOn) startMeter(); else stopMeter();
     updateTicker();
@@ -2778,16 +2809,49 @@
   el.resultsHome.addEventListener('click', () => { el.results.hidden = true; openHome(); });
   el.resultsMode.addEventListener('click', () => { const L = state.level; startLevel(L.def, nextMode(L.mode)); });
 
-  el.micToggle.addEventListener('click', () => {
+  function toggleMic() {
     if (!SpeechRec) {
-      alert('Voice input is not supported in this browser — try Chrome or Edge. You can still type the names!');
+      alert('Voice input is not supported in this browser — try Chrome or Edge. You can still type the names.');
       return;
     }
     state.micOn = !state.micOn;
     if (state.micOn && state.selected) { voicePush(state.selected); startListening(); }
     if (!state.micOn) { stopListening(); voiceQueue.length = 0; voiceBuf = []; updateTicker(''); }
     updateMicUI();
-  });
+  }
+  el.micToggle.addEventListener('click', toggleMic);
+
+  // Voice was a menu item, which is to say a feature nobody found. It now
+  // sits in the bar itself whenever you are naming — idle, asking, and in
+  // hardcore — as a labelled button that lights up while it listens.
+  //
+  // Where the page cannot use the microphone (no speech engine, or a frame
+  // that is not allowed one, like an artifact in a side panel) the button
+  // still shows, dimmed, so the feature is not a secret — and a press says
+  // where it does work instead of failing.
+  const MIC_OK = !!SpeechRec && (!document.featurePolicy || document.featurePolicy.allowsFeature('microphone'));
+  const MIC_WHY = !SpeechRec
+    ? 'Voice needs a browser with speech recognition: Chrome or Edge.'
+    : 'Voice is blocked in this window. Open the game in its own Chrome or Edge tab to use it.';
+  function micPressed() {
+    if (MIC_OK) { toggleMic(); return; }
+    setNote(MIC_WHY, '');
+    if (!el.card.hidden) setFeedback(MIC_WHY, 'hint');
+  }
+  for (const b of document.querySelectorAll('.mic-btn')) {
+    b.hidden = false;
+    b.classList.toggle('unavailable', !MIC_OK);
+    if (!MIC_OK) b.title = MIC_WHY;
+    b.addEventListener('mousedown', (e) => e.preventDefault());   // keep the answer box's focus
+    b.addEventListener('click', micPressed);
+  }
+  if (!MIC_OK) {
+    el.micToggle.classList.add('unavailable');
+    el.micToggle.title = MIC_WHY;
+    el.micToggle.querySelector('.menu-state').textContent = 'Not here';
+    el.micToggle.removeEventListener('click', toggleMic);
+    el.micToggle.addEventListener('click', micPressed);
+  }
 
   // ————— full screen —————
   //
@@ -2987,6 +3051,7 @@
     else if ((e.key === 'm' || e.key === 'M') && isHardcore()) { e.preventDefault(); findGap(); }
     else if ((e.key === 'g' || e.key === 'G') && isHardcore()) { e.preventDefault(); giveUp(); }
     else if (e.key === '?') { e.preventDefault(); toggleHelp(); }
+    else if (e.key === 'v' || e.key === 'V') { e.preventDefault(); micPressed(); }
     else if (e.key === '`' && devOn) { e.preventDefault(); toggleDev(); }
     else {
       const key = jumpKeyFor(e);
