@@ -236,13 +236,14 @@ const SUBREGIONS = [
   // North America
   { name: 'USA, Canada & Mexico', region: 'North America', codes: ['CA', 'US', 'MX'] },
   { name: 'Central America', region: 'North America', codes: ['BZ', 'CR', 'SV', 'GT', 'HN', 'NI', 'PA'] },
-  // The Caribbean as geographers cut it: the big islands of the north-west
-  // (with the Bahamas, Atlantic but always counted here) stay with North
+  // The Caribbean in two: the big islands of the north-west (the Greater
+  // Antilles) and the Bahamas, which are Atlantic, not Antilles — hence
+  // "Northern Caribbean" rather than the textbook name — stay with North
   // America; the arc of small ones curving down to South America is filed
   // under it, below. Atlases put the whole Caribbean in North America, but
   // in this game the Caribbean already belongs to South America's key (Q
   // dives into it), and the arc is where that key takes you.
-  { name: 'Greater Antilles & Bahamas', region: 'North America', codes: ['BS', 'CU', 'DO', 'HT', 'JM'] },
+  { name: 'Northern Caribbean', region: 'North America', codes: ['BS', 'CU', 'DO', 'HT', 'JM'] },
   // South America
   { name: 'South American mainland', region: 'South America', codes: ['AR', 'BO', 'BR', 'CL', 'CO', 'EC', 'GY', 'PY', 'PE', 'SR', 'UY', 'VE'] },
   { name: 'Lesser Antilles', region: 'South America', codes: ['AG', 'BB', 'DM', 'GD', 'KN', 'LC', 'VC', 'TT'] },
