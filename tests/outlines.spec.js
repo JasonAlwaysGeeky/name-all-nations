@@ -12,9 +12,8 @@
 const { test, expect } = require('@playwright/test');
 
 async function boot(page) {
-  await page.goto('/');
-  await page.locator('#hello-close').click();
-  await expect(page.locator('#map svg')).toBeAttached();
+  await page.goto('/?play=name');
+  await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 }
 
@@ -124,4 +123,28 @@ test('an outline is the same shape on the map however far you are zoomed in', as
   // it must never have been tighter when you were close.
   expect(near.w).toBeLessThanOrEqual(wide.w + 0.01);
   expect(near.h).toBeLessThanOrEqual(wide.h + 0.01);
+});
+
+// …and it is one shape, full stop: the same rect in map units on the area
+// view, in the Caribbean pocket and zoomed right in on the island. It was
+// grown to a minimum size in *pixels* at whatever zoom you were at, so it
+// was drawn one size on the area view and another in the pocket.
+test('an island outline keeps its size and shape from the area view to the pocket and beyond', async ({ page }) => {
+  await boot(page);
+  const rectAt = (how) => page.evaluate(async (how) => {
+    const D = window.NAN_DEBUG;
+    if (how.view) D.zoomToView(how.view, 0); else D.zoomToCodes(how.codes, 0);
+    // under a busy runner the jump can still be in flight at 60ms
+    for (let t = 0; t < 40 && !D.settled(); t++) await new Promise(r => setTimeout(r, 50));
+    D.bake();
+    const g = document.querySelector('#overlay-layer g.ov-box[data-code="GD"] rect');
+    return g && ['x', 'y', 'width', 'height', 'rx'].map(a => +(+g.getAttribute(a)).toFixed(2));
+  }, how);
+
+  const area = await rectAt({ view: 'South America' });
+  const pocket = await rectAt({ view: 'Caribbean' });
+  const close = await rectAt({ codes: ['GD'] });
+  expect(pocket, 'no outline for Grenada in the pocket').not.toBeNull();
+  expect(close).toEqual(pocket);
+  if (area) expect(area).toEqual(pocket);              // drawn on the area view only once it is big enough to see
 });

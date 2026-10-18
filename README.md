@@ -25,8 +25,9 @@ map, **you click a country and name it**.
   level one (learn the region), Name mode is the real test.
 - Scroll/pinch to zoom, drag to pan. The hotkeys lay the world out on
   your keyboard: `1` `2` `3` across the north (N. America · Europe ·
-  Asia), `Q` `W` `E` across the south (S. America · Africa · India-to-
-  New-Zealand), `0` the whole world. Tap the same key again to dive into
+  Asia), `Q` `W` `E` across the south (S. America · Africa · South Asia,
+  India across to New Zealand), `0` the whole world; the row of buttons
+  along the bottom runs west to east, 1 Q 2 W 3 E. Tap the same key again to dive into
   that area's dense pocket — Central America, the micro-states, the
   Middle East, the Caribbean, the West African coast, the Pacific
   islands — and again to come back out. `[` / `]` step through
@@ -54,6 +55,33 @@ map, **you click a country and name it**.
   (grown to a comfortable click size) replace the buttons entirely.
 - Every country also has 12px of invisible click padding, so coastal
   waters and archipelago gaps still hit the right country.
+
+### Where the jump keys land
+
+Each of the twelve jump views is a hand-set box in `js/views.js`: the area
+that must be on screen. The camera takes the tightest zoom that holds the
+whole box inside the safe area (the window minus the HUD, the jump keys
+and whatever is docked along the bottom) and centres it there, so a phone
+and an ultrawide show the same required area and only differ in the slack
+around it. To retune them, open the game with `?guides` on the address —
+on the device you care about — drag the boxes, tap the jump keys to check
+the landing, then **Copy** and paste the table back over `VIEW_BOXES`. A
+dive into a dense zone unfolds that zone wherever it lands; a row marked
+⚠ lands below the zoom the zone's buttons were spaced for, so a pair of
+them may merge there. The jump keys are one row along the bottom on every
+screen, each saying where its next tap goes, and sit outside the safe
+area; the sides are bare.
+
+### The globe
+
+`globe.html` draws the same borders as a turning globe (canvas; every
+frame re-projects) and runs enough of the game on it to judge the feel:
+name and place modes over the world or a region, the small countries'
+buttons and the zones they fold into, and the jump keys landing on the
+same boxes as the map, at the same zoom read at the middle of the view.
+Dragging holds the point under your finger, as the map does; past the
+rim it turns by rate. It is an experiment, not a mode: no clock, no
+stats, nothing saved.
 
 ## Challenges
 
@@ -124,4 +152,6 @@ is the untouched amCharts file; the simplifier never drops an island.
   island outlines), fuzzy matching, speech in/out, timer, stats, results
 - `map/world-lo.json` — coarse coastlines for zoomed-out views
 - `map/world.svg` — world map © [amCharts](https://www.amcharts.com)
+- `flags/` — the 195 flags, from [flag-icons](https://github.com/lipis/flag-icons)
+  (MIT), copied out of the npm package so the game needs no CDN
   (free to use with attribution link, kept in the page footer)

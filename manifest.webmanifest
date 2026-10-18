@@ -7,8 +7,8 @@
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
-  "background_color": "#8ab6d8",
-  "theme_color": "#1c4b7a",
+  "background_color": "#0c1522",
+  "theme_color": "#0c1522",
   "categories": ["games", "education"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

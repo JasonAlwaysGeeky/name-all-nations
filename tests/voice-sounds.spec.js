@@ -12,7 +12,8 @@
 const { test, expect } = require('@playwright/test');
 const { boot, clickCountry } = require('./voice-helpers');
 
-const micOn = (page) => page.locator('#mic-toggle').click();
+// voice input lives in the menu
+const micOn = async (page) => { await page.locator('#menu-btn').click(); await page.locator('#mic-toggle').click(); };
 const say = (page, text, isFinal = true) =>
   page.evaluate(([t, f]) => window.__voice.say(t, f), [text, isFinal]);
 const statusOf = (page, code) => page.evaluate((c) => window.NAN_DEBUG.state.status[c], code);

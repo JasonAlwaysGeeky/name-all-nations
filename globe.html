@@ -3,81 +3,61 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#1c4b7a">
-  <title>Globe experiment — Name All Nations</title>
+  <meta name="theme-color" content="#0c1522">
+  <title>Globe — Name All Nations</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* The experiment's own chrome. Everything that decides how the globe
-       looks lives in css/style.css with the flat map's, so the two are
-       being judged on the same palette. */
+    /* The globe's own chrome. Everything the game puts on screen — the
+       jump row, the card, the find bar, the pops — is the flat map's
+       markup under the flat map's stylesheet, so the two are judged on
+       the same furniture. */
     body { display: flex; flex-direction: column; }
     #globe-wrap {
       position: relative;
       flex: 1 1 auto;
       overflow: hidden;
-      background:
-        radial-gradient(120% 90% at 50% 8%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%),
-        linear-gradient(180deg, #d9e8f3, #9dbdd8);
+      background: var(--color-bg);
     }
     #globe { position: absolute; inset: 0; touch-action: none; cursor: grab; display: block; }
     #globe.turning { cursor: grabbing; }
     #pick { display: none; }
 
-    #hud {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      width: min(760px, calc(100% - 24px));
-      background: var(--panel-bg);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-lg);
-      padding: 11px 14px;
-      z-index: 5;
-    }
-    #hud[hidden] { display: none; }
-    #readout { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
-    #fps {
-      margin-top: 4px;
-      font: 600 0.74rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      color: var(--ink-soft);
-    }
-    .hud-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
-    .hud-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--ink-soft); }
+    /* the way back to the flat map, at the end of the HUD */
     #back {
-      position: absolute;
-      left: 14px;
-      top: calc(12px + env(safe-area-inset-top, 0px));
-      z-index: 6;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 7px 12px;
-      font-size: 0.82rem;
-      font-weight: 650;
+      height: 32px;
+      padding: 0 10px;
+      font-size: 0.8rem;
+      font-weight: 500;
       text-decoration: none;
-      color: var(--ink);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.85);
-      box-shadow: var(--shadow-sm);
+      color: var(--color-neutral-300);
+      border-radius: var(--radius-md);
     }
-    #note {
+    #back:hover { background: var(--color-neutral-900); color: var(--ink); }
+    #level-mode { padding: 5px 10px; margin: 0 4px; }
+    /* what each frame costs, for the experiment's sake */
+    #fps {
       position: absolute;
-      right: 14px;
+      right: 12px;
       top: calc(12px + env(safe-area-inset-top, 0px));
       z-index: 6;
-      max-width: 240px;
-      font-size: 0.72rem;
-      line-height: 1.5;
-      color: #16324c;
-      background: rgba(255, 255, 255, 0.82);
-      border-radius: 10px;
-      padding: 8px 11px;
+      max-width: 38vw;
+      font: 500 0.64rem var(--font-mono);
+      color: var(--ink-faint);
+      background: var(--panel-bg);
       box-shadow: var(--shadow-sm);
+      border-radius: 8px;
+      padding: 5px 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    @media (max-width: 640px) { #note { display: none; } }
+    @media (max-width: 640px) { #fps { display: none; } }
+
   </style>
 </head>
 <body>
@@ -86,26 +66,75 @@
     <canvas id="globe"></canvas>
     <canvas id="pick"></canvas>
 
-    <a id="back" href="index.html">‹ back to the game</a>
+    <div id="fps"></div>
 
-    <p id="note">
-      Experiment, not a mode yet: this draws the real borders as a globe and
-      shows what each frame costs. Drag to turn it, scroll or pinch to zoom,
-      click a country to name it. Nothing here is scored.
-    </p>
-
-    <div id="hud" hidden>
-      <div id="readout">loading the map…</div>
-      <div id="fps"></div>
-      <div class="hud-row">
-        <label><input type="checkbox" id="detail"> fine borders (normally automatic, on settle)</label>
-        <label><input type="checkbox" id="grid" checked> graticule</label>
-        <label><input type="checkbox" id="spin-toggle"> spin (a steady worst case for the frame counter)</label>
-      </div>
+    <div id="level-banner">
+      <button id="progress-wrap" title="Next challenge">
+        <svg class="ic" aria-hidden="true"><use href="icons/ph.svg#globe-hemisphere-west"/></svg><span id="level-title">The whole world</span><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-right"/></svg>
+      </button>
+      <button id="level-mode" title="Switch mode">Place</button>
+      <span class="hud-rule"></span>
+      <span id="progress-text">0 / 195</span>
+      <a id="back" href="index.html" title="Back to the flat map"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-left"/></svg>Flat map</a>
     </div>
+
+    <!-- the minimap: six zones, one per jump key (globe-play.js) -->
+    <nav id="jump-bar" aria-label="Jump around the globe">
+      <div id="mini">
+        <svg id="mini-map" viewBox="0 0 1010 666" aria-hidden="true"><path id="mini-terr"/><path id="mini-land"/></svg>
+        <button data-key="1" data-area="N. America" data-pocket="Central America" style="left:0%;top:0%;width:38.61%;height:66.82%"><kbd>1</kbd><span class="jump-to">N. America</span></button>
+        <button data-key="q" data-area="S. America" data-pocket="Caribbean" style="left:14.85%;top:66.82%;width:23.76%;height:33.18%"><kbd>Q</kbd><span class="jump-to">S. America</span></button>
+        <button data-key="2" data-area="Europe" data-pocket="Micro-states" style="left:38.61%;top:15.02%;width:18.32%;height:36.79%"><kbd>2</kbd><span class="jump-to">Europe</span></button>
+        <button data-key="w" data-area="Africa" data-pocket="West coast" style="left:38.61%;top:51.8%;width:24.75%;height:48.2%"><kbd>W</kbd><span class="jump-to">Africa</span></button>
+        <button data-key="3" data-area="Asia" data-pocket="Middle East" style="left:56.93%;top:15.02%;width:43.07%;height:54.35%"><kbd>3</kbd><span class="jump-to">Asia</span></button>
+        <button data-key="e" data-area="South Asia" data-pocket="Pacific isles" style="left:63.37%;top:69.37%;width:36.63%;height:30.63%"><kbd>E</kbd><span class="jump-to">South Asia</span></button>
+      </div>
+    </nav>
+
+    <section id="card" class="dock" hidden>
+      <div class="dock-above"><p id="feedback" role="status"></p></div>
+      <div id="card-question">
+        <form id="guess-form" autocomplete="off">
+          <input id="guess-input" type="text" autocomplete="off" autocapitalize="words"
+                 spellcheck="false" placeholder="Name the highlighted nation, then Enter" aria-label="Nation name guess">
+          <span id="card-actions">
+            <button type="button" id="reveal-btn" title="Reveal" aria-label="Reveal"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#eye"/></svg></button>
+          </span>
+          <button type="submit" id="guess-btn" title="Guess (Enter)" aria-label="Guess"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#arrow-right"/></svg></button>
+        </form>
+      </div>
+      <div id="card-answer" hidden>
+        <h2 id="answer-name"></h2>
+        <p id="answer-result"></p>
+      </div>
+      <button id="card-close" title="Close (Esc)" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#x"/></svg></button>
+    </section>
+
+    <section id="word-bank" class="dock" hidden>
+      <div id="bank-above" class="dock-above">
+        <div id="bank-chips"></div>
+        <p id="bank-hint"></p>
+      </div>
+      <div id="bank-target">
+        <span id="bank-flag"></span>
+        <strong id="bank-name"></strong>
+        <span id="bank-strikes" aria-label="Wrong tries"></span>
+        <span class="bank-buttons">
+          <button id="bank-skip" title="Skip for now (Space)" aria-label="Skip"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#skip-forward"/></svg><span class="lbl">Skip <kbd>Space</kbd></span></button>
+          <button id="bank-show" title="Show me where it is (counts as a miss)" aria-label="Show me"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#eye"/></svg><span class="lbl">Show me</span></button>
+          <button id="bank-collapse" title="Show / hide the list" aria-label="Toggle list"><svg class="ic" aria-hidden="true"><use href="icons/ph.svg#caret-up"/></svg></button>
+        </span>
+      </div>
+    </section>
   </div>
 
   <script src="js/countries.js"></script>
+  <script src="js/targets.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/names.js"></script>
+  <script src="js/minimap.js"></script>
+  <script src="js/islands.js"></script>
   <script src="js/globe.js"></script>
+  <script src="js/globe-play.js"></script>
 </body>
 </html>

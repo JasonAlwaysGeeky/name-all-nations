@@ -25,7 +25,8 @@ test('every file the service worker precaches exists', () => {
 
 test('index.html only references files that exist', () => {
   const html = read('index.html');
-  const refs = [...html.matchAll(/(?:src|href)="(?!https?:|data:|#)([^"]+)"/g)].map(m => m[1]);
+  // an icon is a file plus the symbol inside it: icons/ph.svg#pause
+  const refs = [...html.matchAll(/(?:src|href)="(?!https?:|data:|#)([^"]+)"/g)].map(m => m[1].split('#')[0]);
   expect(refs.length).toBeGreaterThan(3);
   for (const f of refs) expect(exists(f), f).toBe(true);
 });

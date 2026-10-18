@@ -21,10 +21,17 @@ const CACHE = 'nan-v1';
 const CORE = [
   './',
   './index.html',
+  './css/tokens.css',
   './css/style.css',
+  './fonts/inter-latin.woff2',
+  './icons/ph.svg',
   './js/app.js',
   './js/countries.js',
   './js/targets.js',
+  './js/views.js',
+  './js/names.js',
+  './js/minimap.js',
+  './js/islands.js',
   './map/world.svg',
   './map/world-lo.json',
   './manifest.webmanifest',
@@ -33,7 +40,9 @@ const CORE = [
   './icons/icon-maskable-512.png',
 ];
 
-const IMMUTABLE = /\/map\/[^/]+\.(svg|json)$/;
+// The flags too: 195 files that change when a country changes its flag,
+// which is to say when CACHE is bumped for it.
+const IMMUTABLE = /\/(map|flags)\/[^/]+\.(svg|json)$/;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

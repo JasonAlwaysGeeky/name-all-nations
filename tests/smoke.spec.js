@@ -13,10 +13,9 @@ function watchErrors(page, errors) {
 }
 
 async function boot(page) {
-  await page.goto('/');
-  await page.locator('#hello-close').click();
+  await page.goto('/?play=name');
   // The map SVG is fetched at runtime; the hit layer is built after it lands.
-  await expect(page.locator('#map svg')).toBeAttached();
+  await expect(page.locator('#map svg.world')).toBeAttached();
   await expect.poll(() => page.locator('#hit-layer path').count()).toBeGreaterThan(150);
 }
 
@@ -69,7 +68,7 @@ test('name mode: click a country, type its name, score it', async ({ page }) => 
   await page.locator('#guess-input').fill('brasil');
   await page.locator('#guess-input').press('Enter');
 
-  await expect(page.locator('#answer-result')).toHaveText('✓ Correct!');
+  await expect(page.locator('#idle-bar .dock-note')).toContainText('✓');
   await expect.poll(() => page.locator('#progress-text').textContent()).toBe('1 / 195');
   expect(errors).toEqual([]);
 });
@@ -82,7 +81,7 @@ test('aliases count as answers', async ({ page }) => {
   await page.locator('#guess-input').fill('drc');
   await page.locator('#guess-input').press('Enter');
 
-  await expect(page.locator('#answer-result')).toHaveText('✓ Correct!');
+  await expect(page.locator('#idle-bar .dock-note')).toContainText('✓');
 });
 
 test('wrong guess is rejected, reveal shows the answer without scoring', async ({ page }) => {
