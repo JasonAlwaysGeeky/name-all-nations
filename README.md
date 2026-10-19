@@ -1,6 +1,6 @@
 # 🌍 Name All Nations
 
-**Play it: https://jasonalwaysgeeky.github.io/name-all-nations/**
+**Play it: https://moffatjason.github.io/name-all-nations/**
 — on a phone, open that once and use Chrome's ⋮ → *Add to Home screen*; it
 installs full-screen, with no address bar and no system bars.
 
