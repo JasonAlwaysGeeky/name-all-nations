@@ -2,8 +2,10 @@
 
 **Live: https://moffatjason.github.io/name-all-nations/** (GitHub Pages,
 public repo, served from `main` — pushing `main` redeploys). This is the
-build to test on a real device; there is an old published Artifact floating
-around that is stale and unmaintained.
+build to test on a real device. The pinned "Name All Nations" Artifact
+(https://claude.ai/artifact/FZrCwiFHer7W8ecBiHrwKd) is a copy of the repo
+kept current as the side-panel dev build: republished after each change.
+It can't use the microphone or show safe-area insets; Pages can.
 
 Repo: https://github.com/moffatjason/name-all-nations — work lands via
 `jmoffat/` branches and PRs, not straight to `main`.
